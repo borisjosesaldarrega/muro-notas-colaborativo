@@ -151,7 +151,7 @@ function createMuroServer() {
         role: users.length === 0 ? 'superadmin' : 'usuario',
         avatar: '',
         createdAt: Date.now(),
-        settings: { theme: 'system', confirmDelete: true, compactNotes: false, notifications: true }
+        settings: { theme: 'light', confirmDelete: true, compactNotes: false, notifications: true }
       };
       users.push(user);
       const general = walls[0];

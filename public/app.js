@@ -20,7 +20,7 @@ function toast(message, force = false) {
   const item = $('#toast'); item.textContent = message; item.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => item.classList.remove('show'), 3000);
 }
 function formatDate(value) { return new Intl.DateTimeFormat('es-EC', { dateStyle: 'long' }).format(new Date(value)); }
-function applyTheme(theme) { const safe = ['light', 'dark', 'system'].includes(theme) ? theme : 'system'; document.documentElement.dataset.theme = safe; localStorage.setItem('muroTheme', safe); }
+function applyTheme(theme) { const safe = ['light', 'dark', 'system'].includes(theme) ? theme : 'light'; document.documentElement.dataset.theme = safe; localStorage.setItem('muroTheme', safe); }
 
 function showAuth(view = 'login') {
   $('#authView').classList.remove('hidden'); $('#appView').classList.add('hidden');
@@ -39,7 +39,7 @@ function renderAvatar(target, user = state.user) {
   else { target.classList.remove('has-image'); target.textContent = initials(user?.name); }
 }
 function hydrateUser(user, token = state.token) {
-  state.user = user; state.token = token; sessionStorage.setItem('muroToken', token); applyTheme(user.settings?.theme || 'system');
+  state.user = user; state.token = token; sessionStorage.setItem('muroToken', token); applyTheme(user.settings?.theme || 'light');
   renderAvatar($('#avatarImage')); renderAvatar($('#menuAvatar')); $('#menuName').textContent = user.name; $('#menuEmail').textContent = user.email;
   $('#menuAdmin').classList.toggle('hidden', user.role !== 'superadmin');
   $('#authView').classList.add('hidden'); $('#appView').classList.remove('hidden'); showDashboard();
@@ -173,4 +173,4 @@ socket.on('disconnect', () => setConnection('Reconectando…', false)); socket.i
 socket.on('users:count', (count) => { state.online = Number(count) || 0; $('#onlineCount').textContent = state.online; $('#onlineLabel').textContent = state.online === 1 ? 'conectado' : 'conectados'; });
 socket.on('note:created', ({ wallId, note }) => { if (wallId === state.currentWall?.id) renderNote(note); }); socket.on('note:updated', ({ wallId, note }) => { if (wallId === state.currentWall?.id) renderNote(note); }); socket.on('note:moved', ({ wallId, id, x, y, updatedAt }) => { if (wallId !== state.currentWall?.id) return; const note = state.notes.get(id); if (note) renderNote({ ...note, x, y, updatedAt }); }); socket.on('note:deleted', ({ wallId, id }) => { if (wallId !== state.currentWall?.id) return; state.notes.delete(id); document.querySelector(`[data-note-id="${CSS.escape(id)}"]`)?.remove(); }); socket.on('board:cleared', ({ wallId, removed }) => { if (wallId !== state.currentWall?.id) return; state.notes.clear(); board.replaceChildren(); toast(`Muro limpiado: ${removed} notas eliminadas.`); });
 socket.on('profile:changed', (user) => { if (user.id === state.user?.id) hydrateUserElements({ ...state.user, ...user }); state.members = state.members.map((member) => member.id === user.id ? { ...member, ...user } : member); }); socket.on('role:changed', (user) => { if (user.id === state.user?.id) { hydrateUserElements({ ...state.user, ...user }); if (user.role !== 'superadmin' && !$('#adminScreen').classList.contains('hidden')) showDashboard(); } }); socket.on('admin:changed', () => { if (!$('#adminScreen').classList.contains('hidden')) loadAdmin(); }); socket.on('wall:deleted', (id) => { if (state.currentWall?.id === id) { toast('Este muro fue eliminado.', true); showDashboard(); } });
-window.addEventListener('resize', () => state.notes.forEach(renderNote)); applyTheme(localStorage.getItem('muroTheme') || 'system'); if (!state.token) showAuth('login'); else if (socket.connected) restoreSession();
+window.addEventListener('resize', () => state.notes.forEach(renderNote)); applyTheme(localStorage.getItem('muroTheme') || 'light'); if (!state.token) showAuth('login'); else if (socket.connected) restoreSession();
