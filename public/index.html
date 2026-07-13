@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#6d4aff">
+  <title>Muro Colaborativo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main id="authView" class="auth-shell">
+    <section class="auth-brand">
+      <div class="brand-mark">M</div>
+      <div>
+        <p class="eyebrow">Ideas que conectan</p>
+        <h1>Tu equipo, en un mismo muro.</h1>
+        <p>Crea, organiza y comparte notas adhesivas en tiempo real desde cualquier dispositivo.</p>
+      </div>
+      <div class="demo-notes" aria-hidden="true">
+        <span>Investigar</span><span>Diseñar</span><span>Compartir</span>
+      </div>
+    </section>
+
+    <section class="auth-panel">
+      <form id="loginForm" class="auth-card">
+        <div class="mobile-logo"><span class="brand-mark">M</span> Muro</div>
+        <p class="eyebrow">Bienvenido de nuevo</p>
+        <h2>Inicia sesión</h2>
+        <p class="muted">Entra y continúa construyendo grandes ideas.</p>
+        <label>Correo electrónico<input id="loginEmail" type="email" placeholder="nombre@correo.com" required></label>
+        <label>Contraseña<input id="loginPassword" type="password" minlength="4" placeholder="••••••••" required></label>
+        <button class="link-button" type="button" data-view="recover">¿Olvidaste tu contraseña?</button>
+        <button class="primary-button" type="submit">Ingresar al muro</button>
+        <p class="switch-text">¿No tienes cuenta? <button type="button" data-view="register">Regístrate</button></p>
+      </form>
+
+      <form id="registerForm" class="auth-card hidden">
+        <p class="eyebrow">Crea tu espacio</p><h2>Regístrate</h2>
+        <label>Nombre<input id="registerName" maxlength="40" required></label>
+        <label>Correo electrónico<input id="registerEmail" type="email" required></label>
+        <label>Contraseña<input id="registerPassword" type="password" minlength="4" required></label>
+        <button class="primary-button" type="submit">Crear cuenta</button>
+        <p class="switch-text">¿Ya tienes cuenta? <button type="button" data-view="login">Inicia sesión</button></p>
+      </form>
+
+      <form id="recoverForm" class="auth-card hidden">
+        <p class="eyebrow">Recupera tu acceso</p><h2>Restablecer contraseña</h2>
+        <p class="muted">La demostración confirmará localmente el envío del enlace.</p>
+        <label>Correo electrónico<input id="recoverEmail" type="email" required></label>
+        <button class="primary-button" type="submit">Enviar enlace</button>
+        <p class="switch-text"><button type="button" data-view="login">Volver al inicio</button></p>
+      </form>
+    </section>
+  </main>
+
+  <main id="appView" class="app-shell hidden">
+    <header class="topbar">
+      <a class="app-brand" href="#"><span class="brand-mark">M</span><span>Muro</span></a>
+      <div class="board-name"><small>Espacio de trabajo</small><strong>Muro de ideas</strong></div>
+      <div class="top-actions">
+        <span class="presence"><i></i><b id="onlineCount">1</b> conectados</span>
+        <button id="adminButton" class="icon-button" title="Administración">⚙</button>
+        <button id="profileButton" class="avatar" title="Perfil">DZ</button>
+      </div>
+    </header>
+    <section class="toolbar">
+      <button id="newNoteButton" class="primary-button compact">＋ Nueva nota</button>
+      <div class="color-filter" aria-label="Filtrar por color">
+        <button class="swatch active" data-filter="all" title="Todos"></button>
+        <button class="swatch yellow" data-filter="amarillo"></button><button class="swatch pink" data-filter="rosa"></button>
+        <button class="swatch blue" data-filter="azul"></button><button class="swatch green" data-filter="verde"></button>
+      </div>
+      <span id="connectionStatus" class="status">Conectando…</span>
+    </section>
+    <section id="board" class="board" aria-label="Muro colaborativo"></section>
+  </main>
+
+  <dialog id="noteDialog">
+    <form id="noteForm" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow">Nueva idea</p><h3>Crear una nota</h3></div><button class="close-button" value="cancel">×</button></div>
+      <label>Contenido<textarea id="noteText" maxlength="280" rows="5" placeholder="Escribe tu idea…" required></textarea></label>
+      <fieldset><legend>Color</legend><div class="color-options">
+        <label><input type="radio" name="color" value="amarillo" checked><span class="yellow"></span></label>
+        <label><input type="radio" name="color" value="rosa"><span class="pink"></span></label>
+        <label><input type="radio" name="color" value="azul"><span class="blue"></span></label>
+        <label><input type="radio" name="color" value="verde"><span class="green"></span></label>
+        <label><input type="radio" name="color" value="lila"><span class="purple"></span></label>
+      </div></fieldset>
+      <div class="dialog-actions"><button value="cancel" class="secondary-button">Cancelar</button><button id="saveNote" type="submit" class="primary-button">Publicar nota</button></div>
+    </form>
+  </dialog>
+
+  <aside id="sidePanel" class="side-panel" aria-hidden="true">
+    <button id="closePanel" class="close-button">×</button>
+    <div id="profilePanel"><p class="eyebrow">Tu cuenta</p><h2 id="profileName">Usuario</h2><p id="profileEmail" class="muted"></p><button id="logoutButton" class="danger-button">Cerrar sesión</button></div>
+    <div id="adminPanel" class="hidden"><p class="eyebrow">Superadministrador</p><h2>Resumen del muro</h2><div class="stats"><article><strong id="notesStat">0</strong><span>Notas</span></article><article><strong id="usersStat">1</strong><span>Conectados</span></article></div><button id="clearBoardButton" class="danger-button">Eliminar todas mis notas</button></div>
+  </aside>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
