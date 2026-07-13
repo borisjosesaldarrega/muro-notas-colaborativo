@@ -25,32 +25,81 @@ async function main() {
 
   let schemaReady = false;
   if (result.backendAdmin) {
-    const { error } = await services.adminClient.from('profiles').select('id').limit(1);
+    const { error } = await services.adminClient.from('muro_profiles').select('id').limit(1);
     schemaReady = !error;
     result.rls = schemaReady ? 'ready_for_authenticated_test' : 'migration_required';
   }
 
   if (process.argv.includes('--auth') && result.backendAdmin) {
     const suffix = crypto.randomUUID();
-    const email = `codex-verification-${suffix}@example.invalid`;
     const password = `Muro-${suffix}-9a!`;
-    let userId = '';
+    const temporaryUsers = [];
     try {
-      const { data: created, error: createError } = await services.adminClient.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name: 'Verificación temporal' } });
-      if (createError) throw createError;
-      userId = created.user.id;
-      const { data: login, error: loginError } = await services.publicClient.auth.signInWithPassword({ email, password });
-      if (loginError || !login.session?.access_token) throw loginError || new Error('Supabase no devolvió una sesión.');
-      const { data: verified, error: verifyError } = await services.createUserClient(login.session.access_token).auth.getUser(login.session.access_token);
-      if (verifyError || verified.user?.id !== userId) throw verifyError || new Error('El usuario autenticado no coincide.');
+      const sessions = [];
+      for (const label of ['owner', 'outsider']) {
+        const email = `codex-${label}-${suffix}@example.invalid`;
+        const { data: created, error: createError } = await services.adminClient.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { name: `Temporal ${label}` }
+        });
+        if (createError) throw createError;
+        temporaryUsers.push(created.user.id);
+        const loginClient = services.createUserClient();
+        const { data: login, error: loginError } = await loginClient.auth.signInWithPassword({ email, password });
+        if (loginError || !login.session?.access_token) throw loginError || new Error('Supabase no devolvio una sesion.');
+        const { data: verified, error: verifyError } = await services.createUserClient(login.session.access_token).auth.getUser(login.session.access_token);
+        if (verifyError || verified.user?.id !== created.user.id) throw verifyError || new Error('El usuario autenticado no coincide.');
+        sessions.push({ id: created.user.id, token: login.session.access_token });
+      }
       result.authentication = 'passed';
+
       if (schemaReady) {
-        const userClient = services.createUserClient(login.session.access_token);
-        const { data: ownRows, error: ownError } = await userClient.from('profiles').select('id').eq('id', userId);
-        result.rls = !ownError && ownRows?.length === 1 ? 'passed' : 'failed';
+        const [owner, outsider] = sessions;
+        const ownerClient = services.createUserClient(owner.token);
+        const outsiderClient = services.createUserClient(outsider.token);
+        const wallId = crypto.randomUUID();
+        const noteId = crypto.randomUUID();
+        const { error: wallError } = await ownerClient.from('muro_walls').insert({ id: wallId, name: 'RLS temporal', owner_id: owner.id });
+        if (wallError) throw wallError;
+        const { error: memberError } = await ownerClient.from('muro_wall_members').insert({ wall_id: wallId, user_id: owner.id, role: 'propietario' });
+        if (memberError) throw memberError;
+        const { error: noteError } = await ownerClient.from('muro_notes').insert({
+          id: noteId,
+          wall_id: wallId,
+          text: 'Nota privada temporal',
+          color: 'amarillo',
+          x: 20,
+          y: 20,
+          author_id: owner.id,
+          author_name: 'Temporal owner'
+        });
+        if (noteError) throw noteError;
+
+        const { data: ownerRows, error: ownerReadError } = await ownerClient.from('muro_notes').select('id').eq('id', noteId);
+        const { data: hiddenRows, error: outsiderReadError } = await outsiderClient.from('muro_notes').select('id').eq('id', noteId);
+        const { error: outsiderInsertError } = await outsiderClient.from('muro_notes').insert({
+          wall_id: wallId,
+          text: 'Intento bloqueado',
+          color: 'rosa',
+          x: 30,
+          y: 30,
+          author_id: outsider.id,
+          author_name: 'Temporal outsider'
+        });
+        result.rls = !ownerReadError
+          && ownerRows?.length === 1
+          && !outsiderReadError
+          && hiddenRows?.length === 0
+          && Boolean(outsiderInsertError)
+          ? 'passed'
+          : 'failed';
       }
     } finally {
-      if (userId) await services.adminClient.auth.admin.deleteUser(userId);
+      for (const userId of temporaryUsers.reverse()) {
+        await services.adminClient.auth.admin.deleteUser(userId);
+      }
     }
   }
 

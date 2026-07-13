@@ -46,7 +46,7 @@ Abre [http://localhost:3000](http://localhost:3000). El endpoint [http://localho
 
 ## Preparar Supabase
 
-La migración versionada está en `supabase/migrations/20260713200000_create_muro_schema.sql`. Crea `profiles`, `user_settings`, `walls`, `wall_members` y `notes`, junto con índices, disparadores y políticas RLS.
+La migración versionada está en `supabase/migrations/20260713200000_create_muro_schema.sql`. Crea `muro_profiles`, `muro_user_settings`, `muro_walls`, `muro_wall_members` y `muro_notes`, junto con índices, disparadores y políticas RLS. El prefijo `muro_` evita colisiones con otros esquemas.
 
 ```bash
 npx supabase login
@@ -66,7 +66,7 @@ Después de aplicar la migración, reinicia Node.js. El servidor cargará los da
 - Notas: integrantes pueden leer y solo propietarios/editores pueden escribir.
 - Roles globales y operaciones administrativas usan el cliente secreto exclusivamente en el backend.
 - Las operaciones normales usan una sesión de usuario con clave publicable, por lo que pasan por RLS.
-- El rol no se obtiene de `user_metadata`; se guarda en `profiles` y el servidor lo verifica.
+- El rol no se obtiene de `user_metadata`; se guarda en `muro_profiles` y el servidor lo verifica.
 
 ## Verificación
 
