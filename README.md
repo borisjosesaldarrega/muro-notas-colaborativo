@@ -1,54 +1,63 @@
 # Muro de Notas Adhesivas Colaborativo
 
-Aplicación web colaborativa similar a un Padlet o Jamboard simplificado. Permite crear, editar, mover, filtrar y eliminar notas adhesivas; los cambios se sincronizan en tiempo real para todas las personas conectadas.
+Aplicación web inspirada en el diseño de Figma de Muro: permite organizar varios muros, invitar personas con permisos distintos y colaborar con notas adhesivas sincronizadas en tiempo real.
 
 ## Funciones principales
 
-- Registro, inicio de sesión, recuperación de contraseña y cierre de sesión simulados.
-- Primer usuario registrado en cada navegador con rol de superadministrador.
-- Notas de hasta 280 caracteres en amarillo, rosa, azul, verde o lila.
-- Edición y movimiento con mouse, pantalla táctil o lápiz.
-- Filtros por color, nota inicial de bienvenida y autor visible.
-- Sincronización con Socket.io y contador de personas conectadas.
-- Panel exclusivo de superadministrador con estadísticas y limpieza global del muro.
-- Confirmaciones destructivas, notificaciones, estado de conexión y controles accesibles.
-- Diseño morado, adaptable a computadoras y teléfonos.
+- Registro, inicio de sesión, restauración de sesión, recuperación simulada y cambio de contraseña.
+- La primera cuenta registrada recibe el rol `superadmin`; las demás son usuarios normales.
+- Panel “Mis muros” para crear, abrir, editar y eliminar espacios independientes.
+- Miembros por muro con permisos `propietario`, `editor` y `lector`.
+- Notas de hasta 280 caracteres, movimiento táctil o con mouse y cinco colores exactos.
+- Perfil con nombre y avatar, y configuración persistida en el servidor.
+- Temas claro, oscuro y automático según el sistema, sin destello inicial de tema.
+- Menú de avatar accesible, desplegable en escritorio y tipo *bottom sheet* en móvil.
+- Administración de usuarios, roles, muros, miembros, estadísticas y vaciado de notas.
+- Roles y acciones privilegiadas validados en el servidor; el navegador nunca decide si alguien es administrador.
 
 ## Tecnologías
 
-- HTML5, CSS3 y JavaScript sin framework en el frontend.
-- Node.js, Express y Socket.io en el backend.
-- `node:test` y `socket.io-client` para la prueba de integración.
-
-## Requisitos
-
-- Node.js 18 o superior.
-- npm (incluido con Node.js).
+- HTML5, CSS3 y JavaScript sin framework.
+- Node.js, Express y Socket.io.
+- `node:test` y `socket.io-client` para pruebas de integración.
 
 ## Instalación y ejecución
+
+Requiere Node.js 18 o superior.
 
 ```bash
 npm install
 npm start
 ```
 
-Abre [http://localhost:3000](http://localhost:3000). El endpoint de estado está en [http://localhost:3000/api/health](http://localhost:3000/api/health).
+Abre [http://localhost:3000](http://localhost:3000). El estado del servidor está disponible en [http://localhost:3000/api/health](http://localhost:3000/api/health).
 
-Para validar sintaxis y ejecutar las pruebas automatizadas:
+Para comprobar sintaxis y ejecutar todas las pruebas:
 
 ```bash
 npm run check
 ```
 
-## Probar la colaboración en tiempo real
+## Probar la colaboración
 
-1. Inicia el servidor con `npm start`.
-2. Abre `http://localhost:3000` en dos ventanas. Para simular cuentas locales independientes, usa dos perfiles del navegador o dos dispositivos.
-3. Registra una cuenta e inicia sesión en cada ventana.
-4. Crea, edita, mueve o elimina una nota en una ventana.
-5. Confirma que la otra ventana recibe el cambio de inmediato y que el contador muestra ambas conexiones.
+1. Inicia el servidor y abre `http://localhost:3000` en dos ventanas o dispositivos.
+2. Registra una cuenta distinta en cada uno. La primera será superadministradora.
+3. Desde una cuenta propietaria, crea un muro e invita el correo registrado de la otra persona.
+4. Asigna permiso de edición o lectura y abre el mismo muro en ambas ventanas.
+5. Crea, edita, mueve o elimina una nota y confirma que el cambio aparece en tiempo real.
 
-En otro dispositivo de la misma red se debe usar `http://IP_DEL_EQUIPO:3000` y permitir el puerto 3000 en el cortafuegos local.
+Para probar desde otro dispositivo de la misma red, usa `http://IP_DEL_EQUIPO:3000` y permite el puerto 3000 en el cortafuegos local.
+
+## Persistencia y alcance de la demostración
+
+Usuarios, contraseñas, sesiones, ajustes, muros, permisos y notas viven en memoria del servidor. Esto permite verificar autorizaciones desde Socket.io sin confiar en `localStorage`, pero todos los datos se reinician al detener el proceso de Node.js.
+
+El navegador solo conserva:
+
+- El token opaco de sesión en `sessionStorage`.
+- La preferencia de tema en `localStorage` para aplicarla antes de pintar la página y evitar un destello de color. La fuente de verdad vuelve a ser la configuración de usuario enviada por el servidor.
+
+La interfaz inserta contenido mediante APIs seguras del DOM y el servidor limita textos, imágenes, colores y coordenadas. Aun así, esta es una demostración académica: las contraseñas permanecen en memoria sin hash y debe añadirse una base de datos, hash seguro, HTTPS, protección de fuerza bruta y recuperación real antes de usarla en producción.
 
 ## Estructura
 
@@ -60,31 +69,15 @@ En otro dispositivo de la misma red se debe usar `http://IP_DEL_EQUIPO:3000` y p
 │   └── styles.css
 ├── test/
 │   └── server.test.js
-├── .gitignore
-├── package-lock.json
 ├── package.json
+├── package-lock.json
 ├── README.md
 └── server.js
 ```
 
-## Persistencia y seguridad de esta demostración
+## Limitaciones actuales
 
-Las notas viven en un arreglo en memoria del servidor: todas las personas conectadas comparten el mismo muro, pero el contenido se reinicia al reiniciar el proceso de Node.js. Esto es intencional para la presentación académica.
-
-Las cuentas, contraseñas y roles se almacenan localmente en `localStorage`; la sesión de la pestaña se conserva en `sessionStorage`. Esta autenticación es simulada y **no es apta para producción**. Aunque el servidor exige el valor `superadmin` para limpiar el muro, ese rol proviene del navegador y el control es únicamente demostrativo, no una barrera de seguridad real.
-
-El servidor limita texto, autor, colores y coordenadas. La interfaz inserta el contenido como texto mediante propiedades seguras del DOM, sin interpretarlo como HTML.
-
-## Limitaciones
-
-- No hay base de datos ni persistencia después de reiniciar el servidor.
-- No existe autenticación criptográfica, control de sesiones en el servidor ni autorización verificable.
-- Hay un único muro compartido; todavía no hay espacios separados, historial ni resolución avanzada de conflictos simultáneos.
-- Las cuentas creadas en un navegador no aparecen automáticamente en otro dispositivo.
-
-## Mejoras futuras
-
-- Persistencia en una base de datos y varios espacios de trabajo.
-- Autenticación real con contraseñas cifradas y permisos comprobados por el servidor.
-- Historial de versiones, cursores colaborativos, búsqueda, etiquetas y exportación.
-- Pruebas end-to-end adicionales y despliegue con HTTPS.
+- No hay base de datos: reiniciar el servidor borra todo.
+- La recuperación de contraseña solo simula una respuesta segura y uniforme.
+- No hay historial de versiones, cursores remotos ni resolución avanzada de ediciones simultáneas.
+- La representación de las nuevas pantallas en Figma queda pendiente si la cuenta alcanza el límite de llamadas del complemento; el código sí contiene todos los estados descritos.
