@@ -6,16 +6,28 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "check": "node --check server.js && node --check public/app.js && node --test"
+    "build": "node scripts/build.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint server.js lib public scripts test",
+    "verify:supabase": "node scripts/verify-supabase.js",
+    "test": "node --test",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.3",
+    "dotenv": "^17.4.2",
     "express": "^4.21.2",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "socket.io-client": "^4.8.1"
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.1.1",
+    "eslint": "^10.7.0",
+    "socket.io-client": "^4.8.1",
+    "supabase": "^2.109.1",
+    "typescript": "^7.0.2"
   }
 }

@@ -18,13 +18,13 @@
   <main id="authView" class="auth-shell">
     <section class="auth-brand" aria-label="Presentación de Muro">
       <div class="brand-mark">M</div>
-      <div><p class="eyebrow inverse">Ideas que conectan</p><h1>Tu equipo, en un mismo muro.</h1><p>Crea, organiza y comparte notas adhesivas en tiempo real desde cualquier dispositivo.</p></div>
-      <div class="demo-notes" aria-hidden="true"><span>Investigar</span><span>Diseñar</span><span>Compartir</span></div>
+      <div><p class="eyebrow inverse">Ideas que conectan</p><h1>Ideas que se pegan,<br>equipos que conectan.</h1><p>Tu espacio colaborativo, sencillo y en tiempo real.</p></div>
+      <div class="demo-notes" aria-hidden="true"><span>Las mejores ideas empiezan pequeñas.</span><span>Todos pueden escribir, mover y construir.</span><span>Compartir</span></div>
     </section>
     <section class="auth-panel">
       <form id="loginForm" class="auth-card auth-form" data-auth-form="login">
         <div class="mobile-logo"><span class="brand-mark">M</span> Muro</div>
-        <p class="eyebrow">Bienvenido de nuevo</p><h2>Inicia sesión</h2><p class="muted">Entra y continúa construyendo grandes ideas.</p>
+        <p class="eyebrow">Bienvenido de nuevo</p><h2>¡Hola de nuevo! 👋</h2><p class="muted">Entra para ver qué está pensando tu equipo.</p>
         <label for="loginEmail">Correo electrónico</label><input id="loginEmail" type="email" autocomplete="email" placeholder="nombre@correo.com" required>
         <label for="loginPassword">Contraseña</label><input id="loginPassword" type="password" autocomplete="current-password" minlength="4" required>
         <button class="link-button" type="button" data-auth-view="recover">¿Olvidaste tu contraseña?</button>
@@ -32,7 +32,7 @@
         <p class="switch-text">¿No tienes cuenta? <button type="button" data-auth-view="register">Regístrate</button></p>
       </form>
       <form id="registerForm" class="auth-card auth-form hidden" data-auth-form="register">
-        <p class="eyebrow">Crea tu espacio</p><h2>Regístrate</h2><p class="muted">La primera cuenta será superadministradora.</p>
+        <p class="eyebrow">Crea tu espacio</p><h2>Crea tu cuenta ✦</h2><p class="muted">Únete al muro y empieza a compartir ideas. La primera cuenta será superadministradora.</p>
         <label for="registerName">Nombre visible</label><input id="registerName" autocomplete="name" maxlength="40" required>
         <label for="registerEmail">Correo electrónico</label><input id="registerEmail" type="email" autocomplete="email" required>
         <label for="registerPassword">Contraseña</label><input id="registerPassword" type="password" autocomplete="new-password" minlength="4" required>
@@ -40,7 +40,7 @@
         <p class="switch-text">¿Ya tienes cuenta? <button type="button" data-auth-view="login">Inicia sesión</button></p>
       </form>
       <form id="recoverForm" class="auth-card auth-form hidden" data-auth-form="recover">
-        <p class="eyebrow">Recupera tu acceso</p><h2>Restablecer contraseña</h2><p class="muted">Esta demostración simula el envío sin exponer si la cuenta existe.</p>
+        <p class="eyebrow">Recupera tu acceso</p><h2>¿Olvidaste tu contraseña?</h2><p class="muted">Te enviaremos un enlace seguro para recuperar el acceso.</p>
         <label for="recoverEmail">Correo electrónico</label><input id="recoverEmail" type="email" autocomplete="email" required>
         <button class="primary-button full" type="submit">Enviar enlace</button>
         <p class="switch-text"><button type="button" data-auth-view="login">Volver al inicio</button></p>
@@ -76,6 +76,7 @@
 
     <section id="boardView" class="board-view hidden">
       <section class="toolbar" aria-label="Herramientas del muro">
+        <div class="board-copy"><h1>Tormenta de ideas</h1><p>Arrastra las notas, escribe y construyamos algo genial.</p></div>
         <button id="backToWalls" class="secondary-button compact" type="button">← Mis muros</button>
         <button id="newNoteButton" class="primary-button compact" type="button">＋ Nueva nota</button>
         <div class="color-filter" role="group" aria-label="Filtrar por color">
@@ -125,6 +126,9 @@
   <dialog id="confirmDialog" aria-labelledby="confirmTitle"><form method="dialog" class="confirm-card"><div class="warning-icon">!</div><h2 id="confirmTitle">Confirmar acción</h2><p id="confirmMessage"></p><label id="confirmInputWrap" class="hidden" for="confirmInput">Confirmación</label><input id="confirmInput" class="hidden"><div class="dialog-actions"><button id="confirmCancel" class="secondary-button" value="cancel">Cancelar</button><button id="confirmAccept" class="danger-button" value="confirm">Confirmar</button></div></form></dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/socket.io/socket.io.js"></script><script src="/app.js"></script>
+  <script src="/vendor/supabase.js"></script>
+  <script src="/supabase-client.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>

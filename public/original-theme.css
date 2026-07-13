@@ -266,6 +266,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--border); box-sha
 /* Muro original con puntos, notas redondeadas y cinta. */
 .board-view { min-height: calc(100vh - 82px); padding: 22px 28px 16px; }
 .toolbar { margin-bottom: 18px; }
+.board-copy { margin-right: auto; }
+.board-copy h1 { margin: 0 0 5px; font-size: 28px; }
+.board-copy p { margin: 0; color: var(--muted); font-size: 12px; }
 .color-filter { border: 2px solid var(--border); background: var(--surface); }
 .board {
   min-height: 530px;

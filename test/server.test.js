@@ -25,7 +25,7 @@ async function connect() {
 }
 
 before(async () => {
-  server = createMuroServer();
+  server = createMuroServer({ persistence: false, env: {} });
   await new Promise((resolve) => server.httpServer.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${server.httpServer.address().port}`;
 });
@@ -40,7 +40,11 @@ test('sirve la aplicación y un estado de salud', async () => {
   const page = await fetch(baseUrl).then((response) => response.text());
   const health = await fetch(`${baseUrl}/api/health`).then((response) => response.json());
   assert.match(page, /Muro/);
-  assert.deepEqual(health, { ok: true, notes: 1, walls: 1, users: 0 });
+  assert.equal(health.ok, true);
+  assert.equal(health.notes, 1);
+  assert.equal(health.walls, 1);
+  assert.equal(health.users, 0);
+  assert.equal(health.storage.mode, 'memory');
 });
 
 test('registra, restaura y valida cuentas y roles en el servidor', async () => {

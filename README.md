@@ -1,83 +1,97 @@
-# Muro de Notas Adhesivas Colaborativo
+# Muro colaborativo DZ
 
-Aplicación web inspirada en el diseño de Figma de Muro: permite organizar varios muros, invitar personas con permisos distintos y colaborar con notas adhesivas sincronizadas en tiempo real.
+Aplicación de notas adhesivas con el lenguaje visual original de Muro DZ y una arquitectura ampliada: cuentas, perfiles, varios muros, permisos, administración y sincronización en tiempo real con Socket.io.
 
-## Funciones principales
+## Funciones
 
-- Registro, inicio de sesión, restauración de sesión, recuperación simulada y cambio de contraseña.
-- La primera cuenta registrada recibe el rol `superadmin`; las demás son usuarios normales.
-- Panel “Mis muros” para crear, abrir, editar y eliminar espacios independientes.
-- Miembros por muro con permisos `propietario`, `editor` y `lector`.
-- Notas de hasta 280 caracteres, movimiento táctil o con mouse y cinco colores exactos.
-- Perfil con nombre y avatar, y configuración persistida en el servidor.
-- Temas claro, oscuro y automático según el sistema, sin destello inicial de tema.
-- Menú de avatar accesible, desplegable en escritorio y tipo *bottom sheet* en móvil.
-- Administración de usuarios, roles, muros, miembros, estadísticas y vaciado de notas.
-- Roles y acciones privilegiadas validados en el servidor; el navegador nunca decide si alguien es administrador.
+- Registro, inicio y restauración de sesión mediante Supabase Auth cuando el esquema está disponible.
+- Recuperación y cambio de contraseña.
+- Primera cuenta con rol `superadmin`, validado siempre en el backend.
+- Muros independientes con permisos `propietario`, `editor` y `lector`.
+- Notas sincronizadas, arrastrables y disponibles en cinco colores.
+- Perfil, avatar y preferencias de apariencia.
+- Panel administrativo para usuarios, roles, muros, miembros y limpieza de contenido.
+- Diseño original: papel crema con puntos, morado `#6658f5`, bordes azul tinta, cintas y post-its pastel.
 
-## Tecnologías
+## Requisitos
 
-- HTML5, CSS3 y JavaScript sin framework.
-- Node.js, Express y Socket.io.
-- `node:test` y `socket.io-client` para pruebas de integración.
+- Node.js 20 o superior.
+- npm.
+- Proyecto de Supabase para persistencia remota.
 
-## Instalación y ejecución
+## Variables de entorno
 
-Requiere Node.js 18 o superior.
+Copia `.env.example` como `.env` y completa los valores. Nunca subas `.env` al repositorio.
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
+SUPABASE_PROJECT_REF=
+SUPABASE_DB_PASSWORD=
+SUPABASE_ACCESS_TOKEN=
+DATABASE_URL=
+```
+
+Solo `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` se entregan al navegador mediante `/api/supabase/config`. `SUPABASE_SECRET_KEY`, `SUPABASE_DB_PASSWORD`, `SUPABASE_ACCESS_TOKEN` y `DATABASE_URL` son exclusivamente de servidor o CLI.
+
+## Instalar y ejecutar
 
 ```bash
 npm install
 npm start
 ```
 
-Abre [http://localhost:3000](http://localhost:3000). El estado del servidor está disponible en [http://localhost:3000/api/health](http://localhost:3000/api/health).
+Abre [http://localhost:3000](http://localhost:3000). El endpoint [http://localhost:3000/api/health](http://localhost:3000/api/health) indica si se está usando `supabase` o el respaldo temporal `memory`.
 
-Para comprobar sintaxis y ejecutar todas las pruebas:
+## Preparar Supabase
+
+La migración versionada está en `supabase/migrations/20260713200000_create_muro_schema.sql`. Crea `profiles`, `user_settings`, `walls`, `wall_members` y `notes`, junto con índices, disparadores y políticas RLS.
 
 ```bash
-npm run check
+npx supabase login
+npx supabase link --project-ref TU_PROJECT_REF
+npx supabase db push --dry-run
+npx supabase db push
 ```
 
-## Probar la colaboración
+El CLI requiere `SUPABASE_ACCESS_TOKEN` para autenticarse y `SUPABASE_DB_PASSWORD` para enlazar/aplicar migraciones. Como alternativa, `DATABASE_URL` puede usarse con `npx supabase db push --db-url "$DATABASE_URL"`.
 
-1. Inicia el servidor y abre `http://localhost:3000` en dos ventanas o dispositivos.
-2. Registra una cuenta distinta en cada uno. La primera será superadministradora.
-3. Desde una cuenta propietaria, crea un muro e invita el correo registrado de la otra persona.
-4. Asigna permiso de edición o lectura y abre el mismo muro en ambas ventanas.
-5. Crea, edita, mueve o elimina una nota y confirma que el cambio aparece en tiempo real.
+Después de aplicar la migración, reinicia Node.js. El servidor cargará los datos remotos y cambiará automáticamente de `memory` a `supabase`.
 
-Para probar desde otro dispositivo de la misma red, usa `http://IP_DEL_EQUIPO:3000` y permite el puerto 3000 en el cortafuegos local.
+## Seguridad y RLS
 
-## Persistencia y alcance de la demostración
+- Perfil y configuración: cada persona modifica únicamente sus propios datos.
+- Muros y miembros: solo integrantes pueden leer; propietarios administran el espacio.
+- Notas: integrantes pueden leer y solo propietarios/editores pueden escribir.
+- Roles globales y operaciones administrativas usan el cliente secreto exclusivamente en el backend.
+- Las operaciones normales usan una sesión de usuario con clave publicable, por lo que pasan por RLS.
+- El rol no se obtiene de `user_metadata`; se guarda en `profiles` y el servidor lo verifica.
 
-Usuarios, contraseñas, sesiones, ajustes, muros, permisos y notas viven en memoria del servidor. Esto permite verificar autorizaciones desde Socket.io sin confiar en `localStorage`, pero todos los datos se reinician al detener el proceso de Node.js.
+## Verificación
 
-El navegador solo conserva:
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run check
+npm run verify:supabase -- --auth
+```
 
-- El token opaco de sesión en `sessionStorage`.
-- La preferencia de tema en `localStorage` para aplicarla antes de pintar la página y evitar un destello de color. La fuente de verdad vuelve a ser la configuración de usuario enviada por el servidor.
+`verify:supabase` comprueba conexión pública, Auth y backend administrativo. Con la migración aplicada también comprueba una consulta autenticada bajo RLS. La cuenta temporal de verificación se elimina al terminar.
 
-La interfaz inserta contenido mediante APIs seguras del DOM y el servidor limita textos, imágenes, colores y coordenadas. Aun así, esta es una demostración académica: las contraseñas permanecen en memoria sin hash y debe añadirse una base de datos, hash seguro, HTTPS, protección de fuerza bruta y recuperación real antes de usarla en producción.
+## Respaldo en memoria
 
-## Estructura
+Si faltan variables o la migración todavía no existe en el proyecto remoto, el servidor conserva todas las funciones en memoria y muestra `migration_required` en `/api/health`. Ese modo evita que localhost quede inutilizable durante la configuración, pero sus datos se pierden al reiniciar Node.js.
+
+## Estructura principal
 
 ```text
-.
-├── public/
-│   ├── app.js
-│   ├── index.html
-│   └── styles.css
-├── test/
-│   └── server.test.js
-├── package.json
-├── package-lock.json
-├── README.md
-└── server.js
+lib/                     Clientes y almacenamiento de Supabase
+public/                  Interfaz, estilos y cliente público
+scripts/                 Build y verificación de conexión
+supabase/migrations/     Esquema y políticas RLS
+test/                    Pruebas de integración Socket.io
+server.js                Backend Express y Socket.io
 ```
-
-## Limitaciones actuales
-
-- No hay base de datos: reiniciar el servidor borra todo.
-- La recuperación de contraseña solo simula una respuesta segura y uniforme.
-- No hay historial de versiones, cursores remotos ni resolución avanzada de ediciones simultáneas.
-- La representación de las nuevas pantallas en Figma queda pendiente si la cuenta alcanza el límite de llamadas del complemento; el código sí contiene todos los estados descritos.
