@@ -50,12 +50,13 @@ test('sirve la aplicación y un estado de salud', async () => {
 test('registra, restaura y valida cuentas y roles en el servidor', async () => {
   const admin = await connect();
   const member = await connect();
-  const first = await ack(admin, 'auth:register', { name: 'Boris Admin', email: 'saldavargasboris@gmail.com', password: 'clave123' });
-  const second = await ack(member, 'auth:register', { name: 'Brenda Editora', email: 'brenda@example.com', password: 'clave456' });
+  const first = await ack(admin, 'auth:register', { name: 'Boris Admin', email: 'saldavargasboris@gmail.com', password: 'clave123', passwordConfirmation: 'clave123' });
+  const second = await ack(member, 'auth:register', { name: 'Brenda Editora', email: 'brenda@example.com', password: 'clave456', passwordConfirmation: 'clave456' });
   assert.equal(first.ok, true);
   assert.equal(first.user.role, 'superadmin');
   assert.equal(second.user.role, 'usuario');
   assert.equal(second.user.password, undefined);
+  assert.equal((await ack(await connect(), 'auth:register', { name: 'Error', email: 'error@example.com', password: 'clave789', passwordConfirmation: 'otra789' })).ok, false);
   assert.equal((await ack(member, 'auth:login', { email: 'brenda@example.com', password: 'mal' })).ok, false);
 
   const restored = await connect();

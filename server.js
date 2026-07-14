@@ -184,9 +184,11 @@ function createMuroServer(options = {}) {
       const name = cleanText(payload.name, 40);
       const email = validEmail(payload.email);
       const password = String(payload.password ?? '');
+      const passwordConfirmation = String(payload.passwordConfirmation ?? '');
       if (!name) return fail(acknowledge, 'Escribe tu nombre.');
       if (!email) return fail(acknowledge, 'Escribe un correo válido.');
       if (password.length < 4 || password.length > 128) return fail(acknowledge, 'La contraseña debe tener entre 4 y 128 caracteres.');
+      if (password !== passwordConfirmation) return fail(acknowledge, 'Las contraseñas deben coincidir.');
       if (users.some((user) => user.email === email)) return fail(acknowledge, 'Ese correo ya está registrado.');
       if (storage.schemaReady) {
         try {

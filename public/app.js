@@ -54,9 +54,13 @@ $('#loginForm').addEventListener('submit', async (event) => {
 });
 $('#registerForm').addEventListener('submit', async (event) => {
   event.preventDefault(); const button = event.currentTarget.querySelector('[type="submit"]'); setBusy(button, true);
-  const result = await emitAck('auth:register', { name: $('#registerName').value, email: $('#registerEmail').value, password: $('#registerPassword').value }); setBusy(button, false);
+  const password = $('#registerPassword').value; const passwordConfirmation = $('#registerPasswordConfirmation').value;
+  if (password !== passwordConfirmation) { $('#registerPasswordConfirmation').setCustomValidity('Las contraseñas deben coincidir.'); $('#registerPasswordConfirmation').reportValidity(); setBusy(button, false); return; }
+  $('#registerPasswordConfirmation').setCustomValidity('');
+  const result = await emitAck('auth:register', { name: $('#registerName').value, email: $('#registerEmail').value, password, passwordConfirmation }); setBusy(button, false);
   if (!result?.ok) return toast(result?.error || 'No se pudo crear la cuenta.', true); hydrateUser(result.user, result.token); toast(result.user.role === 'superadmin' ? 'Cuenta creada: eres superadministrador.' : 'Cuenta creada correctamente.');
 });
+$('#registerPasswordConfirmation').addEventListener('input', (event) => event.currentTarget.setCustomValidity(''));
 $('#recoverForm').addEventListener('submit', async (event) => { event.preventDefault(); await emitAck('auth:recover', { email: $('#recoverEmail').value }); showAuth('success'); });
 
 async function showDashboard() {
