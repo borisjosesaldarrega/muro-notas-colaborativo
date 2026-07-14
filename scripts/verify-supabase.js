@@ -49,7 +49,7 @@ async function main() {
         const loginClient = services.createUserClient();
         const { data: login, error: loginError } = await loginClient.auth.signInWithPassword({ email, password });
         if (loginError || !login.session?.access_token) throw loginError || new Error('Supabase no devolvio una sesion.');
-        const { data: verified, error: verifyError } = await services.createUserClient(login.session.access_token).auth.getUser(login.session.access_token);
+        const { data: verified, error: verifyError } = await services.publicClient.auth.getUser(login.session.access_token);
         if (verifyError || verified.user?.id !== created.user.id) throw verifyError || new Error('El usuario autenticado no coincide.');
         sessions.push({ id: created.user.id, token: login.session.access_token });
       }

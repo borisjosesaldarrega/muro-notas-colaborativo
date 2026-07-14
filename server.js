@@ -360,8 +360,13 @@ function createMuroServer(options = {}) {
         updatedAt: Date.now()
       };
       if (storage.schemaReady) {
-        try { await store.saveWall(wall, socket.data.accessToken); await store.saveMember(wall.id, user.id, 'propietario', socket.data.accessToken); }
-        catch { return fail(acknowledge, 'No se pudo guardar el muro en Supabase.'); }
+        try {
+          await store.createWall(wall, socket.data.accessToken);
+          await store.createMember(wall.id, user.id, 'propietario', socket.data.accessToken);
+        } catch {
+          try { await store.deleteWall(wall.id, socket.data.accessToken); } catch {}
+          return fail(acknowledge, 'No se pudo guardar el muro en Supabase.');
+        }
       }
       walls.push(wall);
       acknowledge({ ok: true, wall: wallSummary(wall, user) });
@@ -388,7 +393,7 @@ function createMuroServer(options = {}) {
       wall.description = cleanText(payload.description, 160);
       wall.updatedAt = Date.now();
       if (storage.schemaReady) {
-        try { await store.saveWall(wall, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar el muro en Supabase.'); }
+        try { await store.updateWall(wall, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar el muro en Supabase.'); }
       }
       io.to(`wall:${wall.id}`).emit('wall:updated', wallSummary(wall, user));
       acknowledge({ ok: true, wall: wallSummary(wall, user) });
@@ -418,7 +423,10 @@ function createMuroServer(options = {}) {
       if (!target) return fail(acknowledge, 'No existe una cuenta registrada con ese correo.');
       const role = MEMBER_ROLES.has(payload.role) && payload.role !== 'propietario' ? payload.role : 'editor';
       if (storage.schemaReady) {
-        try { await store.saveMember(wall.id, target.id, role, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo guardar la invitación en Supabase.'); }
+        try {
+          if (wall.members[target.id]) await store.updateMember(wall.id, target.id, role, socket.data.accessToken);
+          else await store.createMember(wall.id, target.id, role, socket.data.accessToken);
+        } catch { return fail(acknowledge, 'No se pudo guardar la invitación en Supabase.'); }
       }
       wall.members[target.id] = role;
       wall.updatedAt = Date.now();
@@ -433,7 +441,7 @@ function createMuroServer(options = {}) {
       if (payload.userId === wall.ownerId) return fail(acknowledge, 'No puedes cambiar el rol de la persona propietaria.');
       if (!['editor', 'lector'].includes(payload.role) || !wall.members[payload.userId]) return fail(acknowledge, 'Miembro o permiso no válido.');
       if (storage.schemaReady) {
-        try { await store.saveMember(wall.id, payload.userId, payload.role, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo guardar el permiso en Supabase.'); }
+        try { await store.updateMember(wall.id, payload.userId, payload.role, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo guardar el permiso en Supabase.'); }
       }
       wall.members[payload.userId] = payload.role;
       acknowledge({ ok: true, members: wallMembers(wall) });
@@ -471,7 +479,7 @@ function createMuroServer(options = {}) {
         updatedAt: Date.now()
       };
       if (storage.schemaReady) {
-        try { await store.saveNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo guardar la nota en Supabase.'); }
+        try { await store.createNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo guardar la nota en Supabase.'); }
       }
       wall.notes.push(note);
       wall.updatedAt = Date.now();
@@ -493,7 +501,7 @@ function createMuroServer(options = {}) {
       if (payload.color) note.color = payload.color;
       note.updatedAt = Date.now();
       if (storage.schemaReady) {
-        try { await store.saveNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar la nota en Supabase.'); }
+        try { await store.updateNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar la nota en Supabase.'); }
       }
       io.to(`wall:${wall.id}`).emit('note:updated', { wallId: wall.id, note });
       acknowledge({ ok: true, note });
@@ -510,7 +518,7 @@ function createMuroServer(options = {}) {
       note.y = safeCoordinate(payload.y, note.y);
       note.updatedAt = Date.now();
       if (storage.schemaReady) {
-        try { await store.saveNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo mover la nota en Supabase.'); }
+        try { await store.updateNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo mover la nota en Supabase.'); }
       }
       io.to(`wall:${wall.id}`).emit('note:moved', { wallId: wall.id, id: note.id, x: note.x, y: note.y, updatedAt: note.updatedAt });
       acknowledge({ ok: true });
