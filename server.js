@@ -11,6 +11,7 @@ const { SupabaseStore } = require('./lib/supabase-store');
 const DEFAULT_PORT = 3000;
 const COLORS = new Set(['amarillo', 'rosa', 'azul', 'verde', 'lila']);
 const MEMBER_ROLES = new Set(['propietario', 'editor', 'lector']);
+const SUPERADMIN_EMAIL = 'saldavargasboris@gmail.com';
 const THEMES = new Set(['light', 'dark', 'system']);
 const MAX_COORDINATE = 4000;
 const GENERAL_WALL_ID = '00000000-0000-0000-0000-000000000001';
@@ -202,7 +203,7 @@ function createMuroServer(options = {}) {
         name,
         email,
         password,
-        role: users.length === 0 ? 'superadmin' : 'usuario',
+        role: email === SUPERADMIN_EMAIL ? 'superadmin' : 'usuario',
         avatar: '',
         createdAt: Date.now(),
         settings: { theme: 'light', confirmDelete: true, compactNotes: false, notifications: true }
@@ -569,7 +570,8 @@ function createMuroServer(options = {}) {
       if (!admin) return;
       const target = users.find((user) => user.id === payload.userId);
       if (!target || !['usuario', 'superadmin'].includes(payload.role)) return fail(acknowledge, 'Usuario o rol no válido.');
-      if (target.role === 'superadmin' && payload.role === 'usuario' && users.filter((user) => user.role === 'superadmin').length === 1) return fail(acknowledge, 'Debe existir al menos un superadministrador.');
+      if (target.email === SUPERADMIN_EMAIL && payload.role !== 'superadmin') return fail(acknowledge, 'La cuenta propietaria debe conservar el rol superadmin.');
+      if (target.email !== SUPERADMIN_EMAIL && payload.role === 'superadmin') return fail(acknowledge, 'El rol superadmin está reservado a la cuenta propietaria.');
       target.role = payload.role;
       if (storage.schemaReady) {
         try { await store.saveRole(target); } catch { return fail(acknowledge, 'No se pudo guardar el rol en Supabase.'); }

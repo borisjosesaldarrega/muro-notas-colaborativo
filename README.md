@@ -6,11 +6,11 @@ Aplicación de notas adhesivas con el lenguaje visual original de Muro DZ y una 
 
 - Registro, inicio y restauración de sesión mediante Supabase Auth cuando el esquema está disponible.
 - Recuperación y cambio de contraseña.
-- Primera cuenta con rol `superadmin`, validado siempre en el backend.
+- Rol `superadmin` reservado a la cuenta propietaria y validado siempre en el backend.
 - Muros independientes con permisos `propietario`, `editor` y `lector`.
 - Notas sincronizadas, arrastrables y disponibles en cinco colores.
 - Perfil, avatar y preferencias de apariencia.
-- Panel administrativo para usuarios, roles, muros, miembros y limpieza de contenido.
+- Panel superadmin para usuarios, muros, miembros y limpieza de contenido.
 - Diseño original: papel crema con puntos, morado `#6658f5`, bordes azul tinta, cintas y post-its pastel.
 
 ## Requisitos

@@ -50,7 +50,7 @@ test('sirve la aplicación y un estado de salud', async () => {
 test('registra, restaura y valida cuentas y roles en el servidor', async () => {
   const admin = await connect();
   const member = await connect();
-  const first = await ack(admin, 'auth:register', { name: 'Ada Admin', email: 'ada@example.com', password: 'clave123' });
+  const first = await ack(admin, 'auth:register', { name: 'Boris Admin', email: 'saldavargasboris@gmail.com', password: 'clave123' });
   const second = await ack(member, 'auth:register', { name: 'Brenda Editora', email: 'brenda@example.com', password: 'clave456' });
   assert.equal(first.ok, true);
   assert.equal(first.user.role, 'superadmin');
@@ -133,6 +133,10 @@ test('rechaza roles simulados en el navegador y autoriza solo al superadmin real
   assert.equal(snapshot.ok, true);
   assert.equal(snapshot.users.length, 2);
   assert.equal(snapshot.walls.length, 2);
+  const memberId = snapshot.users.find((user) => user.email === 'brenda@example.com').id;
+  const ownerId = snapshot.users.find((user) => user.email === 'saldavargasboris@gmail.com').id;
+  assert.equal((await ack(admin, 'admin:user:role', { userId: memberId, role: 'superadmin' })).ok, false);
+  assert.equal((await ack(admin, 'admin:user:role', { userId: ownerId, role: 'usuario' })).ok, false);
   const cleared = await ack(admin, 'admin:clear', { wallId });
   assert.equal(cleared.ok, true);
   assert.equal(cleared.removed, 1);
