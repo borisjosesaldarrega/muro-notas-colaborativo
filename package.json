@@ -9,9 +9,12 @@
     "build": "node scripts/build.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint server.js lib public scripts test",
+    "generate:emails": "node scripts/generate-email-templates.js",
+    "verify:emails": "node scripts/verify-email-templates.js",
+    "apply:emails": "npm run verify:emails && node scripts/apply-email-templates.js",
     "verify:supabase": "node scripts/verify-supabase.js",
     "test": "node --test",
-    "check": "npm run typecheck && npm run lint && npm test && npm run build"
+    "check": "npm run typecheck && npm run lint && npm run verify:emails && npm test && npm run build"
   },
   "engines": {
     "node": ">=18"
