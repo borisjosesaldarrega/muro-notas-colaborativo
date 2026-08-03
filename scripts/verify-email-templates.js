@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const directory = path.join(__dirname, '..', '..', 'BaseDeDatos', 'supabase', 'email-templates');
+const directory = path.join(__dirname, '..', 'supabase', 'email-templates');
 const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8'));
 const expectedVariables = {
   confirmation: ['{{ .ConfirmationURL }}', '{{ .Token }}'],
@@ -29,3 +29,4 @@ for (const [name, variables] of Object.entries(expectedVariables)) {
   if (/<script\b/i.test(html) || /supabase/i.test(html)) throw new Error(`${name} contiene contenido no permitido`);
 }
 console.log(`Verificadas ${Object.keys(expectedVariables).length} plantillas y sus variables dinámicas.`);
+

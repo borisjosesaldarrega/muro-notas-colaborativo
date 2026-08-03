@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const outputDirectory = path.join(__dirname, '..', '..', 'BaseDeDatos', 'supabase', 'email-templates');
+const outputDirectory = path.join(__dirname, '..', 'supabase', 'email-templates');
 
 const templates = {
   confirmation: {

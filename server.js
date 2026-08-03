@@ -103,7 +103,7 @@ function createMuroServer(options = {}) {
     if (!config) return res.status(503).json({ ok: false, error: 'Supabase público no está configurado.' });
     return res.json(config);
   });
-  app.use(express.static(path.join(__dirname, '..', 'Frontend', 'public')));
+  app.use(express.static(path.join(__dirname, 'public')));
   app.get('/api/health', async (_req, res) => {
     await ready;
     res.json({

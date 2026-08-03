@@ -8,7 +8,7 @@ if (!projectRef || !accessToken) {
   throw new Error('Configura SUPABASE_PROJECT_REF y SUPABASE_ACCESS_TOKEN en .env antes de aplicar las plantillas.');
 }
 
-const directory = path.join(__dirname, '..', '..', 'BaseDeDatos', 'supabase', 'email-templates');
+const directory = path.join(__dirname, '..', 'supabase', 'email-templates');
 const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8'));
 const apiNames = {
   confirmation: 'confirmation', invite: 'invite', magic_link: 'magic_link', recovery: 'recovery',

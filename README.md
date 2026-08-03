@@ -46,16 +46,16 @@ Abre [http://localhost:3000](http://localhost:3000). El endpoint [http://localho
 
 ## Preparar Supabase
 
-La migración versionada está en `BaseDeDatos/supabase/migrations/20260713200000_create_muro_schema.sql`. Crea `muro_profiles`, `muro_user_settings`, `muro_walls`, `muro_wall_members` y `muro_notes`, junto con índices, disparadores y políticas RLS. El prefijo `muro_` evita colisiones con otros esquemas.
+La migración versionada está en `supabase/migrations/20260713200000_create_muro_schema.sql`. Crea `muro_profiles`, `muro_user_settings`, `muro_walls`, `muro_wall_members` y `muro_notes`, junto con índices, disparadores y políticas RLS. El prefijo `muro_` evita colisiones con otros esquemas.
 
 ```bash
 npx supabase login
-npx supabase --workdir BaseDeDatos link --project-ref TU_PROJECT_REF
-npx supabase --workdir BaseDeDatos db push --dry-run
-npx supabase --workdir BaseDeDatos db push
+npx supabase link --project-ref TU_PROJECT_REF
+npx supabase db push --dry-run
+npx supabase db push
 ```
 
-El CLI requiere `SUPABASE_ACCESS_TOKEN` para autenticarse y `SUPABASE_DB_PASSWORD` para enlazar/aplicar migraciones. Como alternativa, `DATABASE_URL` puede usarse con `npx supabase --workdir BaseDeDatos db push --db-url "$DATABASE_URL"`.
+El CLI requiere `SUPABASE_ACCESS_TOKEN` para autenticarse y `SUPABASE_DB_PASSWORD` para enlazar/aplicar migraciones. Como alternativa, `DATABASE_URL` puede usarse con `npx supabase db push --db-url "$DATABASE_URL"`.
 
 Después de aplicar la migración, reinicia Node.js. El servidor cargará los datos remotos y cambiará automáticamente de `memory` a `supabase`.
 
@@ -88,11 +88,10 @@ Si faltan variables o la migración todavía no existe en el proyecto remoto, el
 ## Estructura principal
 
 ```text
-Backend/                 Servidor Express y Socket.io, servicios y scripts
-Frontend/public/         Interfaz, estilos y cliente público
-BaseDeDatos/supabase/    Migraciones, configuración y correos de Supabase
-Pruebas/test/            Pruebas automatizadas e integración Socket.io
-package.json             Comandos compartidos del proyecto
+lib/                     Clientes y almacenamiento de Supabase
+public/                  Interfaz, estilos y cliente público
+scripts/                 Build y verificación de conexión
+supabase/migrations/     Esquema y políticas RLS
+test/                    Pruebas de integración Socket.io
+server.js                Backend Express y Socket.io
 ```
-
-La raíz conserva únicamente la configuración común y la documentación. Las reglas para trabajar por ramas y evitar cambios cruzados están en `CONTRIBUTING.md`.

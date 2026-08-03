@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "strict": false
   },
-  "include": ["Backend/**/*.js"]
+  "include": ["server.js", "lib/**/*.js", "scripts/**/*.js"]
 }
