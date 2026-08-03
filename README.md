@@ -22,8 +22,8 @@ Aplicación web colaborativa similar a un Padlet simplificado. Permite crear, ed
 ## Ejecutar
 
 ```bash
-npm install
-npm start
+npm --prefix Backend install
+npm --prefix Backend start
 ```
 
 Abre [http://localhost:3000](http://localhost:3000) en el navegador. Para demostrar el tiempo real, abre la misma dirección en dos ventanas o dispositivos conectados al servidor.
@@ -32,14 +32,20 @@ Abre [http://localhost:3000](http://localhost:3000) en el navegador. Para demost
 
 ```text
 .
-├── public/
+├── Backend/
+│   ├── package.json
+│   ├── package-lock.json
+│   └── server.js
+├── BaseDeDatos/
+│   └── README.md
+├── Frontend/
 │   ├── app.js
 │   ├── index.html
 │   └── styles.css
-├── .gitignore
-├── package.json
-└── server.js
+└── README.md
 ```
+
+La versión actual todavía no incluye una base de datos ni colecciones de Postman. Esas carpetas se completarán únicamente cuando existan archivos reales del proyecto.
 
 ## Tecnologías
 

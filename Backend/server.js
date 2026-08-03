@@ -13,7 +13,7 @@ const notes = [
   { id: 'bienvenida', texto: '¡Bienvenidos! Crea una nota y muévela por el muro.', color: 'amarillo', x: 80, y: 100, autor: 'Equipo', updatedAt: Date.now() }
 ];
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '..', 'Frontend')));
 app.get('/api/health', (_req, res) => res.json({ ok: true, notes: notes.length }));
 
 function cleanText(value, max = 280) {
