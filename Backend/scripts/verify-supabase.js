@@ -14,7 +14,7 @@ async function main() {
     authentication: 'not_run',
     rls: 'migration_required',
     backendAdmin: false,
-    migrationFile: fs.existsSync(path.join(__dirname, '..', 'supabase', 'migrations', '20260713200000_create_muro_schema.sql')),
+    migrationFile: fs.existsSync(path.join(__dirname, '..', '..', 'BaseDeDatos', 'supabase', 'migrations', '20260713200000_create_muro_schema.sql')),
     migrationCredentials: environment.missingPrivate.filter((key) => ['SUPABASE_DB_PASSWORD', 'SUPABASE_ACCESS_TOKEN', 'DATABASE_URL'].includes(key))
   };
   if (!services.publicConfigured) throw new Error('Faltan las variables públicas de Supabase.');

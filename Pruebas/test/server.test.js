@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const { after, before, test } = require('node:test');
 const { io: Client } = require('socket.io-client');
-const { createMuroServer } = require('../server');
+const { createMuroServer } = require('../../Backend/server');
 
 let server;
 let baseUrl;

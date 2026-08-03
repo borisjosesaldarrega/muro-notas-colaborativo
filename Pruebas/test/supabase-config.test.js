@@ -2,8 +2,8 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { createSupabaseServices, environmentStatus } = require('../lib/supabase');
-const { SupabaseStore } = require('../lib/supabase-store');
+const { createSupabaseServices, environmentStatus } = require('../../Backend/lib/supabase');
+const { SupabaseStore } = require('../../Backend/lib/supabase-store');
 
 test('expone al navegador solo la configuración pública de Supabase', () => {
   const env = {

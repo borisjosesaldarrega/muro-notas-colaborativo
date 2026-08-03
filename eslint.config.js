@@ -1,9 +1,9 @@
 'use strict';
 
 module.exports = [
-  { ignores: ['node_modules/**', 'public/vendor/**', 'coverage/**'] },
+  { ignores: ['node_modules/**', 'Frontend/public/vendor/**', 'coverage/**'] },
   {
-    files: ['server.js', 'lib/**/*.js', 'scripts/**/*.js', 'test/**/*.js'],
+    files: ['Backend/**/*.js', 'Pruebas/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'commonjs',
@@ -15,7 +15,7 @@ module.exports = [
     }
   },
   {
-    files: ['public/**/*.js'],
+    files: ['Frontend/public/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'script',
