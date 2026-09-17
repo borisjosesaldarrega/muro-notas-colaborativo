@@ -5,7 +5,6 @@ Aplicación web colaborativa similar a un Padlet simplificado. Permite crear, ed
 ## Funciones
 
 - Registro, inicio de sesión y recuperación simulados con almacenamiento local.
-- Primer usuario registrado con rol de superadministrador.
 - Notas de cinco colores, editables y movibles mediante arrastrar y soltar.
 - Sincronización en tiempo real con Socket.io.
 - Contador de participantes conectados.
