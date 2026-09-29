@@ -4,15 +4,15 @@ Aplicación web colaborativa similar a un Padlet simplificado. Permite crear, ed
 
 ## Funciones
 
-- Registro, inicio de sesión y recuperación simulados con almacenamiento local.
+- Registro, inicio de sesión, recuperación y sesiones mediante el backend.
 - Notas de cinco colores, editables y movibles mediante arrastrar y soltar.
 - Sincronización en tiempo real con Socket.io.
 - Contador de participantes conectados.
 - Filtros por color y panel de administración.
 - Diseño adaptable para computadoras y teléfonos.
-- Backend sencillo con arreglo en memoria, ideal para la presentación académica.
+- Backend con Socket.io, permisos, pruebas y persistencia opcional en Supabase.
 
-> Las cuentas se guardan únicamente en el navegador y las notas se reinician al apagar el servidor. Es el alcance intencional de esta versión demostrativa.
+> Sin variables de Supabase, el backend utiliza memoria para permitir las pruebas locales. Con Supabase configurado, los usuarios, muros, integrantes y notas se almacenan en la base de datos.
 
 ## Requisitos
 
@@ -32,10 +32,15 @@ Abre [http://localhost:3000](http://localhost:3000) en el navegador. Para demost
 ```text
 .
 ├── Backend/
+│   ├── lib/
+│   ├── test/
+│   ├── .env.example
+│   ├── README.md
 │   ├── package.json
 │   ├── package-lock.json
 │   └── server.js
 ├── BaseDeDatos/
+│   ├── supabase/migrations/
 │   └── README.md
 ├── Frontend/
 │   ├── app.js
@@ -44,8 +49,8 @@ Abre [http://localhost:3000](http://localhost:3000) en el navegador. Para demost
 └── README.md
 ```
 
-La versión actual todavía no incluye una base de datos ni colecciones de Postman. Esas carpetas se completarán únicamente cuando existan archivos reales del proyecto.
+La validación completa de invitaciones mediante enlace o código permanece pendiente y está documentada en `Backend/README.md`.
 
 ## Tecnologías
 
-HTML5, CSS3, JavaScript, Node.js, Express y Socket.io.
+HTML5, CSS3, JavaScript, Node.js, Express, Socket.io, PostgreSQL y Supabase.
