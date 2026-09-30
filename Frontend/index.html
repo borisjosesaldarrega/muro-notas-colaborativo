@@ -8,9 +8,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
+  <!-- VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO / RECUPERACIÓN) -->
   <main id="authView" class="auth-shell">
     <section class="auth-brand">
       <div class="brand-mark">M</div>
@@ -48,7 +49,7 @@
 
       <form id="recoverForm" class="auth-card hidden">
         <p class="eyebrow">Recupera tu acceso</p><h2>Restablecer contraseña</h2>
-        <p class="muted">La demostración confirmará localmente el envío del enlace.</p>
+        <p class="muted">Ingresa tu correo para recibir un enlace de recuperación.</p>
         <label>Correo electrónico<input id="recoverEmail" type="email" required></label>
         <button class="primary-button" type="submit">Enviar enlace</button>
         <p class="switch-text"><button type="button" data-view="login">Volver al inicio</button></p>
@@ -56,51 +57,184 @@
     </section>
   </main>
 
-  <main id="appView" class="app-shell hidden">
+  <!-- VISTA 2: DASHBOARD DE MIS MUROS / SALAS (CARA DE USUARIO) -->
+  <main id="wallsView" class="walls-shell hidden">
     <header class="topbar">
       <a class="app-brand" href="#"><span class="brand-mark">M</span><span>Muro</span></a>
-      <div class="board-name"><small>Espacio de trabajo</small><strong>Muro de ideas</strong></div>
+      <div class="board-name"><small>Espacio de trabajo</small><strong>Mis Muros y Salas</strong></div>
       <div class="top-actions">
+        <button id="createWallBtn" class="primary-button compact">＋ Crear Muro</button>
+        <!-- El botón de engranaje (superadmin) oculto por defecto para usuarios normales -->
+        <button id="wallsAdminButton" class="icon-button hidden" title="Panel Superadministrador">⚙</button>
+        <button id="wallsProfileBtn" class="avatar" title="Perfil">P</button>
+      </div>
+    </header>
+    <section class="walls-section">
+      <div class="walls-header-title">
+        <h2>Selecciona un Muro Colaborativo</h2>
+        <p class="muted">Entra a una sala para colaborar en tiempo real o crea un nuevo muro para tu proyecto.</p>
+      </div>
+      <div id="wallsGrid" class="walls-grid">
+        <!-- Tarjetas dinámicas de salas -->
+      </div>
+    </section>
+  </main>
+
+  <!-- VISTA 3: LIENZO Y TABLERO DEL MURO ACTIVO (CARA DE USUARIO) -->
+  <main id="appView" class="app-shell hidden">
+    <header class="topbar">
+      <button id="backToWallsButton" class="secondary-button compact" title="Volver a la lista de salas">← Mis Muros</button>
+      <div class="board-name">
+        <small>Muro activo</small>
+        <strong id="currentWallTitle">Muro de ideas</strong>
+      </div>
+      <div class="top-actions">
+        <!-- Botón único de Invitar (incluye dentro la copia de enlace) -->
+        <button id="inviteButton" class="primary-button compact" title="Invitar y compartir enlace">👥 Compartir / Invitar</button>
+        <button id="deleteWallBtn" class="danger-button compact hidden" title="Eliminar este muro">🗑️ Eliminar Sala</button>
         <span class="presence"><i></i><b id="onlineCount">1</b> conectados</span>
-        <button id="adminButton" class="icon-button" title="Administración">⚙</button>
-        <button id="profileButton" class="avatar" title="Perfil">DZ</button>
+        <!-- Botón superadmin oculto por defecto para usuarios normales -->
+        <button id="adminButton" class="icon-button hidden" title="Panel Superadministrador">⚙</button>
+        <button id="profileButton" class="avatar" title="Perfil">P</button>
       </div>
     </header>
     <section class="toolbar">
       <button id="newNoteButton" class="primary-button compact">＋ Nueva nota</button>
       <div class="color-filter" aria-label="Filtrar por color">
         <button class="swatch active" data-filter="all" title="Todos"></button>
-        <button class="swatch yellow" data-filter="amarillo"></button><button class="swatch pink" data-filter="rosa"></button>
-        <button class="swatch blue" data-filter="azul"></button><button class="swatch green" data-filter="verde"></button>
+        <button class="swatch yellow" data-filter="amarillo"></button>
+        <button class="swatch pink" data-filter="rosa"></button>
+        <button class="swatch blue" data-filter="azul"></button>
+        <button class="swatch green" data-filter="verde"></button>
       </div>
-      <span id="connectionStatus" class="status">Conectando…</span>
+      <span id="connectionStatus" class="status">Sincronizado</span>
     </section>
     <section id="board" class="board" aria-label="Muro colaborativo"></section>
   </main>
 
+  <!-- MODAL: CREAR NOTA -->
   <dialog id="noteDialog">
     <form id="noteForm" method="dialog">
-      <div class="dialog-head"><div><p class="eyebrow">Nueva idea</p><h3>Crear una nota</h3></div><button class="close-button" value="cancel">×</button></div>
+      <div class="dialog-head">
+        <div><p class="eyebrow">Nueva idea</p><h3>Crear una nota</h3></div>
+        <button class="close-button" value="cancel" type="button">&times;</button>
+      </div>
       <label>Contenido<textarea id="noteText" maxlength="280" rows="5" placeholder="Escribe tu idea…" required></textarea></label>
-      <fieldset><legend>Color</legend><div class="color-options">
-        <label><input type="radio" name="color" value="amarillo" checked><span class="yellow"></span></label>
-        <label><input type="radio" name="color" value="rosa"><span class="pink"></span></label>
-        <label><input type="radio" name="color" value="azul"><span class="blue"></span></label>
-        <label><input type="radio" name="color" value="verde"><span class="green"></span></label>
-        <label><input type="radio" name="color" value="lila"><span class="purple"></span></label>
-      </div></fieldset>
-      <div class="dialog-actions"><button value="cancel" class="secondary-button">Cancelar</button><button id="saveNote" type="submit" class="primary-button">Publicar nota</button></div>
+      <fieldset>
+        <legend>Color</legend>
+        <div class="color-options">
+          <label><input type="radio" name="color" value="amarillo" checked><span class="yellow"></span></label>
+          <label><input type="radio" name="color" value="rosa"><span class="pink"></span></label>
+          <label><input type="radio" name="color" value="azul"><span class="blue"></span></label>
+          <label><input type="radio" name="color" value="verde"><span class="green"></span></label>
+          <label><input type="radio" name="color" value="lila"><span class="purple"></span></label>
+        </div>
+      </fieldset>
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary-button" type="button">Cancelar</button>
+        <button id="saveNote" type="submit" class="primary-button">Publicar nota</button>
+      </div>
     </form>
   </dialog>
 
+  <!-- MODAL: CREAR UN MURO / SALA -->
+  <dialog id="wallDialog">
+    <form id="wallForm">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Nuevo Espacio</p><h3>Crear un Muro</h3></div>
+        <button class="close-button" id="closeWallModal" type="button">&times;</button>
+      </div>
+      <label>Nombre del Muro<input id="wallNameInput" placeholder="Ej: Tormenta de Ideas" required maxlength="60"></label>
+      <label>Descripción<input id="wallDescInput" placeholder="Ej: Espacio para ideas del equipo" maxlength="160"></label>
+      <div class="dialog-actions">
+        <button id="cancelWallModal" type="button" class="secondary-button">Cancelar</button>
+        <button id="saveWallBtn" type="submit" class="primary-button">Crear Muro</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL UNIFICADO: INVITAR COLABORADORES Y COPIAR ENLACE -->
+  <dialog id="inviteDialog">
+    <form id="inviteForm">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Colaboración</p><h3>Compartir e Invitar</h3></div>
+        <button class="close-button" id="closeInviteModal" type="button">&times;</button>
+      </div>
+      
+      <!-- Bloque 1: Enlace directo a la sala (estilo Figma / Google Docs) -->
+      <div style="background: #f5f3fa; padding: 16px; border-radius: 14px; margin-bottom: 20px;">
+        <label style="margin-top:0; font-weight:700; font-size:0.88rem; color: var(--ink);">🔗 Enlace directo a esta sala</label>
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <input id="shareLinkInput" type="text" readonly style="background:#fff; font-size:0.85rem; padding:10px;" />
+          <button id="copyShareLinkBtn" type="button" class="secondary-button compact" style="white-space:nowrap; padding:10px 14px;">📋 Copiar</button>
+        </div>
+      </div>
+
+      <!-- Bloque 2: Invitar por correo -->
+      <p class="muted" style="margin-bottom:10px; font-weight:600;">O invita a un colaborador por correo electrónico:</p>
+      <label>Correo electrónico<input id="inviteEmailInput" type="email" placeholder="compañero@correo.com"></label>
+      <label>Rol de permisos
+        <select id="inviteRoleSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);">
+          <option value="editor">Editor (Puede crear, mover y editar notas)</option>
+          <option value="lector">Lector (Solo puede ver el muro)</option>
+        </select>
+      </label>
+      <div class="dialog-actions">
+        <button id="cancelInviteModal" type="button" class="secondary-button">Cerrar</button>
+        <button id="sendInviteBtn" type="submit" class="primary-button">Enviar Invitación</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL: REPORTAR CONTENIDO / NOTA -->
+  <dialog id="reportDialog">
+    <form id="reportForm">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Moderación</p><h3>Reportar Contenido</h3></div>
+        <button class="close-button" id="closeReportModal" type="button">&times;</button>
+      </div>
+      <p class="muted">Indica el motivo de tu reporte para enviar la revisión al superadministrador.</p>
+      <label>Motivo del reporte
+        <select id="reportReasonSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);" required>
+          <option value="Contenido ofensivo">Contenido ofensivo o inapropiado</option>
+          <option value="Spam repetido">Spam o mensajes repetidos</option>
+          <option value="Enlace inseguro">Enlace no seguro</option>
+          <option value="Otro">Otro motivo</option>
+        </select>
+      </label>
+      <label>Detalle opcional<input id="reportDetailInput" placeholder="Escribe detalles del reporte..." maxlength="200"></label>
+      <div class="dialog-actions">
+        <button id="cancelReportModal" type="button" class="secondary-button">Cancelar</button>
+        <button id="sendReportBtn" type="submit" class="danger-button" style="margin-top:0;">Enviar Reporte</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- PANEL LATERAL DE PERFIL -->
   <aside id="sidePanel" class="side-panel" aria-hidden="true">
-    <button id="closePanel" class="close-button">×</button>
-    <div id="profilePanel"><p class="eyebrow">Tu cuenta</p><h2 id="profileName">Usuario</h2><p id="profileEmail" class="muted"></p><button id="logoutButton" class="danger-button">Cerrar sesión</button></div>
-    <div id="adminPanel" class="hidden"><p class="eyebrow">Superadministrador</p><h2>Resumen del muro</h2><div class="stats"><article><strong id="notesStat">0</strong><span>Notas</span></article><article><strong id="usersStat">1</strong><span>Conectados</span></article></div><button id="clearBoardButton" class="danger-button">Eliminar todas mis notas</button></div>
+    <button id="closePanel" class="close-button">&times;</button>
+    <div id="profilePanel">
+      <p class="eyebrow">Tu cuenta</p>
+      <h2 id="profileName">Usuario</h2>
+      <p id="profileEmail" class="muted"></p>
+      <button id="logoutButton" class="danger-button">Cerrar sesión</button>
+    </div>
+    <!-- Módulo de Superadmin reservado para Brenda cuando sea role === 'superadmin' -->
+    <div id="adminPanel" class="hidden">
+      <p class="eyebrow">Superadministrador (Panel Brenda)</p>
+      <h2>Resumen del muro</h2>
+      <div class="stats">
+        <article><strong id="notesStat">0</strong><span>Notas</span></article>
+        <article><strong id="usersStat">1</strong><span>Conectados</span></article>
+      </div>
+      <button id="clearBoardButton" class="danger-button">Eliminar todas las notas</button>
+    </div>
   </aside>
+
   <div id="toast" class="toast" role="status"></div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/app.js"></script>
+  <script src="/js/board.js"></script>
+  <script src="/js/app.js"></script>
 </body>
 </html>
