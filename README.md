@@ -44,6 +44,12 @@ npm start
 
 Abre [http://localhost:3000](http://localhost:3000). El endpoint [http://localhost:3000/api/health](http://localhost:3000/api/health) indica si se está usando `supabase` o el respaldo temporal `memory`.
 
+## Publicar en Render
+
+El archivo `render.yaml` configura un Web Service gratuito en Node.js. Crea un Blueprint en Render desde este repositorio y selecciona la rama `agent/completar-muro-colaborativo`. Render solicitará las variables `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` y `SUPABASE_SECRET_KEY`; configura las tres desde los valores de entorno del proyecto, manteniendo la clave secreta solo en Render.
+
+Render genera una URL pública al completar el despliegue. Comprueba `https://TU-URL/api/health`, configura `APP_URL` con la dirección pública y agrega esa dirección a las Redirect URLs de Supabase para recuperación de contraseña.
+
 ## Preparar Supabase
 
 La migración versionada está en `supabase/migrations/20260713200000_create_muro_schema.sql`. Crea `muro_profiles`, `muro_user_settings`, `muro_walls`, `muro_wall_members` y `muro_notes`, junto con índices, disparadores y políticas RLS. El prefijo `muro_` evita colisiones con otros esquemas.
