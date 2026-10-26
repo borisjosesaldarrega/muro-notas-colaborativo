@@ -510,6 +510,19 @@ window.MuroBoard = (function () {
     }
   });
 
+  function loadReports() {
+    return JSON.parse(localStorage.getItem('muroReports') || 'null') || [
+      { id: 'rep-1', reason: 'Contenido inapropiado', detail: 'Posible comentario repetitivo en notas', wallName: 'Muro de ideas', noteId: 'bienvenida', createdAt: Date.now() - 3600000 * 2, status: 'Pendiente' },
+      { id: 'rep-2', reason: 'Spam repetido', detail: 'Varios enlaces en notas de prueba', wallName: 'Tormenta de ideas', noteId: 'nota-102', createdAt: Date.now() - 3600000 * 18, status: 'Pendiente' }
+    ];
+  }
+
+  function saveReport(rep) {
+    const reports = loadReports();
+    reports.unshift(rep);
+    localStorage.setItem('muroReports', JSON.stringify(reports));
+  }
+
   // Modal Reportar Contenido
   $('#closeReportModal')?.addEventListener('click', () => $('#reportDialog')?.close());
   $('#cancelReportModal')?.addEventListener('click', () => $('#reportDialog')?.close());
@@ -517,7 +530,18 @@ window.MuroBoard = (function () {
   $('#reportForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const reason = $('#reportReasonSelect').value;
-    toast(`🚩 Reporte de nota enviado a revisión (${reason})`);
+    const detail = $('#reportDetailInput')?.value.trim() || 'Sin detalles adicionales';
+    const rep = {
+      id: 'rep-' + crypto.randomUUID().slice(0, 8),
+      reason,
+      detail,
+      wallName: state.currentWall?.name || 'Muro de ideas',
+      noteId: state.reportingNoteId || 'N/A',
+      createdAt: Date.now(),
+      status: 'Pendiente'
+    };
+    saveReport(rep);
+    toast(`🚩 Reporte registrado para supervisión (${reason})`);
     $('#reportDialog')?.close();
   });
 
@@ -545,6 +569,10 @@ window.MuroBoard = (function () {
     },
     selectWall,
     fetchWalls,
-    getSocket: () => socket
+    getSocket: () => socket,
+    getAllNotes: () => Array.from(state.notes.values()),
+    getWalls: () => state.walls,
+    getReports: loadReports,
+    getState: () => state
   };
 })();

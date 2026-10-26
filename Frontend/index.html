@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
-  <!-- VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO / RECUPERACIÓN) -->
+  <!-- VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO / VERIFICACIÓN / CONFIRMACIÓN / RECUPERACIÓN) -->
   <main id="authView" class="auth-shell">
     <section class="auth-brand">
       <div class="brand-mark">M</div>
@@ -26,6 +26,7 @@
     </section>
 
     <section class="auth-panel">
+      <!-- 1. LOGIN -->
       <form id="loginForm" class="auth-card">
         <div class="mobile-logo"><span class="brand-mark">M</span> Muro</div>
         <p class="eyebrow">Bienvenido de nuevo</p>
@@ -36,17 +37,67 @@
         <button class="link-button" type="button" data-view="recover">¿Olvidaste tu contraseña?</button>
         <button class="primary-button" type="submit">Ingresar al muro</button>
         <p class="switch-text">¿No tienes cuenta? <button type="button" data-view="register">Regístrate</button></p>
+        <div style="border-top:1px solid var(--line); margin-top:20px; padding-top:16px; text-align:center;">
+          <button id="adminQuickLoginBtn" class="link-button" type="button" style="float:none; font-size:0.85rem;">👁️ Entrar como superadministrador (Modo Monitor)</button>
+        </div>
       </form>
 
+      <!-- 2. REGISTRO (PASO 1) -->
       <form id="registerForm" class="auth-card hidden">
-        <p class="eyebrow">Crea tu espacio</p><h2>Regístrate</h2>
-        <label>Nombre<input id="registerName" maxlength="40" required></label>
-        <label>Correo electrónico<input id="registerEmail" type="email" required></label>
-        <label>Contraseña<input id="registerPassword" type="password" minlength="4" required></label>
-        <button class="primary-button" type="submit">Crear cuenta</button>
+        <p class="eyebrow">Paso 1 de 3 · Registro</p>
+        <h2>Crea tu cuenta</h2>
+        <p class="muted">Te enviaremos un código de confirmación a tu correo.</p>
+        <label>Nombre y Apellido<input id="registerName" maxlength="40" placeholder="Ej: Pierina Medranda" required></label>
+        <label>Correo electrónico<input id="registerEmail" type="email" placeholder="nombre@correo.com" required></label>
+        <label>Contraseña<input id="registerPassword" type="password" minlength="4" placeholder="Mínimo 4 caracteres" required></label>
+        <label>Confirmar Contraseña<input id="registerConfirmPassword" type="password" minlength="4" placeholder="Repite tu contraseña" required></label>
+        <button class="primary-button" type="submit">Continuar a Verificación</button>
         <p class="switch-text">¿Ya tienes cuenta? <button type="button" data-view="login">Inicia sesión</button></p>
       </form>
 
+      <!-- 3. VERIFICAR CÓDIGO (PASO 2) -->
+      <form id="verifyForm" class="auth-card hidden">
+        <p class="eyebrow">Paso 2 de 3 · Verificación</p>
+        <h2>Revisa tu correo</h2>
+        <p class="muted">Ingresa el código de 6 dígitos que enviamos a <strong id="verifyEmailTarget" style="color:var(--ink);">tu correo</strong>.</p>
+        
+        <div class="email-mock-banner" id="emailMockBanner">
+          <span class="mock-icon">✉️</span>
+          <div>
+            <small>Código enviado a tu bandeja:</small>
+            <strong id="mockCodeDisplay">123456</strong>
+          </div>
+        </div>
+
+        <div class="code-inputs-group">
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required autofocus>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+        </div>
+
+        <div class="resend-block">
+          <span id="countdownText" class="muted">Reenviar código en <b id="countdownTimer">00:45</b></span>
+          <button id="resendCodeBtn" type="button" class="link-button" style="display:none; float:none;">Reenviar nuevo código</button>
+        </div>
+
+        <button class="primary-button" type="submit">Verificar código</button>
+        <p class="switch-text"><button type="button" data-view="register">← Volver al registro</button></p>
+      </form>
+
+      <!-- 4. CONFIRMACIÓN EXITOSA (PASO 3) -->
+      <form id="confirmForm" class="auth-card hidden text-center">
+        <div class="confirm-circle">✓</div>
+        <p class="eyebrow">Paso 3 de 3 · Cuenta Activada</p>
+        <h2>¡Todo listo!</h2>
+        <p class="muted">Tu cuenta ha sido verificada correctamente. Ya puedes ingresar y comenzar a colaborar en los muros.</p>
+        <button id="enterAfterConfirmBtn" class="primary-button" type="button">Ingresar al Muro</button>
+        <p class="switch-text"><button type="button" data-view="login">Volver al inicio de sesión</button></p>
+      </form>
+
+      <!-- 5. RECUPERAR CONTRASEÑA -->
       <form id="recoverForm" class="auth-card hidden">
         <p class="eyebrow">Recupera tu acceso</p><h2>Restablecer contraseña</h2>
         <p class="muted">Ingresa tu correo para recibir un enlace de recuperación.</p>
@@ -64,8 +115,7 @@
       <div class="board-name"><small>Espacio de trabajo</small><strong>Mis Muros y Salas</strong></div>
       <div class="top-actions">
         <button id="createWallBtn" class="primary-button compact">＋ Crear Muro</button>
-        <!-- El botón de engranaje (superadmin) oculto por defecto para usuarios normales -->
-        <button id="wallsAdminButton" class="icon-button hidden" title="Panel Superadministrador">⚙</button>
+        <button id="wallsAdminButton" class="icon-button hidden" title="Panel Superadministrador (Monitor)">⚙</button>
         <button id="wallsProfileBtn" class="avatar" title="Perfil">P</button>
       </div>
     </header>
@@ -89,12 +139,10 @@
         <strong id="currentWallTitle">Muro de ideas</strong>
       </div>
       <div class="top-actions">
-        <!-- Botón único de Invitar (incluye dentro la copia de enlace) -->
         <button id="inviteButton" class="primary-button compact" title="Invitar y compartir enlace">👥 Compartir / Invitar</button>
         <button id="deleteWallBtn" class="danger-button compact hidden" title="Eliminar este muro">🗑️ Eliminar Sala</button>
         <span class="presence"><i></i><b id="onlineCount">1</b> conectados</span>
-        <!-- Botón superadmin oculto por defecto para usuarios normales -->
-        <button id="adminButton" class="icon-button hidden" title="Panel Superadministrador">⚙</button>
+        <button id="adminButton" class="icon-button hidden" title="Panel Superadministrador (Monitor)">⚙</button>
         <button id="profileButton" class="avatar" title="Perfil">P</button>
       </div>
     </header>
@@ -110,6 +158,231 @@
       <span id="connectionStatus" class="status">Sincronizado</span>
     </section>
     <section id="board" class="board" aria-label="Muro colaborativo"></section>
+  </main>
+
+  <!-- VISTA 4: PANEL DE SUPERADMINISTRADOR (MODO ESPECTADOR / MONITOREO) -->
+  <main id="adminView" class="admin-shell hidden">
+    <div class="admin-layout">
+      <!-- SIDEBAR LATERAL DE ADMINISTRACIÓN -->
+      <aside class="admin-sidebar">
+        <div class="admin-sidebar-header">
+          <span class="brand-mark">M</span>
+          <div>
+            <strong>Muro Admin</strong>
+            <small class="admin-badge">👁️ Monitor</small>
+          </div>
+        </div>
+
+        <nav class="admin-nav">
+          <button class="admin-nav-item active" data-admin-tab="resumen">
+            <span class="nav-icon">📊</span> Resumen General
+          </button>
+          <button class="admin-nav-item" data-admin-tab="salas">
+            <span class="nav-icon">🚪</span> Salas y Muros
+          </button>
+          <button class="admin-nav-item" data-admin-tab="notas">
+            <span class="nav-icon">📝</span> Notas Globales
+          </button>
+          <button class="admin-nav-item" data-admin-tab="usuarios">
+            <span class="nav-icon">👥</span> Usuarios
+          </button>
+          <button class="admin-nav-item" data-admin-tab="reportes">
+            <span class="nav-icon">🚩</span> Reportes
+            <span id="adminPendingBadge" class="nav-count-badge">0</span>
+          </button>
+        </nav>
+
+        <div class="admin-sidebar-footer">
+          <div class="admin-user-info">
+            <div class="avatar" id="adminAvatar">AD</div>
+            <div>
+              <strong id="adminUserName">Superadministrador</strong>
+              <small class="muted" style="color:#b2acc9;">Solo espectador</small>
+            </div>
+          </div>
+          <button id="adminExitBtn" class="secondary-button compact" style="width:100%; margin-top:12px;">← Volver al Muro</button>
+        </div>
+      </aside>
+
+      <!-- CONTENIDO PRINCIPAL DEL DASHBOARD ESPECTADOR -->
+      <section class="admin-main">
+        <header class="admin-topbar">
+          <div>
+            <h1 id="adminTabTitle">Resumen del Sistema</h1>
+            <p class="muted" style="margin:4px 0 0; font-size:0.9rem;">Monitoreo y supervisión en tiempo real del muro colaborativo.</p>
+          </div>
+          <div class="spectator-indicator">
+            <span class="live-dot"></span>
+            <span>Modo Espectador Activo</span>
+          </div>
+        </header>
+
+        <!-- PESTAÑA 1: RESUMEN GENERAL -->
+        <div id="adminTabResumen" class="admin-tab-content">
+          <div class="admin-spectator-alert">
+            <span style="font-size:1.3rem;">ℹ️</span>
+            <div>
+              <strong>Panel de Monitoreo:</strong> Puedes supervisar en tiempo real las estadísticas, usuarios y notas activas. Por política de supervisión pura, las acciones de edición y eliminación están deshabilitadas.
+            </div>
+          </div>
+
+          <!-- 4 Métricas Clave (Pág 20 del PDF) -->
+          <div class="admin-metrics-grid">
+            <article class="metric-card">
+              <span class="metric-icon purple">👥</span>
+              <div>
+                <small>Usuarios Registrados</small>
+                <strong id="metricUsersCount">1</strong>
+              </div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon yellow">📝</span>
+              <div>
+                <small>Notas en Tableros</small>
+                <strong id="metricNotesCount">0</strong>
+              </div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon blue">🚪</span>
+              <div>
+                <small>Salas Creadas</small>
+                <strong id="metricWallsCount">1</strong>
+              </div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon red">🚩</span>
+              <div>
+                <small>Reportes de Contenido</small>
+                <strong id="metricReportsCount">0</strong>
+              </div>
+            </article>
+          </div>
+
+          <!-- Actividad Semanal de Notas & Moderación Pendiente -->
+          <div class="admin-grid-two">
+            <div class="admin-card">
+              <div class="admin-card-head">
+                <h3>Actividad de Notas (Semanal)</h3>
+                <small class="muted">Volumen de aportes recibidos</small>
+              </div>
+              <div class="activity-chart">
+                <div class="chart-col"><div class="bar" style="height:35%;"></div><span>Lun</span></div>
+                <div class="chart-col"><div class="bar" style="height:65%;"></div><span>Mar</span></div>
+                <div class="chart-col"><div class="bar" style="height:50%;"></div><span>Mié</span></div>
+                <div class="chart-col"><div class="bar" style="height:85%;"></div><span>Jue</span></div>
+                <div class="chart-col"><div class="bar" style="height:75%;"></div><span>Vie</span></div>
+                <div class="chart-col"><div class="bar active" style="height:100%;"></div><span>Sáb</span></div>
+                <div class="chart-col"><div class="bar" style="height:45%;"></div><span>Dom</span></div>
+              </div>
+            </div>
+
+            <div class="admin-card">
+              <div class="admin-card-head">
+                <h3>Moderación Pendiente</h3>
+                <small class="muted">Reportes de usuarios</small>
+              </div>
+              <div id="adminRecentReports" class="admin-reports-list">
+                <!-- Cargado dinámicamente -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla de Usuarios Recientes -->
+          <div class="admin-card" style="margin-top:24px;">
+            <div class="admin-card-head">
+              <h3>Usuarios Recientes Monitoreados</h3>
+              <small class="muted">Supervisión sin alteración</small>
+            </div>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Usuario</th>
+                    <th>Correo Electrónico</th>
+                    <th>Rol</th>
+                    <th>Muros Creados</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="adminRecentUsersTable">
+                  <!-- Cargado dinámicamente -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- PESTAÑA 2: SALAS Y MUROS -->
+        <div id="adminTabSalas" class="admin-tab-content hidden">
+          <div class="admin-card-head">
+            <h3>Muros Activos en la Plataforma</h3>
+            <small class="muted">Espacios colaborativos creados por los equipos</small>
+          </div>
+          <div id="adminWallsGrid" class="walls-grid" style="margin-top:20px;">
+            <!-- Cargado dinámicamente -->
+          </div>
+        </div>
+
+        <!-- PESTAÑA 3: NOTAS GLOBALES -->
+        <div id="adminTabNotas" class="admin-tab-content hidden">
+          <div class="admin-card-head">
+            <h3>Notas en Tiempo Real</h3>
+            <small class="muted">Visualización continua de ideas de los participantes</small>
+          </div>
+          <div id="adminNotesGrid" class="admin-notes-grid" style="margin-top:20px;">
+            <!-- Cargado dinámicamente -->
+          </div>
+        </div>
+
+        <!-- PESTAÑA 4: USUARIOS -->
+        <div id="adminTabUsuarios" class="admin-tab-content hidden">
+          <div class="admin-card-head">
+            <h3>Directorio de Cuentas</h3>
+            <input id="adminUserSearch" type="search" placeholder="🔍 Buscar por nombre o correo..." style="max-width:320px; padding:10px 14px; border-radius:12px; border:1px solid var(--line);">
+          </div>
+          <div class="admin-table-wrap" style="margin-top:16px;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Correo Electrónico</th>
+                  <th>Rol Asignado</th>
+                  <th>Estado</th>
+                  <th>Permiso del Panel</th>
+                </tr>
+              </thead>
+              <tbody id="adminAllUsersTable">
+                <!-- Cargado dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PESTAÑA 5: REPORTES -->
+        <div id="adminTabReportes" class="admin-tab-content hidden">
+          <div class="admin-card-head">
+            <h3>Bandeja de Reportes de Contenido</h3>
+            <small class="muted">Alertas enviadas con el botón 🚩 por los usuarios</small>
+          </div>
+          <div class="admin-table-wrap" style="margin-top:16px;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Motivo</th>
+                  <th>Detalle del reporte</th>
+                  <th>Muro Afectado</th>
+                  <th>Fecha</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="adminAllReportsTable">
+                <!-- Cargado dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
 
   <!-- MODAL: CREAR NOTA -->
@@ -217,17 +490,10 @@
       <p class="eyebrow">Tu cuenta</p>
       <h2 id="profileName">Usuario</h2>
       <p id="profileEmail" class="muted"></p>
-      <button id="logoutButton" class="danger-button">Cerrar sesión</button>
-    </div>
-    <!-- Módulo de Superadmin reservado para Brenda cuando sea role === 'superadmin' -->
-    <div id="adminPanel" class="hidden">
-      <p class="eyebrow">Superadministrador (Panel Brenda)</p>
-      <h2>Resumen del muro</h2>
-      <div class="stats">
-        <article><strong id="notesStat">0</strong><span>Notas</span></article>
-        <article><strong id="usersStat">1</strong><span>Conectados</span></article>
+      <div id="profileAdminAccess" class="hidden" style="margin:20px 0;">
+        <button id="openAdminFromProfileBtn" class="primary-button compact" style="width:100%;">📊 Ir al Panel de Monitoreo</button>
       </div>
-      <button id="clearBoardButton" class="danger-button">Eliminar todas las notas</button>
+      <button id="logoutButton" class="danger-button">Cerrar sesión</button>
     </div>
   </aside>
 
