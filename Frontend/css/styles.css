@@ -456,33 +456,6 @@ legend { font-weight: 700; margin-bottom: 10px; }
 /* --- FLUJO DE VERIFICACIÓN POR CÓDIGO --- */
 .text-center { text-align: center; }
 
-.email-mock-banner {
-  background: #f4efff;
-  border: 1px dashed #cfbdfd;
-  border-radius: 14px;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 18px 0;
-  text-align: left;
-}
-.email-mock-banner .mock-icon {
-  font-size: 1.6rem;
-}
-.email-mock-banner small {
-  display: block;
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 0.78rem;
-}
-.email-mock-banner strong {
-  color: var(--primary-dark);
-  font-size: 1.25rem;
-  letter-spacing: 0.18em;
-  font-family: monospace;
-}
-
 .code-inputs-group {
   display: flex;
   justify-content: space-between;
@@ -895,7 +868,80 @@ legend { font-weight: 700; margin-bottom: 10px; }
   opacity: 0;
   transition: .25s ease;
 }
-.toast.show { transform: translate(-50%, 0); opacity: 1; }
+/* Estilos de validación de formulario */
+.field-error {
+  color: #ef4444;
+  font-size: 0.78rem;
+  font-weight: 500;
+  margin-top: 4px;
+  display: block;
+}
+input.is-invalid {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2 !important;
+}
+
+/* Miembros de la sala en modal de invitación */
+.invite-members-list {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.invite-members-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.member-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #faf9fd;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+.member-item-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.member-item-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ece8ff;
+  color: var(--primary);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+.member-role-tag {
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.member-role-tag.propietario { background: #fef3c7; color: #b45309; }
+.member-role-tag.editor { background: #e0f2fe; color: #0369a1; }
+.member-role-tag.lector { background: #f3f4f6; color: #4b5563; }
+
+/* Rol en perfil de usuario */
+.profile-role-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.profile-role-tag.superadmin { background: #ede9fe; color: #6d28d9; }
+.profile-role-tag.usuario { background: #f3f4f6; color: #4b5563; }
 
 /* Adaptación Responsiva (Móvil y Tablet) */
 @media (max-width: 960px) {
