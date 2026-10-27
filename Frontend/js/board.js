@@ -54,7 +54,7 @@ window.MuroBoard = (function () {
      ========================================== */
 
   function renderNote(note) {
-    if (!note || !note.id) return;
+    if (!note || !note.id || note.id === 'bienvenida') return;
     state.notes.set(note.id, note);
 
     let element = document.querySelector(`[data-note-id="${CSS.escape(note.id)}"]`);
@@ -284,16 +284,24 @@ window.MuroBoard = (function () {
     if (socket) {
       socket.emit('wall:select', { id: wallId }, (res) => {
         if (res && res.ok) {
+          state.currentWall = {
+            id: res.wall.id,
+            name: res.wall.name,
+            description: res.wall.description,
+            ownerId: res.wall.ownerId,
+            role: res.wall.role,
+            members: res.members || []
+          };
           if (res.notes) {
             res.notes.forEach(renderNote);
           }
-          toast(`Entraste a la sala: ${wallName}`);
+          toast(`Entraste a la sala: ${res.wall.name}`);
         } else {
           toast(res?.error || 'No se pudo cargar la sala.');
         }
       });
     } else {
-      toast(`Entraste a la sala local: ${wallName}`);
+      toast(`Entraste a la sala: ${wallName}`);
     }
   }
 
@@ -380,8 +388,14 @@ window.MuroBoard = (function () {
   // Modal Nueva Nota
   $('#newNoteButton')?.addEventListener('click', () => {
     $('#noteForm')?.reset();
+    if ($('#characterCount')) $('#characterCount').textContent = '0 / 280';
     $('#noteDialog')?.showModal();
     setTimeout(() => $('#noteText')?.focus(), 50);
+  });
+
+  $('#noteText')?.addEventListener('input', (e) => {
+    const counter = $('#characterCount');
+    if (counter) counter.textContent = `${e.target.value.length} / 280`;
   });
 
   $('#noteForm')?.addEventListener('submit', (event) => {
@@ -460,7 +474,64 @@ window.MuroBoard = (function () {
     }
   });
 
-  // Modal Compartir e Invitar (Unificado)
+  // Renderizar miembros de la sala (Datos reales devueltos por el backend)
+  function renderWallMembers(members = []) {
+    const list = $('#wallMembersList');
+    const count = $('#wallMembersCount');
+    if (count) count.textContent = `${members.length} miembro${members.length === 1 ? '' : 's'}`;
+    if (!list) return;
+
+    list.innerHTML = '';
+    if (!members.length) {
+      list.innerHTML = '<p class="muted" style="font-size:0.82rem; padding:8px 0; text-align:center;">No hay miembros registrados en esta sala.</p>';
+      return;
+    }
+
+    const isCurrentUserOwner = state.currentWall?.role === 'propietario';
+
+    members.forEach((m) => {
+      const item = document.createElement('div');
+      item.className = 'member-item';
+      const role = m.roleInWall || 'editor';
+      const isTargetOwner = role === 'propietario';
+
+      item.innerHTML = `
+        <div class="member-item-info">
+          <div class="member-item-avatar">${(m.name || 'U').slice(0, 2).toUpperCase()}</div>
+          <div>
+            <strong>${m.name || 'Usuario'}</strong>
+            <small class="muted" style="display:block;">${m.email || ''}</small>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="member-role-tag ${role}">${role}</span>
+          ${isCurrentUserOwner && !isTargetOwner ? `<button type="button" class="remove-member-btn" data-user-id="${m.id}" title="Quitar miembro" style="border:0; background:none; color:#ef4444; cursor:pointer; font-size:1.1rem; padding:0 4px;">&times;</button>` : ''}
+        </div>
+      `;
+
+      if (isCurrentUserOwner && !isTargetOwner) {
+        item.querySelector('.remove-member-btn')?.addEventListener('click', () => {
+          if (confirm(`¿Quitar a ${m.name || m.email} de esta sala?`)) {
+            if (socket) {
+              socket.emit('wall:member:remove', { wallId: state.currentWall.id, userId: m.id }, (res) => {
+                if (res && res.ok) {
+                  state.currentWall.members = res.members || [];
+                  renderWallMembers(state.currentWall.members);
+                  toast('Miembro retirado de la sala.');
+                } else {
+                  toast(res?.error || 'No se pudo quitar al miembro.');
+                }
+              });
+            }
+          }
+        });
+      }
+
+      list.appendChild(item);
+    });
+  }
+
+  // Modal Compartir e Invitar (Unificado según reglas del Backend)
   $('#inviteButton')?.addEventListener('click', () => {
     $('#inviteForm')?.reset();
     
@@ -469,6 +540,21 @@ window.MuroBoard = (function () {
     if (shareInput) {
       shareInput.value = `${window.location.origin}${window.location.pathname}#wall=${state.currentWall.id}`;
     }
+
+    // Regla estricta del backend: Solo la persona propietaria puede invitar miembros
+    const isOwner = state.currentWall?.role === 'propietario';
+    const ownerNotice = $('#inviteOwnerOnlyNotice');
+    const emailInput = $('#inviteEmailInput');
+    const roleSelect = $('#inviteRoleSelect');
+    const sendBtn = $('#sendInviteBtn');
+
+    if (ownerNotice) ownerNotice.classList.toggle('hidden', isOwner);
+    if (emailInput) emailInput.disabled = !isOwner;
+    if (roleSelect) roleSelect.disabled = !isOwner;
+    if (sendBtn) sendBtn.disabled = !isOwner;
+
+    // Renderizar miembros reales de la sala
+    renderWallMembers(state.currentWall?.members || []);
 
     $('#inviteDialog')?.showModal();
   });
@@ -493,28 +579,28 @@ window.MuroBoard = (function () {
     const email = $('#inviteEmailInput').value.trim().toLowerCase();
     const role = $('#inviteRoleSelect').value;
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) return toast('Ingresa el correo del invitado.');
+    if (!emailRegex.test(email)) return toast('Ingresa un correo electrónico válido.');
 
     if (socket) {
       socket.emit('wall:invite', { wallId: state.currentWall.id, email, role }, (res) => {
         if (res && res.ok) {
-          $('#inviteDialog')?.close();
-          toast(`¡Invitación enviada a ${email}!`);
+          state.currentWall.members = res.members || [];
+          renderWallMembers(state.currentWall.members);
+          $('#inviteEmailInput').value = '';
+          toast(`¡Invitación exitosa! ${email} ahora es ${role}.`);
         } else {
           toast(res?.error || 'No se pudo enviar la invitación.');
         }
       });
     } else {
-      $('#inviteDialog')?.close();
-      toast(`Invitación simulada enviada a ${email}`);
+      toast('Conexión con el servidor no disponible.');
     }
   });
 
   function loadReports() {
-    return JSON.parse(localStorage.getItem('muroReports') || 'null') || [
-      { id: 'rep-1', reason: 'Contenido inapropiado', detail: 'Posible comentario repetitivo en notas', wallName: 'Muro de ideas', noteId: 'bienvenida', createdAt: Date.now() - 3600000 * 2, status: 'Pendiente' },
-      { id: 'rep-2', reason: 'Spam repetido', detail: 'Varios enlaces en notas de prueba', wallName: 'Tormenta de ideas', noteId: 'nota-102', createdAt: Date.now() - 3600000 * 18, status: 'Pendiente' }
-    ];
+    return JSON.parse(localStorage.getItem('muroReports') || '[]');
   }
 
   function saveReport(rep) {
