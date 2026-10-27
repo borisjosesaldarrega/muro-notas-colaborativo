@@ -13,6 +13,8 @@ async function main() {
     publicConnection: false,
     authentication: 'not_run',
     rls: 'migration_required',
+    invitations: 'not_run',
+    reports: 'not_run',
     backendAdmin: false,
     migrationFile: fs.existsSync(path.join(__dirname, '..', 'supabase', 'migrations', '20260713200000_create_muro_schema.sql')),
     migrationCredentials: environment.missingPrivate.filter((key) => ['SUPABASE_DB_PASSWORD', 'SUPABASE_ACCESS_TOKEN', 'DATABASE_URL'].includes(key))
@@ -101,6 +103,36 @@ async function main() {
           && Boolean(outsiderInsertError)
           ? 'passed'
           : 'failed';
+
+        const token = crypto.randomBytes(32).toString('base64url');
+        const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+        const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
+        const outsiderProfile = await outsiderClient.from('muro_usuarios').select('correo').eq('id', outsider.id).single();
+        if (outsiderProfile.error) throw outsiderProfile.error;
+        const { data: invitation, error: invitationError } = await ownerClient.rpc('muro_crear_invitacion', {
+          sala_objetivo: wallId,
+          correo_objetivo: outsiderProfile.data.correo,
+          rol_objetivo: 'lector',
+          token_hash_nuevo: digest(token),
+          codigo_hash_nuevo: digest(code),
+          vence_en_nuevo: new Date(Date.now() + 3_600_000).toISOString()
+        });
+        if (invitationError || !invitation?.id) throw invitationError || new Error('No se creó la invitación.');
+        const { error: directMemberError } = await ownerClient.from('muro_sala_miembros').insert({ sala_id: wallId, usuario_id: outsider.id, rol: 'lector' });
+        const { data: accepted, error: acceptError } = await outsiderClient.rpc('muro_responder_invitacion', { secreto_hash: digest(code), respuesta: 'aceptar' });
+        const { error: reuseError } = await outsiderClient.rpc('muro_responder_invitacion', { secreto_hash: digest(code), respuesta: 'aceptar' });
+        const { data: membership, error: membershipError } = await outsiderClient.from('muro_sala_miembros').select('rol').eq('sala_id', wallId).eq('usuario_id', outsider.id).single();
+        result.invitations = Boolean(directMemberError) && !acceptError && accepted?.estado === 'aceptada' && Boolean(reuseError) && !membershipError && membership?.rol === 'lector' ? 'passed' : 'failed';
+
+        const { data: report, error: reportError } = await outsiderClient.rpc('muro_crear_reporte', { motivo_nuevo: 'fallo_aplicacion', detalle_nuevo: 'Verificación temporal del circuito completo.', sala_objetivo: wallId, nota_objetivo: null });
+        if (reportError || !report?.id) throw reportError || new Error('No se creó el reporte.');
+        const { error: promoteError } = await services.adminClient.from('muro_usuarios').update({ rol: 'superadmin' }).eq('id', owner.id);
+        if (promoteError) throw promoteError;
+        const { data: adminReports, error: adminReportsError } = await ownerClient.rpc('muro_reportes_administracion');
+        const { error: takeError } = await ownerClient.rpc('muro_tomar_reporte', { reporte_objetivo: report.id });
+        const { error: answerError } = await ownerClient.rpc('muro_responder_reporte', { reporte_objetivo: report.id, estado_nuevo: 'resuelto', respuesta_nueva: 'Circuito verificado correctamente.' });
+        const { data: ownReports, error: ownReportsError } = await outsiderClient.rpc('muro_mis_reportes');
+        result.reports = !adminReportsError && adminReports?.some((item) => item.id === report.id) && !takeError && !answerError && !ownReportsError && ownReports?.some((item) => item.id === report.id && item.decision === 'Circuito verificado correctamente.') ? 'passed' : 'failed';
       }
     } finally {
       for (const userId of temporaryUsers.reverse()) {

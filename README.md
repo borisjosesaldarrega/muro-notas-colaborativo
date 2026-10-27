@@ -9,6 +9,9 @@ Aplicación de notas adhesivas con el lenguaje visual original de Muro DZ y una 
 - Rol `superadmin` reservado a la cuenta propietaria y validado siempre en el backend.
 - Muros independientes con permisos `propietario`, `editor` y `lector`.
 - Creación atómica de cada muro y su membresía propietaria mediante la RPC transaccional `muro_crear_sala`.
+- Invitaciones mediante enlace y código de un solo uso: solo se guarda SHA-256, vencen en 24 horas y la membresía se crea al aceptar.
+- Consulta, rechazo, reenvío y cancelación de invitaciones sin permitir altas directas de miembros.
+- Reportes privados con estados `pendiente`, `en_revision`, `resuelto` y `rechazado`, atención del superadmin y respuesta exclusiva al autor.
 - Notas sincronizadas, arrastrables y disponibles en cinco colores.
 - Perfil, avatar y preferencias de apariencia.
 - Panel superadmin para usuarios, muros, miembros y limpieza de contenido.
@@ -57,7 +60,7 @@ Render asignará la URL al completar el primer despliegue. Abre esa URL para pro
 
 ## Preparar Supabase
 
-Las migraciones versionadas están en `supabase/migrations/`. Crean y actualizan las tablas `muro_usuarios`, `muro_configuraciones_usuario`, `muro_salas`, `muro_sala_miembros`, `muro_notas` y `muro_reportes`, junto con índices, funciones y políticas RLS. La migración `20261027000508_corregir_a10_creacion_atomica_muro.sql` añade la RPC transaccional usada por el frontend de Netlify y el backend Express. El prefijo `muro_` evita colisiones con otros esquemas.
+Las migraciones versionadas están en `supabase/migrations/`. Crean y actualizan las tablas `muro_usuarios`, `muro_configuraciones_usuario`, `muro_salas`, `muro_sala_miembros`, `muro_notas`, `muro_invitaciones` y `muro_reportes`, junto con índices, funciones y políticas RLS. La migración `20261027000508_corregir_a10_creacion_atomica_muro.sql` añade la RPC transaccional de muros. `20261027002032_completar_invitaciones_y_reportes.sql` termina los flujos que habían quedado incompletos y `20261027002607_bloquear_altas_directas_de_miembros.sql` cierra el atajo que permitía crear membresías sin aceptar una invitación. El prefijo `muro_` evita colisiones con otros esquemas.
 
 ```bash
 npx supabase login
@@ -80,6 +83,8 @@ Después de aplicar la migración, reinicia Node.js. El servidor cargará los da
 - El rol no se obtiene de `user_metadata`; se guarda en `muro_usuarios` y el servidor lo verifica.
 - La creación de una sala no admite un propietario enviado por el navegador: la RPC toma `auth.uid()`, inserta sala y membresía en la misma transacción y revierte ambas si algo falla.
 - Los errores enviados a la interfaz se normalizan; los mensajes internos de Postgres/PostgREST no se muestran a las personas usuarias.
+- Los tokens y códigos de invitación nunca se guardan en texto claro; la base compara su hash y bloquea vencimiento, reutilización, destinatario incorrecto y duplicados.
+- Los reportes toman el autor desde `auth.uid()` y el listado administrativo no incluye nombres de muros ni contenido de notas privadas.
 
 ## Verificación
 
@@ -92,11 +97,11 @@ npm run check
 npm run verify:supabase -- --auth
 ```
 
-`verify:supabase` comprueba conexión pública, Auth y backend administrativo. Con las migraciones aplicadas también comprueba una consulta autenticada bajo RLS. La cuenta temporal de verificación se elimina al terminar. La prueba `test/a10-atomic-wall.test.js` verifica que los clientes usan la RPC y que la inserción directa quedó cerrada.
+`verify:supabase` comprueba conexión pública, Auth, backend administrativo, RLS, invitación de un solo uso y el recorrido completo de reportes. Las cuentas temporales se eliminan al terminar. `test/a10-atomic-wall.test.js` y `test/invitations-reports-contract.test.js` revisan los contratos de seguridad y que no existan altas directas.
 
 ## Aporte de esta entrega
 
-Responsable de la corrección: **Boris Salda Vargas**. Sobre la actualización visual incorporada por Pierina, completé el pendiente de backend para que funcione tanto en la página principal como en la ruta Express: creación transaccional del muro, membresía propietaria, errores públicos normalizados, pruebas y documentación de seguridad.
+Responsable de la corrección y cierre del backend: **Boris Salda Vargas**. La implementación anterior dejó pendientes las invitaciones verificables y la atención de reportes; Boris completó ambos recorridos, cerró las altas directas de miembros, aplicó las migraciones y añadió las pruebas. El trabajo visual actualizado por Pierina se conservó e integró con estas funciones tanto en la aplicación principal como en la carpeta `Backend/`.
 
 ## Respaldo en memoria
 

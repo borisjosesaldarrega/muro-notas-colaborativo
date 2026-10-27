@@ -15,6 +15,18 @@ const SUPERADMIN_EMAIL = 'saldavargasboris@gmail.com';
 const THEMES = new Set(['light', 'dark', 'system']);
 const MAX_COORDINATE = 4000;
 const GENERAL_WALL_ID = '00000000-0000-0000-0000-000000000001';
+const REPORT_REASONS = new Set(['fallo_aplicacion', 'contenido_ofensivo', 'spam', 'enlace_inseguro', 'otro']);
+const INVITATION_TTL = 24 * 60 * 60 * 1000;
+
+function sha256(value) {
+  return crypto.createHash('sha256').update(String(value)).digest('hex');
+}
+
+function invitationSecrets() {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+  return { token, code, tokenHash: sha256(token), codeHash: sha256(code), expiresAt: Date.now() + INVITATION_TTL };
+}
 
 function cleanText(value, max = 280) {
   return String(value ?? '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, max);
@@ -64,6 +76,8 @@ function createMuroServer(options = {}) {
   const storage = { mode: 'memory', publicConnection: false, adminConnection: false, schemaReady: false, reason: store ? 'initializing' : 'not_configured' };
   const users = [];
   const sessions = new Map();
+  const invitations = [];
+  const reports = [];
   const walls = [{
     id: 'general',
     name: 'Muro de ideas',
@@ -163,6 +177,17 @@ function createMuroServer(options = {}) {
     updatedAt: wall.updatedAt
   });
   const wallMembers = (wall) => Object.entries(wall.members).map(([id, role]) => ({ ...publicUser(users.find((user) => user.id === id)), roleInWall: role })).filter((item) => item.id);
+  const invitationView = (invitation, user) => ({
+    id: invitation.id, wallId: invitation.wallId, wallName: findWall(invitation.wallId)?.name || 'Muro',
+    email: invitation.email, role: invitation.role, status: invitation.status,
+    owner: invitation.invitedBy === user.id, expiresAt: invitation.expiresAt, createdAt: invitation.createdAt
+  });
+  const reportView = (report, admin = false) => ({
+    id: report.id, reason: report.reason, detail: report.detail, status: report.status,
+    decision: report.decision || '', createdAt: report.createdAt, reviewedAt: report.reviewedAt || null,
+    answeredAt: report.answeredAt || null,
+    ...(admin ? { reporterId: report.reporterId, reporterName: users.find((item) => item.id === report.reporterId)?.name || 'Usuario' } : {})
+  });
 
   function establishSession(socket, user, suppliedToken = '') {
     const token = suppliedToken || crypto.randomUUID();
@@ -437,18 +462,84 @@ function createMuroServer(options = {}) {
       const wall = findWall(payload.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'El muro no existe.');
       if (!canOwn(wall, user)) return fail(acknowledge, 'Solo la persona propietaria puede invitar miembros.');
-      const target = users.find((item) => item.email === validEmail(payload.email));
+      const email = validEmail(payload.email);
+      const target = users.find((item) => item.email === email);
       if (!target) return fail(acknowledge, 'No existe una cuenta registrada con ese correo.');
+      if (target.id === user.id) return fail(acknowledge, 'No puedes invitarte a tu propio muro.');
+      if (wall.members[target.id]) return fail(acknowledge, 'Esa persona ya es miembro del muro.');
       const role = MEMBER_ROLES.has(payload.role) && payload.role !== 'propietario' ? payload.role : 'editor';
+      const pending = invitations.find((item) => item.wallId === wall.id && item.email === email && item.status === 'pendiente' && item.expiresAt > Date.now());
+      if (pending) return fail(acknowledge, 'Ya existe una invitación pendiente para ese correo.');
+      const secrets = invitationSecrets();
+      const invitation = { id: crypto.randomUUID(), wallId: wall.id, email, role, invitedBy: user.id, status: 'pendiente', createdAt: Date.now(), ...secrets };
       if (storage.schemaReady) {
         try {
-          if (wall.members[target.id]) await store.updateMember(wall.id, target.id, role, socket.data.accessToken);
-          else await store.createMember(wall.id, target.id, role, socket.data.accessToken);
-        } catch { return fail(acknowledge, 'No se pudo guardar la invitación en Supabase.'); }
+          const saved = await store.createInvitation(invitation, socket.data.accessToken);
+          invitation.id = saved.id;
+        } catch { return fail(acknowledge, 'No se pudo crear la invitación.'); }
       }
-      wall.members[target.id] = role;
-      wall.updatedAt = Date.now();
-      acknowledge({ ok: true, members: wallMembers(wall) });
+      invitations.push(invitation);
+      const link = `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}`;
+      for (const peer of io.sockets.sockets.values()) if (findUser(peer)?.id === target.id) peer.emit('invitation:received');
+      acknowledge({ ok: true, invitation: invitationView(invitation, user), code: secrets.code, link, members: wallMembers(wall) });
+    });
+
+    socket.on('invitations:list', async (_payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      if (storage.schemaReady) {
+        try {
+          const rows = await store.listInvitations(socket.data.accessToken);
+          return acknowledge({ ok: true, invitations: rows.map((row) => ({ id: row.id, wallId: row.sala_id, wallName: row.sala_nombre, email: row.correo, role: row.rol, status: row.estado, owner: row.es_propietario, expiresAt: Date.parse(row.vence_en), createdAt: Date.parse(row.creado_en) })) });
+        } catch { return fail(acknowledge, 'No se pudieron cargar las invitaciones.'); }
+      }
+      invitations.forEach((item) => { if (item.status === 'pendiente' && item.expiresAt <= Date.now()) item.status = 'vencida'; });
+      acknowledge({ ok: true, invitations: invitations.filter((item) => item.invitedBy === user.id || item.email === user.email).map((item) => invitationView(item, user)) });
+    });
+
+    socket.on('invitation:answer', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      const secret = cleanText(payload.secret, 200); const answer = payload.answer === 'rechazar' ? 'rechazar' : 'aceptar';
+      if (!secret) return fail(acknowledge, 'Escribe el código o abre el enlace de invitación.');
+      const secretHash = sha256(secret);
+      if (storage.schemaReady) {
+        try {
+          const result = await store.answerInvitation(secretHash, answer, socket.data.accessToken);
+          replaceState(await store.loadState());
+          return acknowledge({ ok: true, wallId: result.sala_id, status: result.estado });
+        } catch { return fail(acknowledge, 'La invitación no es válida, venció o ya fue utilizada.'); }
+      }
+      const invitation = invitations.find((item) => item.tokenHash === secretHash || item.codeHash === secretHash);
+      if (!invitation || invitation.email !== user.email || invitation.status !== 'pendiente' || invitation.expiresAt <= Date.now()) return fail(acknowledge, 'La invitación no es válida, venció o ya fue utilizada.');
+      invitation.status = answer === 'aceptar' ? 'aceptada' : 'rechazada';
+      if (answer === 'aceptar') {
+        const wall = findWall(invitation.wallId); if (!wall || wall.members[user.id]) return fail(acknowledge, 'La invitación ya no se puede aceptar.');
+        wall.members[user.id] = invitation.role;
+      }
+      acknowledge({ ok: true, wallId: invitation.wallId, status: invitation.status });
+    });
+
+    socket.on('invitation:cancel', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      if (storage.schemaReady) {
+        try { await store.cancelInvitation(payload.id, socket.data.accessToken); return acknowledge({ ok: true }); }
+        catch { return fail(acknowledge, 'La invitación no se puede cancelar.'); }
+      }
+      const invitation = invitations.find((item) => item.id === payload.id && item.invitedBy === user.id && item.status === 'pendiente');
+      if (!invitation) return fail(acknowledge, 'La invitación no se puede cancelar.'); invitation.status = 'cancelada'; acknowledge({ ok: true });
+    });
+
+    socket.on('invitation:resend', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      const secrets = invitationSecrets();
+      if (storage.schemaReady) {
+        try {
+          const saved = await store.resendInvitation({ id: payload.id, ...secrets }, socket.data.accessToken);
+          return acknowledge({ ok: true, invitation: saved, code: secrets.code, link: `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}` });
+        } catch { return fail(acknowledge, 'La invitación no se puede reenviar.'); }
+      }
+      const invitation = invitations.find((item) => item.id === payload.id && item.invitedBy === user.id && !['aceptada', 'cancelada'].includes(item.status));
+      if (!invitation) return fail(acknowledge, 'La invitación no se puede reenviar.'); Object.assign(invitation, secrets, { status: 'pendiente' });
+      acknowledge({ ok: true, invitation: invitationView(invitation, user), code: secrets.code, link: `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}` });
     });
 
     socket.on('wall:member:update', async (payload = {}, acknowledge = () => {}) => {
@@ -558,6 +649,61 @@ function createMuroServer(options = {}) {
       acknowledge({ ok: true });
     });
 
+    socket.on('report:create', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      const reason = REPORT_REASONS.has(payload.reason) ? payload.reason : ''; const detail = cleanText(payload.detail, 1000);
+      const wall = payload.wallId ? findWall(payload.wallId) : null;
+      if (!reason || detail.length < 10) return fail(acknowledge, 'Describe el problema con al menos 10 caracteres.');
+      if (payload.wallId && (!wall || !wallRole(wall, user))) return fail(acknowledge, 'No puedes reportar contenido de un muro al que no perteneces.');
+      const report = { id: crypto.randomUUID(), reporterId: user.id, wallId: wall?.id || null, noteId: cleanText(payload.noteId, 100) || null, reason, detail, status: 'pendiente', decision: '', createdAt: Date.now() };
+      if (storage.schemaReady) {
+        try { const saved = await store.createReport(report, socket.data.accessToken); report.id = saved.id; report.createdAt = Date.parse(saved.creado_en); }
+        catch { return fail(acknowledge, 'No se pudo registrar el reporte.'); }
+      }
+      reports.push(report);
+      for (const peer of io.sockets.sockets.values()) if (findUser(peer)?.role === 'superadmin') peer.emit('report:received');
+      acknowledge({ ok: true, report: reportView(report) }); emitAdminSnapshot();
+    });
+
+    socket.on('reports:list', async (_payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      if (storage.schemaReady) {
+        try { const rows = await store.listOwnReports(socket.data.accessToken); return acknowledge({ ok: true, reports: rows.map((row) => ({ id: row.id, reason: row.motivo, detail: row.detalle, status: row.estado, decision: row.decision, createdAt: Date.parse(row.creado_en), reviewedAt: row.revisado_en ? Date.parse(row.revisado_en) : null, answeredAt: row.respondido_en ? Date.parse(row.respondido_en) : null })) }); }
+        catch { return fail(acknowledge, 'No se pudieron cargar tus reportes.'); }
+      }
+      acknowledge({ ok: true, reports: reports.filter((item) => item.reporterId === user.id).map((item) => reportView(item)) });
+    });
+
+    socket.on('admin:reports:list', async (_payload = {}, acknowledge = () => {}) => {
+      const admin = requireAdmin(socket, acknowledge); if (!admin) return;
+      if (storage.schemaReady) {
+        try { const rows = await store.listAdminReports(socket.data.accessToken); return acknowledge({ ok: true, reports: rows.map((row) => ({ id: row.id, reporterId: row.reportante_id, reporterName: row.reportante_nombre, reason: row.motivo, detail: row.detalle, status: row.estado, decision: row.decision, createdAt: Date.parse(row.creado_en), reviewedAt: row.revisado_en ? Date.parse(row.revisado_en) : null, answeredAt: row.respondido_en ? Date.parse(row.respondido_en) : null })) }); }
+        catch { return fail(acknowledge, 'No se pudieron cargar los reportes.'); }
+      }
+      acknowledge({ ok: true, reports: reports.map((item) => reportView(item, true)) });
+    });
+
+    socket.on('admin:report:take', async (payload = {}, acknowledge = () => {}) => {
+      const admin = requireAdmin(socket, acknowledge); if (!admin) return;
+      if (storage.schemaReady) { try { await store.takeReport(payload.id, socket.data.accessToken); return acknowledge({ ok: true }); } catch { return fail(acknowledge, 'El reporte ya no está disponible.'); } }
+      const report = reports.find((item) => item.id === payload.id && item.status === 'pendiente'); if (!report) return fail(acknowledge, 'El reporte ya no está disponible.');
+      Object.assign(report, { status: 'en_revision', reviewerId: admin.id, reviewedAt: Date.now() }); acknowledge({ ok: true });
+    });
+
+    socket.on('admin:report:respond', async (payload = {}, acknowledge = () => {}) => {
+      const admin = requireAdmin(socket, acknowledge); if (!admin) return;
+      const status = ['resuelto', 'rechazado'].includes(payload.status) ? payload.status : ''; const decision = cleanText(payload.decision, 1000);
+      if (!status || decision.length < 3) return fail(acknowledge, 'Escribe una respuesta válida.');
+      if (storage.schemaReady) {
+        try { const reporterId = await store.answerReport(payload.id, status, decision, socket.data.accessToken); for (const peer of io.sockets.sockets.values()) if (findUser(peer)?.id === reporterId) peer.emit('report:answered'); acknowledge({ ok: true }); emitAdminSnapshot(); return; }
+        catch { return fail(acknowledge, 'No se pudo responder el reporte.'); }
+      }
+      const report = reports.find((item) => item.id === payload.id && ['pendiente', 'en_revision'].includes(item.status)); if (!report) return fail(acknowledge, 'El reporte ya no está disponible.');
+      Object.assign(report, { status, decision, reviewerId: admin.id, reviewedAt: report.reviewedAt || Date.now(), answeredAt: Date.now() });
+      for (const peer of io.sockets.sockets.values()) if (findUser(peer)?.id === report.reporterId) peer.emit('report:answered');
+      acknowledge({ ok: true }); emitAdminSnapshot();
+    });
+
     socket.on('admin:clear', async (payload = {}, acknowledge = () => {}) => {
       const user = requireAdmin(socket, acknowledge);
       const wall = findWall(payload.wallId || socket.data.wallId);
@@ -574,12 +720,12 @@ function createMuroServer(options = {}) {
     socket.on('admin:snapshot', (_payload = {}, acknowledge = () => {}) => {
       const user = requireAdmin(socket, acknowledge);
       if (!user) return;
-      acknowledge({
-        ok: true,
-        users: users.map(publicUser),
-        walls: walls.map((wall) => ({ ...wallSummary(wall, user), members: wallMembers(wall) })),
-        connected: io.engine.clientsCount
-      });
+      if (storage.schemaReady) {
+        store.userClient(socket.data.accessToken).rpc('muro_resumen_administrativo').then(({ data, error }) => {
+          if (error) return fail(acknowledge, 'No se pudo cargar el resumen administrativo.');
+          acknowledge({ ok: true, totals: data, connected: io.engine.clientsCount });
+        });
+      } else acknowledge({ ok: true, users: users.map(publicUser), walls: walls.map((wall) => ({ ...wallSummary(wall, user), members: wallMembers(wall) })), totals: { usuarios: users.length, salas: walls.length, notas: walls.reduce((sum, wall) => sum + wall.notes.length, 0), reportes_pendientes: reports.filter((item) => ['pendiente', 'en_revision'].includes(item.status)).length }, connected: io.engine.clientsCount });
     });
 
     socket.on('admin:user:role', async (payload = {}, acknowledge = () => {}) => {
@@ -601,7 +747,7 @@ function createMuroServer(options = {}) {
     socket.on('disconnect', () => io.emit('users:count', io.engine.clientsCount));
   });
 
-  return { app, httpServer, io, users, sessions, walls, ready, storage };
+  return { app, httpServer, io, users, sessions, walls, invitations, reports, ready, storage };
 }
 
 if (require.main === module) {
@@ -610,4 +756,4 @@ if (require.main === module) {
   httpServer.listen(port, () => console.log(`Muro disponible en http://localhost:${port}`));
 }
 
-module.exports = { COLORS, cleanText, createMuroServer, safeCoordinate, validEmail };
+module.exports = { COLORS, cleanText, createMuroServer, invitationSecrets, safeCoordinate, sha256, validEmail };

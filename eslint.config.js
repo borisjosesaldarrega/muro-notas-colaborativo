@@ -20,9 +20,9 @@ module.exports = [
       ecmaVersion: 2022,
       sourceType: 'script',
       globals: {
-        CSS: 'readonly', FileReader: 'readonly', FormData: 'readonly', Intl: 'readonly', Map: 'readonly', Set: 'readonly',
+        CSS: 'readonly', FileReader: 'readonly', FormData: 'readonly', Intl: 'readonly', Map: 'readonly', Set: 'readonly', TextEncoder: 'readonly', URLSearchParams: 'readonly',
         crypto: 'readonly', location: 'readonly', history: 'readonly', console: 'readonly', Date: 'readonly', Promise: 'readonly', Object: 'readonly', Number: 'readonly', String: 'readonly',
-        document: 'readonly', fetch: 'readonly', io: 'readonly', localStorage: 'readonly', sessionStorage: 'readonly',
+        document: 'readonly', fetch: 'readonly', io: 'readonly', localStorage: 'readonly', navigator: 'readonly', sessionStorage: 'readonly',
         setTimeout: 'readonly', clearTimeout: 'readonly', window: 'readonly'
       }
     },

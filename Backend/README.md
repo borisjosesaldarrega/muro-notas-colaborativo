@@ -14,6 +14,9 @@ Este backend reemplaza la demostración que guardaba todo en memoria. Mantiene u
 - Privacidad de muros: ser superadministrador no concede acceso automático a muros ajenos.
 - Persistencia en Supabase con modo en memoria para pruebas locales.
 - Creación atómica de sala y membresía propietaria mediante la RPC `muro_crear_sala`.
+- Invitaciones con enlace y código de un solo uso, hash SHA-256, vencimiento, aceptación, rechazo, reenvío y cancelación.
+- Alta de miembros únicamente después de aceptar una invitación válida.
+- Reportes privados con bandeja del usuario, recepción del superadmin, toma, respuesta y notificación en tiempo real.
 
 ## Ejecutar
 
@@ -27,42 +30,12 @@ El servidor utiliza el frontend ubicado en `../Frontend`.
 
 Para activar Supabase, copia `.env.example` como `.env` y completa las variables en tu entorno local. Nunca subas el archivo `.env` ni claves privadas.
 
-## Pendiente para Steven: invitaciones y reportes
+## Cierre de invitaciones y reportes
 
-Responsable propuesto: **Steven León — @stevenleonb2**
+Responsable de implementación y corrección: **Boris Salda Vargas**.
 
-### 1. Validación de invitaciones
+La entrega anterior había dejado estos dos módulos como pendientes. Boris terminó el contrato del backend y su interfaz: la persona propietaria genera enlace y código, Supabase conserva únicamente los hashes, el destinatario acepta o rechaza, y solo la aceptación crea la membresía. También quedaron disponibles consulta, reenvío y cancelación, con controles de destinatario, duplicados, vencimiento y reutilización.
 
-El evento `wall:invite` actualmente agrega directamente a una cuenta registrada. Falta convertirlo en un flujo de invitación verificable:
+En reportes, el autor sale siempre de la sesión. Cada persona ve únicamente sus solicitudes; el superadmin recibe, toma y responde sin obtener por ello acceso al contenido de muros privados. La respuesta vuelve solamente a la persona que creó el reporte. Las pruebas cubren el recorrido correcto y los intentos no autorizados.
 
-1. Definir si la invitación se aceptará mediante enlace, código o ambos.
-2. Generar un token o código aleatorio, de un solo uso y con fecha de expiración.
-3. Guardar solamente el hash del token o código.
-4. Crear los eventos para enviar, consultar, aceptar, rechazar, reenviar y cancelar invitaciones.
-5. Agregar al usuario a `muro_sala_miembros` únicamente después de validar la invitación.
-6. Impedir que un lector invite personas o modifique permisos.
-7. Rechazar invitaciones vencidas, usadas, canceladas o dirigidas a otro usuario.
-8. Evitar invitaciones duplicadas para la misma sala y el mismo correo.
-9. Añadir pruebas automáticas del flujo correcto y de los casos de error.
-10. Documentar los eventos y las respuestas que consumirá el frontend.
-
-La integración con correo puede conectarse después; la validación del backend no debe depender de que el correo ya esté configurado.
-
-### 2. Flujo de reportes y respuestas
-
-Las migraciones ya contemplan la tabla de reportes, pero falta terminar su API y su comunicación en tiempo real:
-
-1. Permitir que un usuario autenticado cree un reporte con categoría, motivo y descripción validados.
-2. Guardar cada reporte en Supabase con estado `pendiente`, autor y fecha.
-3. Enviar el nuevo reporte en tiempo real únicamente a las cuentas superadministradoras.
-4. Permitir que solo un superadministrador consulte, tome, revise y responda reportes.
-5. Guardar quién revisó el reporte, la respuesta, la decisión y la fecha de revisión.
-6. Manejar estados definidos: `pendiente`, `en_revision`, `resuelto` y `rechazado`.
-7. Enviar la respuesta en tiempo real únicamente al usuario que creó el reporte.
-8. Permitir que cada usuario consulte solo sus propios reportes y respuestas.
-9. Evitar que el identificador enviado por el navegador suplante al autor; el autor debe salir de la sesión autenticada.
-10. No mostrar el contenido de muros privados al superadministrador por el solo hecho de recibir un reporte.
-11. Validar longitudes, estados y transiciones para impedir respuestas vacías o cambios inválidos.
-12. Añadir pruebas de creación, recepción, autorización, respuesta y privacidad.
-
-Se considera terminado cuando las pruebas demuestren el recorrido completo: usuario crea el reporte, superadministrador lo recibe y responde, y el mismo usuario recibe la respuesta.
+La actualización visual de Pierina se mantuvo intacta y se conectó a estos eventos. La misma versión se publica desde la raíz y queda reflejada en `Backend/`, `Frontend/` y `BaseDeDatos/` para la revisión por áreas.

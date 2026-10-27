@@ -68,6 +68,8 @@
           <div id="userMenu" class="user-menu hidden" role="menu" aria-label="Menú de usuario">
             <div class="user-menu-head"><span id="menuAvatar" class="avatar-face">U</span><div><strong id="menuName">Usuario</strong><small id="menuEmail"></small></div></div>
             <button type="button" role="menuitem" data-open-screen="profile">Mi perfil</button>
+            <button type="button" role="menuitem" data-open-screen="invitations">Invitaciones</button>
+            <button type="button" role="menuitem" data-open-screen="reports">Mis reportes</button>
             <button type="button" role="menuitem" data-open-screen="settings">Configuración</button>
             <button id="menuAdmin" class="hidden" type="button" role="menuitem" data-open-screen="admin">Panel superadmin</button>
             <hr><button id="logoutButton" class="menu-danger" type="button" role="menuitem">Cerrar sesión</button>
@@ -95,6 +97,7 @@
           <button class="swatch purple" type="button" data-filter="lila" aria-label="Filtrar por lila"></button>
         </div>
         <button id="membersButton" class="secondary-button compact" type="button">Miembros</button>
+        <button id="reportButton" class="secondary-button compact" type="button">Reportar</button>
         <span id="connectionStatus" class="status" role="status"><i></i> Conectando…</span>
       </section>
       <section id="board" class="board" aria-label="Muro colaborativo"></section>
@@ -117,9 +120,18 @@
           <section class="hidden danger-zone" data-settings-panel="danger"><h2>Zona de peligro</h2><p>Eliminar la cuenta cerrará tu sesión y retirará tus accesos. Esta acción requiere tu contraseña.</p><button id="deleteAccountButton" class="danger-button" type="button">Eliminar cuenta</button></section>
         </div>
       </div>
+      <div id="invitationsScreen" class="screen-card hidden">
+        <div class="section-heading"><div><h2>Invitaciones</h2><p class="muted">Acepta con el enlace o el código de 6 dígitos. Cada invitación vence y solo puede usarse una vez.</p></div></div>
+        <form id="invitationCodeForm" class="inline-form"><input id="invitationCode" inputmode="text" maxlength="128" placeholder="Código o token del enlace" required><select id="invitationAnswer"><option value="aceptar">Aceptar</option><option value="rechazar">Rechazar</option></select><button class="primary-button" type="submit">Confirmar</button></form>
+        <div id="invitationsList" class="data-list"></div>
+      </div>
+      <div id="reportsScreen" class="screen-card hidden">
+        <div class="section-heading"><div><h2>Mis reportes</h2><p class="muted">Aquí verás únicamente tus solicitudes y la respuesta del equipo.</p></div><button id="newReportButton" class="primary-button compact" type="button">Nuevo reporte</button></div>
+        <div id="reportsList" class="data-list"></div>
+      </div>
       <div id="adminScreen" class="admin-layout hidden">
-        <nav class="admin-nav"><button class="active" data-admin-tab="summary">Resumen privado</button></nav>
-        <div class="admin-content"><section id="adminSummary" data-admin-panel="summary"></section></div>
+        <nav class="admin-nav"><button class="active" data-admin-tab="summary">Resumen privado</button><button data-admin-tab="reports">Reportes</button></nav>
+        <div class="admin-content"><section id="adminSummary" data-admin-panel="summary"></section><section id="adminReports" class="hidden" data-admin-panel="reports"></section></div>
       </div>
     </section>
   </main>
@@ -129,6 +141,12 @@
   <dialog id="wallDialog" aria-labelledby="wallDialogTitle"><form id="wallForm"><div class="dialog-head"><div><p class="eyebrow">Nuevo espacio</p><h2 id="wallDialogTitle">Crear muro</h2></div><button id="closeWallDialog" class="close-button" type="button" aria-label="Cerrar">×</button></div><label for="wallName">Nombre</label><input id="wallName" maxlength="60" required><label for="wallDescription">Descripción</label><textarea id="wallDescription" maxlength="160" rows="3"></textarea><div class="dialog-actions"><button id="cancelWall" class="secondary-button" type="button">Cancelar</button><button class="primary-button" type="submit">Crear muro</button></div></form></dialog>
 
   <dialog id="membersDialog" aria-labelledby="membersDialogTitle"><div class="dialog-body"><div class="dialog-head"><div><p class="eyebrow">Colaboración</p><h2 id="membersDialogTitle">Miembros del muro</h2></div><button id="closeMembersDialog" class="close-button" type="button" aria-label="Cerrar">×</button></div><form id="inviteMemberForm" class="inline-form"><input id="memberEmail" type="email" placeholder="correo registrado" required><select id="memberRole"><option value="editor">Editor</option><option value="lector">Lector</option></select><button class="primary-button" type="submit">Invitar</button></form><div id="membersList" class="members-list"></div></div></dialog>
+
+  <dialog id="invitationResultDialog" aria-labelledby="invitationResultTitle"><div class="dialog-body"><div class="dialog-head"><div><p class="eyebrow">Invitación creada</p><h2 id="invitationResultTitle">Comparte el acceso</h2></div><button id="closeInvitationResult" class="close-button" type="button" aria-label="Cerrar">×</button></div><p class="muted">Envía uno de estos datos al correo indicado. El código y el enlace vencen en 24 horas y funcionan una sola vez.</p><label for="invitationResultCode">Código</label><input id="invitationResultCode" readonly><label for="invitationResultLink">Enlace</label><textarea id="invitationResultLink" rows="3" readonly></textarea><button id="copyInvitation" class="primary-button full" type="button">Copiar enlace y código</button></div></dialog>
+
+  <dialog id="reportDialog" aria-labelledby="reportDialogTitle"><form id="reportForm"><div class="dialog-head"><div><p class="eyebrow">Ayuda y seguridad</p><h2 id="reportDialogTitle">Crear reporte</h2></div><button id="closeReportDialog" class="close-button" type="button" aria-label="Cerrar">×</button></div><label for="reportReason">Motivo</label><select id="reportReason" required><option value="fallo_aplicacion">Fallo de la aplicación</option><option value="contenido_ofensivo">Contenido ofensivo</option><option value="spam">Spam</option><option value="enlace_inseguro">Enlace inseguro</option><option value="otro">Otro</option></select><label for="reportDetail">Descripción</label><textarea id="reportDetail" minlength="10" maxlength="1000" rows="6" required></textarea><p class="muted">No copies contenido privado innecesario. El administrador recibe tu descripción, no las notas del muro.</p><div class="dialog-actions"><button id="cancelReport" class="secondary-button" type="button">Cancelar</button><button class="primary-button" type="submit">Enviar reporte</button></div></form></dialog>
+
+  <dialog id="reportResponseDialog" aria-labelledby="reportResponseTitle"><form id="reportResponseForm"><div class="dialog-head"><div><p class="eyebrow">Atención de reporte</p><h2 id="reportResponseTitle">Responder al usuario</h2></div><button id="closeReportResponse" class="close-button" type="button" aria-label="Cerrar">×</button></div><input id="reportResponseId" type="hidden"><label for="reportResponseStatus">Decisión</label><select id="reportResponseStatus"><option value="resuelto">Resuelto</option><option value="rechazado">Rechazado</option></select><label for="reportResponseText">Respuesta</label><textarea id="reportResponseText" minlength="3" maxlength="1000" rows="5" required></textarea><div class="dialog-actions"><button id="cancelReportResponse" class="secondary-button" type="button">Cancelar</button><button class="primary-button" type="submit">Enviar respuesta</button></div></form></dialog>
 
   <dialog id="recoveryPasswordDialog" aria-labelledby="recoveryPasswordTitle"><form id="recoveryPasswordForm"><div class="dialog-head"><div><p class="eyebrow">Recupera tu acceso</p><h2 id="recoveryPasswordTitle">Crea una nueva contraseña</h2></div></div><p class="muted">Usa al menos 8 caracteres y repítela para confirmar.</p><label for="recoveryPassword">Nueva contraseña</label><input id="recoveryPassword" type="password" autocomplete="new-password" minlength="8" required><label for="recoveryPasswordConfirmation">Confirmar contraseña</label><input id="recoveryPasswordConfirmation" type="password" autocomplete="new-password" minlength="8" required><button class="primary-button full" type="submit">Guardar nueva contraseña</button></form></dialog>
 

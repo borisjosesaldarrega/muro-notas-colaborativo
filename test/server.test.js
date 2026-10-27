@@ -108,14 +108,19 @@ test('persiste perfil, tema y preferencias del usuario en el servidor', async ()
   assert.equal(login.user.settings.theme, 'dark');
 });
 
-test('crea muros, invita miembros y aplica permisos de lectura', async () => {
+test('crea invitaciones de un solo uso y agrega la membresía únicamente al aceptar', async () => {
   const admin = clients[0];
   const member = clients[1];
   const created = await ack(admin, 'wall:create', { name: 'Sprint web', description: 'Ideas del equipo' });
   assert.equal(created.wall.role, 'propietario');
   const wallId = created.wall.id;
   const invited = await ack(admin, 'wall:invite', { wallId, email: 'brenda@example.com', role: 'lector' });
-  assert.equal(invited.members.find((item) => item.email === 'brenda@example.com').roleInWall, 'lector');
+  assert.equal(invited.invitation.status, 'pendiente');
+  assert.equal(invited.code.length, 6);
+  assert.equal((await ack(member, 'wall:select', { id: wallId })).ok, false);
+  const accepted = await ack(member, 'invitation:answer', { secret: invited.code, answer: 'aceptar' });
+  assert.equal(accepted.status, 'aceptada');
+  assert.equal((await ack(member, 'invitation:answer', { secret: invited.code, answer: 'aceptar' })).ok, false);
   assert.equal((await ack(member, 'wall:select', { id: wallId })).wall.role, 'lector');
   assert.equal((await ack(member, 'note:create', { texto: 'No permitido', color: 'verde' })).ok, false);
 
@@ -124,6 +129,21 @@ test('crea muros, invita miembros y aplica permisos de lectura', async () => {
   assert.equal((await ack(member, 'wall:select', { id: wallId })).wall.role, 'editor');
   assert.equal((await ack(member, 'note:create', { texto: 'Ahora sí', color: 'verde' })).ok, true);
   assert.equal((await ack(admin, 'wall:update', { id: wallId, name: 'Sprint actualizado', description: '' })).wall.name, 'Sprint actualizado');
+});
+
+test('mantiene reportes privados y permite que el superadmin responda al mismo autor', async () => {
+  const admin = clients[0]; const member = clients[1];
+  const created = await ack(member, 'report:create', { reason: 'fallo_aplicacion', detail: 'La pantalla no carga correctamente.' });
+  assert.equal(created.report.status, 'pendiente');
+  assert.equal(server.reports[0].reporterId, server.users.find((user) => user.email === 'brenda@example.com').id);
+  const own = await ack(member, 'reports:list'); assert.equal(own.reports.length, 1);
+  const adminList = await ack(admin, 'admin:reports:list'); assert.equal(adminList.reports.length, 1); assert.equal(adminList.reports[0].wallName, undefined);
+  assert.equal((await ack(admin, 'admin:report:take', { id: created.report.id })).ok, true);
+  assert.equal((await ack(admin, 'admin:report:respond', { id: created.report.id, status: 'resuelto', decision: 'Se corrigió la carga.' })).ok, true);
+  const answered = await ack(member, 'reports:list'); assert.equal(answered.reports[0].decision, 'Se corrigió la carga.');
+  const outsider = await connect();
+  await ack(outsider, 'auth:register', { name: 'Persona externa', email: 'externa@example.com', password: 'clave999', passwordConfirmation: 'clave999' });
+  assert.equal((await ack(outsider, 'reports:list')).reports.length, 0);
 });
 
 test('rechaza roles simulados en el navegador y autoriza solo al superadmin real', async () => {
@@ -136,7 +156,7 @@ test('rechaza roles simulados en el navegador y autoriza solo al superadmin real
 
   const snapshot = await ack(admin, 'admin:snapshot');
   assert.equal(snapshot.ok, true);
-  assert.equal(snapshot.users.length, 2);
+  assert.ok(snapshot.users.length >= 2);
   assert.equal(snapshot.walls.length, 2);
   const memberId = snapshot.users.find((user) => user.email === 'brenda@example.com').id;
   const ownerId = snapshot.users.find((user) => user.email === 'saldavargasboris@gmail.com').id;

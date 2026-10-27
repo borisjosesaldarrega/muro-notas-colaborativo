@@ -5,6 +5,12 @@
   const noteValue = (row) => ({ id: row.id, titulo: row.titulo, texto: row.contenido, color: row.color, x: Number(row.posicion_x), y: Number(row.posicion_y), autor: row.nombre_autor, authorId: row.autor_id, updatedAt: dateValue(row.actualizado_en) });
   const settingsValue = (row = {}) => ({ theme: row.tema || 'light', confirmDelete: row.confirmar_eliminacion ?? true, compactNotes: row.notas_compactas ?? false, notifications: row.notificaciones ?? true });
   const profileValue = (row, settings) => ({ id: row.id, name: row.nombre, email: row.correo, role: row.rol, avatar: row.avatar || '', createdAt: dateValue(row.creado_en), settings: settingsValue(settings) });
+  const sha256 = async (value) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value))))).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  const invitationSecrets = async () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(32)); const token = Array.from(bytes).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, '0');
+    return { token, code, tokenHash: await sha256(token), codeHash: await sha256(code), expiresAt: new Date(Date.now() + 86_400_000).toISOString() };
+  };
   const rawError = (error) => String(error?.message || error || 'No se pudo completar la operación.').replace(/^.*?:\s*/, '');
   const publicError = (error, event) => {
     const message = rawError(error);
@@ -34,6 +40,11 @@
       'wall:update': 'No se pudo actualizar el muro.',
       'wall:delete': 'No se pudo eliminar el muro.',
       'wall:invite': 'No se pudo completar la invitación.',
+      'invitation:answer': 'La invitación no es válida, venció o ya fue utilizada.',
+      'invitations:list': 'No se pudieron cargar las invitaciones.',
+      'report:create': 'No se pudo registrar el reporte.',
+      'reports:list': 'No se pudieron cargar tus reportes.',
+      'admin:reports:list': 'No se pudieron cargar los reportes.',
       'note:create': 'No se pudo crear la nota.',
       'note:update': 'No se pudo actualizar la nota.',
       'note:move': 'No se pudo mover la nota.',
@@ -46,7 +57,7 @@
 
   class SupabaseSocketAdapter {
     constructor() {
-      this.handlers = new Map(); this.connected = false; this.client = null; this.currentWallId = null; this.online = 1; this.realtimeChannel = null;
+      this.handlers = new Map(); this.connected = false; this.client = null; this.currentWallId = null; this.online = 1; this.realtimeChannel = null; this.reportChannel = null; this.reportUserId = null;
       this.io = { on: (event, handler) => this.on(`io:${event}`, handler) };
       this.initialize();
     }
@@ -90,7 +101,15 @@
         this.client.from('muro_usuarios').select('*').eq('id', id).single(),
         this.client.from('muro_configuraciones_usuario').select('*').eq('usuario_id', id).single()
       ]);
-      if (profileError) throw profileError; if (settingsError) throw settingsError; return profileValue(profile, settings);
+      if (profileError) throw profileError; if (settingsError) throw settingsError; const value = profileValue(profile, settings); await this.installReportRealtime(value); return value;
+    }
+    async installReportRealtime(profile) {
+      if (this.reportUserId === profile.id && this.reportChannel) return;
+      if (this.reportChannel) await this.client.removeChannel(this.reportChannel);
+      const channel = this.client.channel(`reportes:${profile.id}:${crypto.randomUUID()}`); this.reportChannel = channel; this.reportUserId = profile.id;
+      channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'muro_reportes', filter: `reportante_id=eq.${profile.id}` }, () => this.trigger('report:answered'));
+      if (profile.role === 'superadmin') channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'muro_reportes' }, () => this.trigger('report:received'));
+      channel.subscribe();
     }
     async wallMembers(wallId) {
       const { data: rows, error } = await this.client.from('muro_sala_miembros').select('usuario_id,rol').eq('sala_id', wallId); if (error) throw error;
@@ -117,7 +136,7 @@
         }
         case 'auth:login': { const { data, error } = await this.client.auth.signInWithPassword({ email: payload.email.trim().toLowerCase(), password: payload.password }); if (error) throw error; return { ok: true, token: data.session.access_token, user: await this.userProfile(data.user.id) }; }
         case 'auth:restore': { const session = await this.session(); if (!session) return { ok: false, error: 'La sesión expiró.' }; return { ok: true, token: session.access_token, user: await this.userProfile(session.user.id) }; }
-        case 'auth:logout': { if (this.realtimeChannel) await this.client.removeChannel(this.realtimeChannel); this.realtimeChannel = null; const { error } = await this.client.auth.signOut(); if (error) throw error; return { ok: true }; }
+        case 'auth:logout': { if (this.realtimeChannel) await this.client.removeChannel(this.realtimeChannel); if (this.reportChannel) await this.client.removeChannel(this.reportChannel); this.realtimeChannel = null; this.reportChannel = null; this.reportUserId = null; const { error } = await this.client.auth.signOut(); if (error) throw error; return { ok: true }; }
         case 'auth:recover': { const { error } = await this.client.auth.resetPasswordForEmail(payload.email.trim().toLowerCase(), { redirectTo: location.origin }); if (error) throw error; return { ok: true }; }
         case 'auth:verify-code': {
           const type = payload.type === 'signup' ? 'signup' : 'recovery'; const { data, error } = await this.client.auth.verifyOtp({ email: payload.email.trim().toLowerCase(), token: payload.token.trim(), type }); if (error) throw error;
@@ -145,7 +164,15 @@
         case 'wall:create': { await this.identity(); const { data: id, error } = await this.client.rpc('muro_crear_sala', { nombre_nuevo: payload.name.trim(), descripcion_nueva: payload.description?.trim() || '' }); if (error) throw error; return { ok: true, id }; }
         case 'wall:update': { const { error } = await this.client.from('muro_salas').update({ nombre: payload.name.trim(), descripcion: payload.description?.trim() || '', actualizado_en: new Date().toISOString() }).eq('id', payload.id); if (error) throw error; return { ok: true }; }
         case 'wall:delete': { const { error } = await this.client.from('muro_salas').delete().eq('id', payload.id); if (error) throw error; this.trigger('wall:deleted', payload.id); return { ok: true }; }
-        case 'wall:invite': { const { session } = await this.identity(); const response = await fetch('/.netlify/functions/invite-member', { method: 'POST', headers: { authorization: `Bearer ${session.access_token}`, 'content-type': 'application/json' }, body: JSON.stringify({ wallId: payload.wallId, email: payload.email.trim().toLowerCase(), role: payload.role }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'No se pudo enviar la invitación.'); return { ok: true, members: (await this.selectWall(payload.wallId)).members }; }
+        case 'wall:invite': {
+          await this.identity(); const secrets = await invitationSecrets();
+          const { data, error } = await this.client.rpc('muro_crear_invitacion', { sala_objetivo: payload.wallId, correo_objetivo: payload.email.trim().toLowerCase(), rol_objetivo: payload.role, token_hash_nuevo: secrets.tokenHash, codigo_hash_nuevo: secrets.codeHash, vence_en_nuevo: secrets.expiresAt });
+          if (error) throw error; return { ok: true, invitation: data, code: secrets.code, link: `${location.origin}${location.pathname}?invitacion=${encodeURIComponent(secrets.token)}`, members: (await this.selectWall(payload.wallId)).members };
+        }
+        case 'invitations:list': { const { data, error } = await this.client.rpc('muro_listar_invitaciones'); if (error) throw error; return { ok: true, invitations: (data || []).map((row) => ({ id: row.id, wallId: row.sala_id, wallName: row.sala_nombre, email: row.correo, role: row.rol, status: row.estado, owner: row.es_propietario, expiresAt: dateValue(row.vence_en), createdAt: dateValue(row.creado_en) })) }; }
+        case 'invitation:answer': { const { data, error } = await this.client.rpc('muro_responder_invitacion', { secreto_hash: await sha256(payload.secret), respuesta: payload.answer === 'rechazar' ? 'rechazar' : 'aceptar' }); if (error) throw error; return { ok: true, wallId: data.sala_id, status: data.estado }; }
+        case 'invitation:cancel': { const { error } = await this.client.rpc('muro_cancelar_invitacion', { invitacion_objetivo: payload.id }); if (error) throw error; return { ok: true }; }
+        case 'invitation:resend': { const secrets = await invitationSecrets(); const { data, error } = await this.client.rpc('muro_reenviar_invitacion', { invitacion_objetivo: payload.id, token_hash_nuevo: secrets.tokenHash, codigo_hash_nuevo: secrets.codeHash, vence_en_nuevo: secrets.expiresAt }); if (error) throw error; return { ok: true, invitation: data, code: secrets.code, link: `${location.origin}${location.pathname}?invitacion=${encodeURIComponent(secrets.token)}` }; }
         case 'wall:member:update': { const { error } = await this.client.from('muro_sala_miembros').update({ rol: payload.role }).eq('sala_id', payload.wallId).eq('usuario_id', payload.userId); if (error) throw error; return { ok: true, members: (await this.selectWall(payload.wallId)).members }; }
         case 'wall:member:remove': { const { error } = await this.client.from('muro_sala_miembros').delete().eq('sala_id', payload.wallId).eq('usuario_id', payload.userId); if (error) throw error; return { ok: true, members: (await this.selectWall(payload.wallId)).members }; }
         case 'note:create': { const { user } = await this.identity(); const profile = await this.userProfile(user.id); const row = { id: crypto.randomUUID(), sala_id: this.currentWallId, titulo: String(payload.titulo || payload.texto).trim().slice(0, 80), contenido: payload.texto.trim(), color: payload.color, posicion_x: payload.x, posicion_y: payload.y, autor_id: user.id, nombre_autor: profile.name }; const { data, error } = await this.client.from('muro_notas').insert(row).select().single(); if (error) throw error; this.trigger('note:created', { wallId: this.currentWallId, note: noteValue(data) }); return { ok: true }; }
@@ -153,6 +180,11 @@
         case 'note:preview-move': { const { error } = await this.client.from('muro_notas').update({ posicion_x: payload.x, posicion_y: payload.y }).eq('id', payload.id).eq('sala_id', this.currentWallId); if (error) throw error; return { ok: true }; }
         case 'note:move': { const { data, error } = await this.client.from('muro_notas').update({ posicion_x: payload.x, posicion_y: payload.y, actualizado_en: new Date().toISOString() }).eq('id', payload.id).select().single(); if (error) throw error; this.trigger('note:moved', { wallId: data.sala_id, id: data.id, x: Number(data.posicion_x), y: Number(data.posicion_y), updatedAt: dateValue(data.actualizado_en) }); return { ok: true }; }
         case 'note:delete': { const { data, error } = await this.client.from('muro_notas').delete().eq('id', payload.id).select('id,sala_id').single(); if (error) throw error; this.trigger('note:deleted', { wallId: data.sala_id, id: data.id }); return { ok: true }; }
+        case 'report:create': { const { data, error } = await this.client.rpc('muro_crear_reporte', { motivo_nuevo: payload.reason, detalle_nuevo: payload.detail.trim(), sala_objetivo: payload.wallId || null, nota_objetivo: payload.noteId || null }); if (error) throw error; return { ok: true, report: data }; }
+        case 'reports:list': { const { data, error } = await this.client.rpc('muro_mis_reportes'); if (error) throw error; return { ok: true, reports: (data || []).map((row) => ({ id: row.id, reason: row.motivo, detail: row.detalle, status: row.estado, decision: row.decision, createdAt: dateValue(row.creado_en), reviewedAt: row.revisado_en ? dateValue(row.revisado_en) : null, answeredAt: row.respondido_en ? dateValue(row.respondido_en) : null })) }; }
+        case 'admin:reports:list': { const { data, error } = await this.client.rpc('muro_reportes_administracion'); if (error) throw error; return { ok: true, reports: (data || []).map((row) => ({ id: row.id, reporterId: row.reportante_id, reporterName: row.reportante_nombre, reason: row.motivo, detail: row.detalle, status: row.estado, decision: row.decision, createdAt: dateValue(row.creado_en), reviewedAt: row.revisado_en ? dateValue(row.revisado_en) : null, answeredAt: row.respondido_en ? dateValue(row.respondido_en) : null })) }; }
+        case 'admin:report:take': { const { error } = await this.client.rpc('muro_tomar_reporte', { reporte_objetivo: payload.id }); if (error) throw error; return { ok: true }; }
+        case 'admin:report:respond': { const { error } = await this.client.rpc('muro_responder_reporte', { reporte_objetivo: payload.id, estado_nuevo: payload.status, respuesta_nueva: payload.decision.trim() }); if (error) throw error; return { ok: true }; }
         case 'profile:update': { const { user } = await this.identity(); const { error } = await this.client.from('muro_usuarios').update({ nombre: payload.name.trim(), avatar: payload.avatar || '', actualizado_en: new Date().toISOString() }).eq('id', user.id); if (error) throw error; const profile = await this.userProfile(user.id); this.trigger('profile:changed', profile); return { ok: true, user: profile }; }
         case 'settings:update': { const { user } = await this.identity(); const row = { tema: payload.theme, confirmar_eliminacion: payload.confirmDelete, notas_compactas: payload.compactNotes, notificaciones: payload.notifications, actualizado_en: new Date().toISOString() }; const { data, error } = await this.client.from('muro_configuraciones_usuario').update(row).eq('usuario_id', user.id).select().single(); if (error) throw error; return { ok: true, settings: settingsValue(data) }; }
         case 'admin:snapshot': {

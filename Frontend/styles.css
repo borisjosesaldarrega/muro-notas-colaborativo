@@ -304,6 +304,20 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
 .admin-stat.tone-2 { background: color-mix(in srgb, var(--note-blue) 50%, var(--surface)); }
 .admin-stat.tone-3 { background: color-mix(in srgb, var(--note-green) 50%, var(--surface)); }
 .admin-note { margin-top: 18px; }
+.section-heading, .request-head, .request-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.section-heading { margin-bottom: 18px; }
+.section-heading h2, .section-heading p { margin: 0; }
+.request-card { display: grid; gap: 10px; padding: 17px; border-bottom: 1px solid var(--border); }
+.request-card:last-child { border-bottom: 0; }
+.request-card p, .request-card small { margin: 0; }
+.request-actions { justify-content: flex-start; margin-top: 4px; }
+.status-chip { padding: 5px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: .72rem; font-weight: 800; text-transform: capitalize; }
+.status-pendiente { background: color-mix(in srgb, var(--note-yellow) 65%, var(--surface)); color: var(--text); }
+.status-en_revision { background: color-mix(in srgb, var(--note-blue) 60%, var(--surface)); color: var(--text); }
+.status-resuelto, .status-aceptada { background: color-mix(in srgb, var(--note-green) 65%, var(--surface)); color: var(--text); }
+.status-rechazado, .status-rechazada, .status-cancelada, .status-vencida { background: color-mix(in srgb, var(--note-pink) 55%, var(--surface)); color: var(--text); }
+.response-box { padding: 12px; border-radius: 10px; background: var(--primary-soft); }
+.empty-inline { padding: 22px; color: var(--muted); text-align: center; }
 .table-tools { margin-bottom: 13px; }
 .data-list { overflow: hidden; border: 1px solid var(--border); border-radius: 15px; background: var(--surface); }
 .data-row { display: grid; grid-template-columns: minmax(180px, 1fr) 150px 150px; align-items: center; gap: 14px; padding: 15px 17px; border-bottom: 1px solid var(--border); }
