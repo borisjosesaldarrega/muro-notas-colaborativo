@@ -112,3 +112,5 @@ supabase/migrations/     Esquema y políticas RLS
 test/                    Pruebas de integración Socket.io
 server.js                Backend Express y Socket.io
 ```
+
+Las carpetas `Frontend/`, `Backend/` y `BaseDeDatos/` conservan la misma entrega organizada por áreas para la revisión académica. La raíz sigue siendo la fuente que publica Render; antes de entregar se verifican ambas rutas para que la corrección A10 no exista solamente en una copia.

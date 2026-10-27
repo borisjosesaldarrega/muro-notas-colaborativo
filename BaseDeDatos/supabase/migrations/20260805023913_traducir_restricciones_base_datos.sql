@@ -1,0 +1,28 @@
+alter table public.muro_usuarios rename constraint muro_profiles_pkey to muro_usuarios_pkey;
+alter table public.muro_usuarios rename constraint muro_profiles_id_fkey to muro_usuarios_id_fkey;
+alter table public.muro_usuarios rename constraint muro_profiles_email_key to muro_usuarios_correo_key;
+alter table public.muro_usuarios rename constraint muro_profiles_name_check to muro_usuarios_nombre_check;
+alter table public.muro_usuarios rename constraint muro_profiles_role_check to muro_usuarios_rol_check;
+
+alter table public.muro_configuraciones_usuario rename constraint muro_user_settings_pkey to muro_configuraciones_usuario_pkey;
+alter table public.muro_configuraciones_usuario rename constraint muro_user_settings_user_id_fkey to muro_configuraciones_usuario_usuario_id_fkey;
+alter table public.muro_configuraciones_usuario rename constraint muro_user_settings_theme_check to muro_configuraciones_usuario_tema_check;
+
+alter table public.muro_salas rename constraint muro_walls_pkey to muro_salas_pkey;
+alter table public.muro_salas rename constraint muro_walls_owner_id_fkey to muro_salas_propietario_id_fkey;
+alter table public.muro_salas rename constraint muro_walls_name_check to muro_salas_nombre_check;
+alter table public.muro_salas rename constraint muro_walls_description_check to muro_salas_descripcion_check;
+
+alter table public.muro_sala_miembros rename constraint muro_wall_members_pkey to muro_sala_miembros_pkey;
+alter table public.muro_sala_miembros rename constraint muro_wall_members_wall_id_fkey to muro_sala_miembros_sala_id_fkey;
+alter table public.muro_sala_miembros rename constraint muro_wall_members_user_id_fkey to muro_sala_miembros_usuario_id_fkey;
+alter table public.muro_sala_miembros rename constraint muro_wall_members_role_check to muro_sala_miembros_rol_check;
+
+alter table public.muro_notas rename constraint muro_notes_pkey to muro_notas_pkey;
+alter table public.muro_notas rename constraint muro_notes_wall_id_fkey to muro_notas_sala_id_fkey;
+alter table public.muro_notas rename constraint muro_notes_author_id_fkey to muro_notas_autor_id_fkey;
+alter table public.muro_notas rename constraint muro_notes_text_check to muro_notas_contenido_check;
+alter table public.muro_notas rename constraint muro_notes_color_check to muro_notas_color_check;
+alter table public.muro_notas rename constraint muro_notes_x_check to muro_notas_posicion_x_check;
+alter table public.muro_notas rename constraint muro_notes_y_check to muro_notas_posicion_y_check;
+alter table public.muro_notas rename constraint muro_notes_author_name_check to muro_notas_nombre_autor_check;
