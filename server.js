@@ -96,6 +96,21 @@ function createMuroServer(options = {}) {
   })();
 
   app.disable('x-powered-by');
+  app.use((req, res, next) => {
+    res.set({
+      'Content-Security-Policy': "default-src 'self'; base-uri 'self'; connect-src 'self' https://zdyljsfnnbqcrqaivwqa.supabase.co wss://zdyljsfnnbqcrqaivwqa.supabase.co; font-src 'self' https://fonts.gstatic.com data:; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; upgrade-insecure-requests",
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Resource-Policy': 'same-origin',
+      'Permissions-Policy': 'camera=(), geolocation=(), microphone=(), payment=(), usb=()',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY'
+    });
+    if (req.secure || req.get('x-forwarded-proto') === 'https') {
+      res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
   const supabaseBrowserBundle = path.join(path.dirname(require.resolve('@supabase/supabase-js')), 'umd', 'supabase.js');
   app.get('/vendor/supabase.js', (_req, res) => res.sendFile(supabaseBrowserBundle));
   app.get('/api/supabase/config', (_req, res) => {
@@ -118,7 +133,9 @@ function createMuroServer(options = {}) {
   const fail = (acknowledge, error) => acknowledge({ ok: false, error });
   const findUser = (socket) => users.find((user) => user.id === socket.data.userId);
   const findWall = (id) => walls.find((wall) => wall.id === cleanText(id, 100));
-  const wallRole = (wall, user) => user?.role === 'superadmin' ? 'propietario' : wall?.members[user?.id];
+  // El rol global administra la plataforma, pero no concede acceso implícito al
+  // contenido privado de los muros. La membresía siempre se comprueba por muro.
+  const wallRole = (wall, user) => wall?.members[user?.id];
   const canEdit = (wall, user) => ['propietario', 'editor'].includes(wallRole(wall, user));
   const canOwn = (wall, user) => wallRole(wall, user) === 'propietario';
   const requireUser = (socket, acknowledge) => {
@@ -364,10 +381,8 @@ function createMuroServer(options = {}) {
       };
       if (storage.schemaReady) {
         try {
-          await store.createWall(wall, socket.data.accessToken);
-          await store.createMember(wall.id, user.id, 'propietario', socket.data.accessToken);
+          wall.id = await store.createWall(wall, socket.data.accessToken);
         } catch {
-          try { await store.deleteWall(wall.id, socket.data.accessToken); } catch {}
           return fail(acknowledge, 'No se pudo guardar el muro en Supabase.');
         }
       }

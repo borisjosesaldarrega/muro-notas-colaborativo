@@ -1,9 +1,7 @@
 'use strict';
 
-window.muroSupabaseReady = fetch('/api/supabase/config', { credentials: 'same-origin' })
-  .then(async (response) => {
-    if (!response.ok) return null;
-    const config = await response.json();
+window.muroSupabaseReady = Promise.resolve(window.MURO_SUPABASE_CONFIG)
+  .then((config) => {
     if (!config?.url || !config?.publishableKey || !window.supabase?.createClient) return null;
     window.muroSupabase = window.supabase.createClient(config.url, config.publishableKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }

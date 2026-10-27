@@ -37,9 +37,13 @@ after(async () => {
 });
 
 test('sirve la aplicación y un estado de salud', async () => {
-  const page = await fetch(baseUrl).then((response) => response.text());
+  const pageResponse = await fetch(baseUrl);
+  const page = await pageResponse.text();
   const health = await fetch(`${baseUrl}/api/health`).then((response) => response.json());
   assert.match(page, /Muro/);
+  assert.equal(pageResponse.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(pageResponse.headers.get('x-frame-options'), 'DENY');
+  assert.match(pageResponse.headers.get('content-security-policy'), /frame-ancestors 'none'/);
   assert.equal(health.ok, true);
   assert.equal(health.notes, 1);
   assert.equal(health.walls, 1);
@@ -141,4 +145,24 @@ test('rechaza roles simulados en el navegador y autoriza solo al superadmin real
   const cleared = await ack(admin, 'admin:clear', { wallId });
   assert.equal(cleared.ok, true);
   assert.equal(cleared.removed, 1);
+});
+
+test('bloquea un IDOR aunque el atacante tenga rol global de superadmin', async () => {
+  const admin = clients[0];
+  const member = clients[1];
+  const privateWall = await ack(member, 'wall:create', { name: 'Privado de Brenda', description: 'Solo invitadas' });
+  assert.equal(privateWall.ok, true);
+
+  const guessedId = privateWall.wall.id;
+  const readAttempt = await ack(admin, 'wall:select', { id: guessedId });
+  const updateAttempt = await ack(admin, 'wall:update', { id: guessedId, name: 'Tomado', description: '' });
+  const deleteAttempt = await ack(admin, 'wall:delete', { id: guessedId });
+
+  assert.equal(readAttempt.ok, false);
+  assert.match(readAttempt.error, /No tienes acceso/);
+  assert.equal(updateAttempt.ok, false);
+  assert.match(updateAttempt.error, /propietaria/);
+  assert.equal(deleteAttempt.ok, false);
+  assert.match(deleteAttempt.error, /propietaria/);
+  assert.equal(server.walls.find((wall) => wall.id === guessedId).name, 'Privado de Brenda');
 });

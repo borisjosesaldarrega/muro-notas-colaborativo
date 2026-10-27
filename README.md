@@ -8,6 +8,7 @@ Aplicación de notas adhesivas con el lenguaje visual original de Muro DZ y una 
 - Recuperación y cambio de contraseña.
 - Rol `superadmin` reservado a la cuenta propietaria y validado siempre en el backend.
 - Muros independientes con permisos `propietario`, `editor` y `lector`.
+- Creación atómica de cada muro y su membresía propietaria mediante la RPC transaccional `muro_crear_sala`.
 - Notas sincronizadas, arrastrables y disponibles en cinco colores.
 - Perfil, avatar y preferencias de apariencia.
 - Panel superadmin para usuarios, muros, miembros y limpieza de contenido.
@@ -46,13 +47,17 @@ Abre [http://localhost:3000](http://localhost:3000). El endpoint [http://localho
 
 ## Publicar en Render
 
-El archivo `render.yaml` configura un Web Service gratuito en Node.js. Crea un Blueprint en Render desde este repositorio y selecciona la rama `agent/completar-muro-colaborativo`. Render solicitará las variables `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` y `SUPABASE_SECRET_KEY`; configura las tres desde los valores de entorno del proyecto, manteniendo la clave secreta solo en Render.
+El archivo `render.yaml` prepara un Web Service gratuito con `npm ci`, `npm start` y la comprobación `/api/health`. En Render, crea un Blueprint desde el repositorio y completa las variables que solicite:
 
-Render genera una URL pública al completar el despliegue. Comprueba `https://TU-URL/api/health`, configura `APP_URL` con la dirección pública y agrega esa dirección a las Redirect URLs de Supabase para recuperación de contraseña.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SECRET_KEY` (secreto; solo para el backend)
+
+Render asignará la URL al completar el primer despliegue. Abre esa URL para probar la aplicación y añade también la URL a las Redirect URLs permitidas en la configuración de autenticación de Supabase. Después, configura `APP_URL` en Render con esa URL para los enlaces de recuperación de contraseña. No uses `localhost` como `APP_URL` en producción. No es necesario configurar `JWT_SECRET`, `FRONT_URL` ni `DATABASE_URL` para ejecutar este servicio.
 
 ## Preparar Supabase
 
-La migración versionada está en `supabase/migrations/20260713200000_create_muro_schema.sql`. Crea `muro_profiles`, `muro_user_settings`, `muro_walls`, `muro_wall_members` y `muro_notes`, junto con índices, disparadores y políticas RLS. El prefijo `muro_` evita colisiones con otros esquemas.
+Las migraciones versionadas están en `supabase/migrations/`. Crean y actualizan las tablas `muro_usuarios`, `muro_configuraciones_usuario`, `muro_salas`, `muro_sala_miembros`, `muro_notas` y `muro_reportes`, junto con índices, funciones y políticas RLS. La migración `20261027000508_corregir_a10_creacion_atomica_muro.sql` añade la RPC transaccional usada por el frontend de Netlify y el backend Express. El prefijo `muro_` evita colisiones con otros esquemas.
 
 ```bash
 npx supabase login
@@ -72,7 +77,9 @@ Después de aplicar la migración, reinicia Node.js. El servidor cargará los da
 - Notas: integrantes pueden leer y solo propietarios/editores pueden escribir.
 - Roles globales y operaciones administrativas usan el cliente secreto exclusivamente en el backend.
 - Las operaciones normales usan una sesión de usuario con clave publicable, por lo que pasan por RLS.
-- El rol no se obtiene de `user_metadata`; se guarda en `muro_profiles` y el servidor lo verifica.
+- El rol no se obtiene de `user_metadata`; se guarda en `muro_usuarios` y el servidor lo verifica.
+- La creación de una sala no admite un propietario enviado por el navegador: la RPC toma `auth.uid()`, inserta sala y membresía en la misma transacción y revierte ambas si algo falla.
+- Los errores enviados a la interfaz se normalizan; los mensajes internos de Postgres/PostgREST no se muestran a las personas usuarias.
 
 ## Verificación
 
@@ -85,7 +92,11 @@ npm run check
 npm run verify:supabase -- --auth
 ```
 
-`verify:supabase` comprueba conexión pública, Auth y backend administrativo. Con la migración aplicada también comprueba una consulta autenticada bajo RLS. La cuenta temporal de verificación se elimina al terminar.
+`verify:supabase` comprueba conexión pública, Auth y backend administrativo. Con las migraciones aplicadas también comprueba una consulta autenticada bajo RLS. La cuenta temporal de verificación se elimina al terminar. La prueba `test/a10-atomic-wall.test.js` verifica que los clientes usan la RPC y que la inserción directa quedó cerrada.
+
+## Aporte de esta entrega
+
+Responsable de la corrección: **Boris Salda Vargas**. Sobre la actualización visual incorporada por Pierina, completé el pendiente de backend para que funcione tanto en la página principal como en la ruta Express: creación transaccional del muro, membresía propietaria, errores públicos normalizados, pruebas y documentación de seguridad.
 
 ## Respaldo en memoria
 

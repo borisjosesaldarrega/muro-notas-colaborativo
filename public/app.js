@@ -4,7 +4,7 @@ const socket = io();
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const board = $('#board');
-const state = { token: sessionStorage.getItem('muroToken') || '', user: null, walls: [], currentWall: null, members: [], notes: new Map(), filter: 'all', online: 0, admin: null, avatarDraft: '', editingWallId: null, restoring: false };
+const state = { token: sessionStorage.getItem('muroToken') || '', pendingEmail: sessionStorage.getItem('muroPendingEmail') || '', pendingVerification: sessionStorage.getItem('muroPendingVerification') || '', user: null, walls: [], currentWall: null, members: [], notes: new Map(), filter: 'all', online: 0, admin: null, avatarDraft: '', editingWallId: null, restoring: false };
 
 function create(tag, className, text) {
   const node = document.createElement(tag);
@@ -27,6 +27,16 @@ function showAuth(view = 'login') {
   $$('[data-auth-form]').forEach((item) => item.classList.toggle('hidden', item.dataset.authForm !== view));
   setTimeout(() => $(`[data-auth-form="${view}"] input`)?.focus(), 0);
 }
+function showCodeVerification(email, type) {
+  state.pendingEmail = email.trim().toLowerCase(); state.pendingVerification = type;
+  sessionStorage.setItem('muroPendingEmail', state.pendingEmail); sessionStorage.setItem('muroPendingVerification', type);
+  $('#verificationEmail').value = state.pendingEmail; $('#verificationCode').value = '';
+  const signup = type === 'signup'; $('#verifyCodeEyebrow').textContent = signup ? 'Confirma tu cuenta' : 'Recupera tu acceso';
+  $('#verifyCodeTitle').textContent = signup ? 'Te damos la bienvenida' : 'Verifica que eres tú';
+  $('#verifyCodeMessage').textContent = `Escribe el código de 8 dígitos que enviamos a ${state.pendingEmail}.`;
+  showAuth('verify');
+}
+function clearCodeVerification() { state.pendingEmail = ''; state.pendingVerification = ''; sessionStorage.removeItem('muroPendingEmail'); sessionStorage.removeItem('muroPendingVerification'); }
 function showAppView(view) {
   $('#dashboardView').classList.toggle('hidden', view !== 'dashboard');
   $('#boardView').classList.toggle('hidden', view !== 'board');
@@ -53,15 +63,44 @@ $('#loginForm').addEventListener('submit', async (event) => {
   if (!result?.ok) return toast(result?.error || 'No se pudo iniciar sesión.', true); hydrateUser(result.user, result.token); toast(`Bienvenido, ${result.user.name}.`);
 });
 $('#registerForm').addEventListener('submit', async (event) => {
-  event.preventDefault(); const button = event.currentTarget.querySelector('[type="submit"]'); setBusy(button, true);
+  event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('[type="submit"]'); setBusy(button, true);
+  const email = $('#registerEmail').value.trim().toLowerCase(); const emailConfirmation = $('#registerEmailConfirmation').value.trim().toLowerCase();
+  if (email !== emailConfirmation) { $('#registerEmailConfirmation').setCustomValidity('Los correos deben coincidir.'); $('#registerEmailConfirmation').reportValidity(); setBusy(button, false); return; }
+  $('#registerEmailConfirmation').setCustomValidity('');
   const password = $('#registerPassword').value; const passwordConfirmation = $('#registerPasswordConfirmation').value;
   if (password !== passwordConfirmation) { $('#registerPasswordConfirmation').setCustomValidity('Las contraseñas deben coincidir.'); $('#registerPasswordConfirmation').reportValidity(); setBusy(button, false); return; }
   $('#registerPasswordConfirmation').setCustomValidity('');
-  const result = await emitAck('auth:register', { name: $('#registerName').value, email: $('#registerEmail').value, password, passwordConfirmation }); setBusy(button, false);
-  if (!result?.ok) return toast(result?.error || 'No se pudo crear la cuenta.', true); hydrateUser(result.user, result.token); toast(result.user.role === 'superadmin' ? 'Cuenta creada: eres superadministrador.' : 'Cuenta creada correctamente.');
+  const result = await emitAck('auth:register', { name: $('#registerName').value, email, password, passwordConfirmation }); setBusy(button, false);
+  if (!result?.ok) return toast(result?.error || 'No se pudo crear la cuenta.', true);
+  if (result.requiresConfirmation) { form.reset(); showCodeVerification(email, 'signup'); return; }
+  hydrateUser(result.user, result.token); toast(result.user.role === 'superadmin' ? 'Cuenta creada: eres superadministrador.' : 'Cuenta creada correctamente.');
 });
+$('#registerEmailConfirmation').addEventListener('input', (event) => event.currentTarget.setCustomValidity(''));
 $('#registerPasswordConfirmation').addEventListener('input', (event) => event.currentTarget.setCustomValidity(''));
-$('#recoverForm').addEventListener('submit', async (event) => { event.preventDefault(); await emitAck('auth:recover', { email: $('#recoverEmail').value }); showAuth('success'); });
+$('#recoverForm').addEventListener('submit', async (event) => { event.preventDefault(); const button = event.currentTarget.querySelector('[type="submit"]'); const email = $('#recoverEmail').value; setBusy(button, true); const result = await emitAck('auth:recover', { email }); setBusy(button, false); if (!result?.ok) return toast(result?.error, true); showCodeVerification(email, 'recovery'); });
+
+$('#verifyCodeForm').addEventListener('submit', async (event) => {
+  event.preventDefault(); const button = event.currentTarget.querySelector('[type="submit"]'); setBusy(button, true);
+  const result = await emitAck('auth:verify-code', { email: state.pendingEmail, token: $('#verificationCode').value.trim(), type: state.pendingVerification }); setBusy(button, false);
+  if (!result?.ok) return toast(result?.error || 'El código no es válido o ya caducó.', true);
+  const type = state.pendingVerification; clearCodeVerification();
+  if (type === 'recovery') { openRecoveryPassword(); return; }
+  hydrateUser(result.user, result.token); toast('Cuenta confirmada. ¡Te damos la bienvenida!');
+});
+$('#verificationCode').addEventListener('input', (event) => { event.currentTarget.value = event.currentTarget.value.replace(/\D/g, '').slice(0, 8); });
+$('#resendVerificationCode').addEventListener('click', async (event) => { const button = event.currentTarget; setBusy(button, true); const result = await emitAck('auth:resend-code', { email: state.pendingEmail, type: state.pendingVerification }); setBusy(button, false); toast(result?.ok ? 'Te enviamos un código nuevo.' : result?.error, !result?.ok); });
+
+const recoveryRedirect = location.hash.includes('type=recovery') || location.search.includes('type=recovery');
+function openRecoveryPassword() { if (!$('#recoveryPasswordDialog').open) { $('#recoveryPasswordForm').reset(); $('#recoveryPasswordDialog').showModal(); } }
+window.muroSupabaseReady.then((client) => client?.auth.onAuthStateChange((event, session) => { if (event === 'PASSWORD_RECOVERY' || (recoveryRedirect && session)) openRecoveryPassword(); }));
+$('#recoveryPasswordForm').addEventListener('submit', async (event) => {
+  event.preventDefault(); const password = $('#recoveryPassword').value; const confirmation = $('#recoveryPasswordConfirmation').value;
+  if (password !== confirmation) { $('#recoveryPasswordConfirmation').setCustomValidity('Las contraseñas deben coincidir.'); return $('#recoveryPasswordConfirmation').reportValidity(); }
+  $('#recoveryPasswordConfirmation').setCustomValidity(''); const button = event.currentTarget.querySelector('[type="submit"]'); setBusy(button, true);
+  const result = await emitAck('auth:recovery-password', { password }); setBusy(button, false); if (!result?.ok) return toast(result?.error, true);
+  $('#recoveryPasswordDialog').close(); history.replaceState({}, '', location.pathname); toast('Contraseña actualizada correctamente.');
+});
+$('#recoveryPasswordConfirmation').addEventListener('input', (event) => event.currentTarget.setCustomValidity(''));
 
 async function showDashboard() {
   showAppView('dashboard'); $('#headerContext').textContent = 'Mis muros';
@@ -119,8 +158,8 @@ function renderNote(note) {
   element.querySelector('.note-footer span').textContent = note.autor || 'Invitado'; const position = clampPosition(element, note.x, note.y); element.style.left = `${position.x}px`; element.style.top = `${position.y}px`;
 }
 function setupDrag(element) {
-  let drag = null; element.addEventListener('pointerdown', (event) => { if (state.currentWall?.role === 'lector' || event.target.matches('textarea, button')) return; const rect = element.getBoundingClientRect(); drag = { dx: event.clientX - rect.left, dy: event.clientY - rect.top }; element.setPointerCapture(event.pointerId); element.classList.add('dragging'); });
-  element.addEventListener('pointermove', (event) => { if (!drag) return; const bounds = board.getBoundingClientRect(); const position = clampPosition(element, event.clientX - bounds.left - drag.dx, event.clientY - bounds.top - drag.dy); element.style.left = `${position.x}px`; element.style.top = `${position.y}px`; });
+  let drag = null; element.addEventListener('pointerdown', (event) => { if (state.currentWall?.role === 'lector' || event.target.matches('textarea, button')) return; const rect = element.getBoundingClientRect(); drag = { dx: event.clientX - rect.left, dy: event.clientY - rect.top, lastBroadcast: 0 }; element.setPointerCapture(event.pointerId); element.classList.add('dragging'); });
+  element.addEventListener('pointermove', (event) => { if (!drag) return; const bounds = board.getBoundingClientRect(); const position = clampPosition(element, event.clientX - bounds.left - drag.dx, event.clientY - bounds.top - drag.dy); element.style.left = `${position.x}px`; element.style.top = `${position.y}px`; const now = Date.now(); if (now - drag.lastBroadcast >= 120) { drag.lastBroadcast = now; socket.emit('note:preview-move', { id: element.dataset.noteId, x: position.x, y: position.y }); } });
   const end = async () => { if (!drag) return; drag = null; element.classList.remove('dragging'); const result = await emitAck('note:move', { id: element.dataset.noteId, x: parseFloat(element.style.left), y: parseFloat(element.style.top) }); if (!result?.ok) toast(result?.error, true); }; element.addEventListener('pointerup', end); element.addEventListener('pointercancel', end);
 }
 $('#newNoteButton').addEventListener('click', () => { $('#noteForm').reset(); $('#characterCount').textContent = '0 / 280'; $('#noteDialog').showModal(); setTimeout(() => $('#noteText').focus(), 20); }); $('#closeNoteDialog').addEventListener('click', () => $('#noteDialog').close()); $('#cancelNote').addEventListener('click', () => $('#noteDialog').close()); $('#noteText').addEventListener('input', (event) => { $('#characterCount').textContent = `${event.target.value.length} / 280`; });
@@ -146,7 +185,7 @@ function renderSettings() { const settings = state.user.settings; $$('[name="the
 $$('[data-settings-tab]').forEach((button) => button.addEventListener('click', () => { $$('[data-settings-tab]').forEach((item) => item.classList.toggle('active', item === button)); $$('[data-settings-panel]').forEach((panel) => panel.classList.toggle('hidden', panel.dataset.settingsPanel !== button.dataset.settingsTab)); }));
 async function saveSettings(patch) { const result = await emitAck('settings:update', { ...state.user.settings, ...patch }); if (!result?.ok) return toast(result?.error, true); state.user.settings = result.settings; applyTheme(result.settings.theme); document.body.classList.toggle('compact-notes', result.settings.compactNotes); toast('Preferencias guardadas.'); }
 $$('[name="theme"]').forEach((radio) => radio.addEventListener('change', () => saveSettings({ theme: radio.value }))); ['confirmDeleteSetting', 'compactNotesSetting', 'notificationsSetting'].forEach((id) => $(`#${id}`).addEventListener('change', () => saveSettings({ confirmDelete: $('#confirmDeleteSetting').checked, compactNotes: $('#compactNotesSetting').checked, notifications: $('#notificationsSetting').checked })));
-$('#passwordForm').addEventListener('submit', async (event) => { event.preventDefault(); const result = await emitAck('auth:password', { currentPassword: $('#currentPassword').value, newPassword: $('#newPassword').value }); if (!result?.ok) return toast(result?.error, true); event.currentTarget.reset(); toast('Contraseña actualizada.'); });
+$('#passwordForm').addEventListener('submit', async (event) => { event.preventDefault(); const form = event.currentTarget; const result = await emitAck('auth:password', { currentPassword: $('#currentPassword').value, newPassword: $('#newPassword').value }); if (!result?.ok) return toast(result?.error, true); form.reset(); toast('Contraseña actualizada.'); });
 $('#deleteAccountButton').addEventListener('click', async () => { const password = await confirmAction('Escribe tu contraseña para eliminar la cuenta.', { input: true }); if (!password) return; const result = await emitAck('auth:delete', { password }); if (!result?.ok) return toast(result?.error, true); clearSession(); toast('Cuenta eliminada.', true); });
 
 $('#membersButton').addEventListener('click', () => { renderMembers(); $('#membersDialog').showModal(); }); $('#closeMembersDialog').addEventListener('click', () => $('#membersDialog').close());
@@ -154,15 +193,12 @@ function renderMembers() {
   const list = $('#membersList'); list.replaceChildren(); const canManage = state.currentWall?.role === 'propietario'; $('#inviteMemberForm').classList.toggle('hidden', !canManage);
   state.members.forEach((member) => { const row = create('article', 'member-row'); const face = create('span', 'avatar-face'); renderAvatar(face, member); const info = create('div'); info.append(create('strong', '', member.name), create('small', '', member.email)); const role = create('select'); ['propietario', 'editor', 'lector'].forEach((value) => { const option = create('option', '', value); option.value = value; option.selected = member.roleInWall === value; role.append(option); }); role.disabled = !canManage || member.roleInWall === 'propietario'; role.addEventListener('change', async () => { const result = await emitAck('wall:member:update', { wallId: state.currentWall.id, userId: member.id, role: role.value }); if (!result?.ok) { toast(result?.error, true); return renderMembers(); } state.members = result.members; renderMembers(); }); const remove = create('button', 'icon-danger', '×'); remove.type = 'button'; remove.title = 'Quitar miembro'; remove.hidden = !canManage || member.roleInWall === 'propietario'; remove.addEventListener('click', async () => { if (!(await confirmAction(`¿Quitar a ${member.name} del muro?`))) return; const result = await emitAck('wall:member:remove', { wallId: state.currentWall.id, userId: member.id }); if (!result?.ok) return toast(result?.error, true); state.members = result.members; renderMembers(); }); row.append(face, info, role, remove); list.append(row); });
 }
-$('#inviteMemberForm').addEventListener('submit', async (event) => { event.preventDefault(); const result = await emitAck('wall:invite', { wallId: state.currentWall.id, email: $('#memberEmail').value, role: $('#memberRole').value }); if (!result?.ok) return toast(result?.error, true); state.members = result.members; event.currentTarget.reset(); renderMembers(); updateBoardPermissions(); toast('Miembro añadido.'); });
+$('#inviteMemberForm').addEventListener('submit', async (event) => { event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('[type="submit"]'); setBusy(button, true); const result = await emitAck('wall:invite', { wallId: state.currentWall.id, email: $('#memberEmail').value, role: $('#memberRole').value }); setBusy(button, false); if (!result?.ok) return toast(result?.error, true); state.members = result.members; form.reset(); renderMembers(); updateBoardPermissions(); toast('Miembro añadido e invitación enviada.'); });
 
 $$('[data-admin-tab]').forEach((button) => button.addEventListener('click', () => { $$('[data-admin-tab]').forEach((item) => item.classList.toggle('active', item === button)); $$('[data-admin-panel]').forEach((panel) => panel.classList.toggle('hidden', panel.dataset.adminPanel !== button.dataset.adminTab)); }));
 async function loadAdmin() { const result = await emitAck('admin:snapshot'); if (!result?.ok) { toast(result?.error, true); return showDashboard(); } state.admin = result; renderAdmin(); }
 function renderAdmin() {
-  const summary = $('#adminSummary'); summary.replaceChildren(); const stats = create('div', 'admin-stats'); [['Usuarios', state.admin.users.length], ['Muros', state.admin.walls.length], ['Notas', state.admin.walls.reduce((sum, wall) => sum + wall.notesCount, 0)], ['Conectados', state.admin.connected]].forEach(([label, value], index) => { const card = create('article', `admin-stat tone-${index}`); card.append(create('small', '', label), create('strong', '', String(value))); stats.append(card); }); summary.append(stats, create('section', 'screen-card admin-note', 'El acceso superadmin está reservado a la cuenta propietaria y se valida siempre en el servidor.'));
-  const users = $('#adminUsers'); users.replaceChildren(); const userTools = create('div', 'table-tools'); const search = create('input'); search.placeholder = 'Buscar usuario'; userTools.append(search); const table = create('div', 'data-list'); users.append(userTools, table);
-  function drawUsers(query = '') { table.replaceChildren(); state.admin.users.filter((user) => `${user.name} ${user.email}`.toLowerCase().includes(query.toLowerCase())).forEach((user) => { const row = create('article', 'data-row'); const info = create('div'); info.append(create('strong', '', user.name), create('small', '', user.email)); const role = create('span', 'role-chip', user.role === 'superadmin' ? 'Superadmin propietario' : 'Usuario'); row.append(info, create('span', 'date-cell', formatDate(user.createdAt)), role); table.append(row); }); } search.addEventListener('input', () => drawUsers(search.value)); drawUsers();
-  const walls = $('#adminWalls'); walls.replaceChildren(); state.admin.walls.forEach((wall) => { const card = create('article', 'admin-wall-card'); const head = create('div'); head.append(create('h3', '', wall.name), create('p', 'muted', `${wall.notesCount} notas · ${wall.membersCount} miembros`)); const clear = create('button', 'danger-button', 'Vaciar notas'); clear.type = 'button'; clear.disabled = wall.notesCount === 0; clear.addEventListener('click', async () => { if (!(await confirmAction(`¿Vaciar todas las notas de “${wall.name}”?`))) return; const result = await emitAck('admin:clear', { wallId: wall.id }); if (!result?.ok) return toast(result?.error, true); toast(`${result.removed} notas eliminadas.`); await loadAdmin(); }); head.append(clear); const list = create('div', 'mini-members'); wall.members.forEach((member) => list.append(create('span', '', `${member.name} · ${member.roleInWall}`))); card.append(head, list); walls.append(card); });
+  const summary = $('#adminSummary'); summary.replaceChildren(); const stats = create('div', 'admin-stats'); [['Usuarios', state.admin.totals.usuarios], ['Muros', state.admin.totals.salas], ['Notas', state.admin.totals.notas], ['Reportes pendientes', state.admin.totals.reportes_pendientes]].forEach(([label, value], index) => { const card = create('article', `admin-stat tone-${index}`); card.append(create('small', '', label), create('strong', '', String(value))); stats.append(card); }); summary.append(stats, create('section', 'screen-card admin-note', 'El superadmin administra la plataforma, pero no puede abrir, modificar ni eliminar muros y notas ajenas.'));
 }
 
 $('#logoutButton').addEventListener('click', async () => { await emitAck('auth:logout', { token: state.token }); clearSession(); toast('Sesión cerrada.', true); });
@@ -171,10 +207,11 @@ function confirmAction(message, options = {}) {
 }
 
 function setConnection(label, connected) { const status = $('#connectionStatus'); status.lastChild.textContent = ` ${label}`; status.classList.toggle('connected', connected); }
-async function restoreSession() { if (!state.token || state.restoring) return; state.restoring = true; const result = await emitAck('auth:restore', { token: state.token }); state.restoring = false; if (result?.ok) hydrateUser(result.user, result.token); else { clearSession(); toast(result?.error || 'La sesión expiró.', true); } }
+async function restoreSession() { if (state.restoring) return; state.restoring = true; const result = await emitAck('auth:restore', { token: state.token }); state.restoring = false; if (result?.ok) hydrateUser(result.user, result.token); else if (state.token) { clearSession(); toast(result?.error || 'La sesión expiró.', true); } }
 socket.on('connect', async () => { setConnection('Sincronizado', true); await restoreSession(); });
 socket.on('disconnect', () => setConnection('Reconectando…', false)); socket.io.on('reconnect_attempt', () => setConnection('Reconectando…', false));
 socket.on('users:count', (count) => { state.online = Number(count) || 0; $('#onlineCount').textContent = state.online; $('#onlineLabel').textContent = state.online === 1 ? 'conectado' : 'conectados'; });
 socket.on('note:created', ({ wallId, note }) => { if (wallId === state.currentWall?.id) renderNote(note); }); socket.on('note:updated', ({ wallId, note }) => { if (wallId === state.currentWall?.id) renderNote(note); }); socket.on('note:moved', ({ wallId, id, x, y, updatedAt }) => { if (wallId !== state.currentWall?.id) return; const note = state.notes.get(id); if (note) renderNote({ ...note, x, y, updatedAt }); }); socket.on('note:deleted', ({ wallId, id }) => { if (wallId !== state.currentWall?.id) return; state.notes.delete(id); document.querySelector(`[data-note-id="${CSS.escape(id)}"]`)?.remove(); }); socket.on('board:cleared', ({ wallId, removed }) => { if (wallId !== state.currentWall?.id) return; state.notes.clear(); board.replaceChildren(); toast(`Muro limpiado: ${removed} notas eliminadas.`); });
+socket.on('members:changed', async ({ wallId }) => { if (wallId !== state.currentWall?.id) return; const result = await emitAck('wall:select', { id: wallId }); if (!result?.ok) { toast('Tu acceso a este muro cambió.', true); return showDashboard(); } state.currentWall = result.wall; state.members = result.members; updateBoardPermissions(); });
 socket.on('profile:changed', (user) => { if (user.id === state.user?.id) hydrateUserElements({ ...state.user, ...user }); state.members = state.members.map((member) => member.id === user.id ? { ...member, ...user } : member); }); socket.on('role:changed', (user) => { if (user.id === state.user?.id) { hydrateUserElements({ ...state.user, ...user }); if (user.role !== 'superadmin' && !$('#adminScreen').classList.contains('hidden')) showDashboard(); } }); socket.on('admin:changed', () => { if (!$('#adminScreen').classList.contains('hidden')) loadAdmin(); }); socket.on('wall:deleted', (id) => { if (state.currentWall?.id === id) { toast('Este muro fue eliminado.', true); showDashboard(); } });
-window.addEventListener('resize', () => state.notes.forEach(renderNote)); applyTheme(localStorage.getItem('muroTheme') || 'light'); if (!state.token) showAuth('login'); else if (socket.connected) restoreSession();
+window.addEventListener('resize', () => state.notes.forEach(renderNote)); applyTheme(localStorage.getItem('muroTheme') || 'light'); if (!state.token) { if (state.pendingEmail && ['signup', 'recovery'].includes(state.pendingVerification)) showCodeVerification(state.pendingEmail, state.pendingVerification); else showAuth('login'); } else if (socket.connected) restoreSession();

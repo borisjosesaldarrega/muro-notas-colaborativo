@@ -25,7 +25,7 @@ async function main() {
 
   let schemaReady = false;
   if (result.backendAdmin) {
-    const { error } = await services.adminClient.from('muro_profiles').select('id').limit(1);
+    const { error } = await services.adminClient.from('muro_usuarios').select('id').limit(1);
     schemaReady = !error;
     result.rls = schemaReady ? 'ready_for_authenticated_test' : 'migration_required';
   }
@@ -59,36 +59,42 @@ async function main() {
         const [owner, outsider] = sessions;
         const ownerClient = services.createUserClient(owner.token);
         const outsiderClient = services.createUserClient(outsider.token);
-        const wallId = crypto.randomUUID();
         const noteId = crypto.randomUUID();
-        const { error: wallError } = await ownerClient.from('muro_walls').insert({ id: wallId, name: 'RLS temporal', owner_id: owner.id });
-        if (wallError) throw wallError;
-        const { error: memberError } = await ownerClient.from('muro_wall_members').insert({ wall_id: wallId, user_id: owner.id, role: 'propietario' });
-        if (memberError) throw memberError;
-        const { error: noteError } = await ownerClient.from('muro_notes').insert({
+        const { data: wallId, error: wallError } = await ownerClient.rpc('muro_crear_sala', {
+          nombre_nuevo: 'RLS temporal',
+          descripcion_nueva: 'Verificación automática A10'
+        });
+        if (wallError || !wallId) throw wallError || new Error('La RPC no devolvió la sala creada.');
+
+        const { error: directInsertError } = await ownerClient.from('muro_salas').insert({
+          nombre: 'Intento directo bloqueado',
+          propietario_id: owner.id
+        });
+        const { error: noteError } = await ownerClient.from('muro_notas').insert({
           id: noteId,
-          wall_id: wallId,
-          text: 'Nota privada temporal',
+          sala_id: wallId,
+          contenido: 'Nota privada temporal',
           color: 'amarillo',
-          x: 20,
-          y: 20,
-          author_id: owner.id,
-          author_name: 'Temporal owner'
+          posicion_x: 20,
+          posicion_y: 20,
+          autor_id: owner.id,
+          nombre_autor: 'Temporal owner'
         });
         if (noteError) throw noteError;
 
-        const { data: ownerRows, error: ownerReadError } = await ownerClient.from('muro_notes').select('id').eq('id', noteId);
-        const { data: hiddenRows, error: outsiderReadError } = await outsiderClient.from('muro_notes').select('id').eq('id', noteId);
-        const { error: outsiderInsertError } = await outsiderClient.from('muro_notes').insert({
-          wall_id: wallId,
-          text: 'Intento bloqueado',
+        const { data: ownerRows, error: ownerReadError } = await ownerClient.from('muro_notas').select('id').eq('id', noteId);
+        const { data: hiddenRows, error: outsiderReadError } = await outsiderClient.from('muro_notas').select('id').eq('id', noteId);
+        const { error: outsiderInsertError } = await outsiderClient.from('muro_notas').insert({
+          sala_id: wallId,
+          contenido: 'Intento bloqueado',
           color: 'rosa',
-          x: 30,
-          y: 30,
-          author_id: outsider.id,
-          author_name: 'Temporal outsider'
+          posicion_x: 30,
+          posicion_y: 30,
+          autor_id: outsider.id,
+          nombre_autor: 'Temporal outsider'
         });
-        result.rls = !ownerReadError
+        result.rls = Boolean(directInsertError)
+          && !ownerReadError
           && ownerRows?.length === 1
           && !outsiderReadError
           && hiddenRows?.length === 0
