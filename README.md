@@ -126,3 +126,5 @@ Las carpetas `Frontend/`, `Backend/` y `BaseDeDatos/` conservan la misma entrega
 `.github/workflows/supabase-uptime.yml` consulta cada seis horas `/api/health`. Esa ruta realiza una consulta real a PostgreSQL mediante Supabase, no solo una comprobación del proceso de Render. Si Render o la base no responden, el workflow falla y GitHub registra la alerta; también puede ejecutarse manualmente desde Actions. El workflow queda activo en la rama predeterminada del repositorio.
 
 Render tiene `Auto-Deploy: On Commit` y `render.yaml` conserva `autoDeploy: true`. El servicio sigue `agent/completar-muro-colaborativo`: cuando el frontend de Pierina se integra en esa rama mediante PR, Render lo publica sin despliegue manual y mantiene las conexiones del backend.
+
+Como respaldo del webhook nativo, `.github/workflows/render-frontend-auto-deploy.yml` escucha únicamente cambios en `Frontend/**` sobre esa rama y solicita el despliegue mediante el secreto `RENDER_DEPLOY_HOOK_URL`. Así una actualización visual integrada no requiere abrir el panel de Render.
