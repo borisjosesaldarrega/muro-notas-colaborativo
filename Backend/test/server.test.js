@@ -108,19 +108,23 @@ test('persiste perfil, tema y preferencias del usuario en el servidor', async ()
   assert.equal(login.user.settings.theme, 'dark');
 });
 
-test('crea invitaciones de un solo uso y agrega la membresía únicamente al aceptar', async () => {
+test('crea un código de sala reutilizable y agrega cada membresía al unirse', async () => {
   const admin = clients[0];
   const member = clients[1];
   const created = await ack(admin, 'wall:create', { name: 'Sprint web', description: 'Ideas del equipo' });
   assert.equal(created.wall.role, 'propietario');
   const wallId = created.wall.id;
-  const invited = await ack(admin, 'wall:invite', { wallId, email: 'brenda@example.com', role: 'lector' });
+  const invited = await ack(admin, 'wall:invite', { wallId, role: 'lector' });
   assert.equal(invited.invitation.status, 'pendiente');
-  assert.equal(invited.code.length, 6);
+  assert.match(invited.code, /^[A-Z0-9]{8}$/);
   assert.equal((await ack(member, 'wall:select', { id: wallId })).ok, false);
   const accepted = await ack(member, 'invitation:answer', { secret: invited.code, answer: 'aceptar' });
   assert.equal(accepted.status, 'aceptada');
   assert.equal((await ack(member, 'invitation:answer', { secret: invited.code, answer: 'aceptar' })).ok, false);
+  const secondMember = await connect();
+  await ack(secondMember, 'auth:register', { name: 'Carla Invitada', email: 'carla@example.com', password: 'clave789', passwordConfirmation: 'clave789' });
+  assert.equal((await ack(secondMember, 'invitation:answer', { secret: invited.code.toLowerCase() })).status, 'aceptada');
+  assert.equal((await ack(secondMember, 'wall:select', { id: wallId })).wall.role, 'lector');
   assert.equal((await ack(member, 'wall:select', { id: wallId })).wall.role, 'lector');
   assert.equal((await ack(member, 'note:create', { texto: 'No permitido', color: 'verde' })).ok, false);
 

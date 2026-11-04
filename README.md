@@ -9,8 +9,8 @@ Aplicación de notas adhesivas con el lenguaje visual original de Muro DZ y una 
 - Rol `superadmin` reservado a la cuenta propietaria y validado siempre en el backend.
 - Muros independientes con permisos `propietario`, `editor` y `lector`.
 - Creación atómica de cada muro y su membresía propietaria mediante la RPC transaccional `muro_crear_sala`.
-- Invitaciones mediante enlace y código de un solo uso: solo se guarda SHA-256, vencen en 24 horas y la membresía se crea al aceptar.
-- Consulta, rechazo, reenvío y cancelación de invitaciones sin permitir altas directas de miembros.
+- Un código activo por sala, reutilizable por varias cuentas: solo se guarda SHA-256, vence en 24 horas y cada usuario obtiene su propia membresía al unirse.
+- Códigos de invitación alfanuméricos de 8 caracteres, vista previa de la sala y alta de membresía únicamente al usarlos.
 - Reportes privados con estados `pendiente`, `en_revision`, `resuelto` y `rechazado`, atención del superadmin y respuesta exclusiva al autor.
 - Notas sincronizadas, arrastrables y disponibles en cinco colores.
 - Perfil, avatar y preferencias de apariencia.
@@ -83,7 +83,7 @@ Después de aplicar la migración, reinicia Node.js. El servidor cargará los da
 - El rol no se obtiene de `user_metadata`; se guarda en `muro_usuarios` y el servidor lo verifica.
 - La creación de una sala no admite un propietario enviado por el navegador: la RPC toma `auth.uid()`, inserta sala y membresía en la misma transacción y revierte ambas si algo falla.
 - Los errores enviados a la interfaz se normalizan; los mensajes internos de Postgres/PostgREST no se muestran a las personas usuarias.
-- Los tokens y códigos de invitación nunca se guardan en texto claro; la base compara su hash y bloquea vencimiento, reutilización, destinatario incorrecto y duplicados.
+- Los tokens y códigos de invitación nunca se guardan en texto claro; la base compara su hash, bloquea códigos vencidos y evita que una misma cuenta se una dos veces. El código se genera desde la interfaz, no requiere indicar un correo y puede incorporar a varias personas.
 - Los reportes toman el autor desde `auth.uid()` y el listado administrativo no incluye nombres de muros ni contenido de notas privadas.
 
 ## Verificación
@@ -97,7 +97,7 @@ npm run check
 npm run verify:supabase -- --auth
 ```
 
-`verify:supabase` comprueba conexión pública, Auth, backend administrativo, RLS, invitación de un solo uso y el recorrido completo de reportes. Las cuentas temporales se eliminan al terminar. `test/a10-atomic-wall.test.js` y `test/invitations-reports-contract.test.js` revisan los contratos de seguridad y que no existan altas directas.
+`verify:supabase` comprueba conexión pública, Auth, backend administrativo, RLS, unión de varias cuentas mediante el mismo código y el recorrido completo de reportes. Las cuentas temporales se eliminan al terminar. `test/a10-atomic-wall.test.js` y `test/invitations-reports-contract.test.js` revisan los contratos de seguridad y que no existan altas directas.
 
 ## Aporte de esta entrega
 
@@ -112,6 +112,7 @@ Si faltan variables o la migración todavía no existe en el proyecto remoto, el
 ```text
 lib/                     Clientes y almacenamiento de Supabase
 public/                  Interfaz, estilos y cliente público
+Frontend/                Interfaz visual integrada de Pierina que publica Render
 scripts/                 Build y verificación de conexión
 supabase/migrations/     Esquema y políticas RLS
 test/                    Pruebas de integración Socket.io
@@ -119,3 +120,7 @@ server.js                Backend Express y Socket.io
 ```
 
 Las carpetas `Frontend/`, `Backend/` y `BaseDeDatos/` conservan la misma entrega organizada por áreas para la revisión académica. La raíz sigue siendo la fuente que publica Render; antes de entregar se verifican ambas rutas para que la corrección A10 no exista solamente en una copia.
+
+## Monitor de disponibilidad
+
+`.github/workflows/supabase-uptime.yml` consulta cada seis horas `/api/health`. Esa ruta realiza una consulta real a PostgreSQL mediante Supabase, no solo una comprobación del proceso de Render. Si Render o la base no responden, el workflow falla y GitHub registra la alerta; también puede ejecutarse manualmente desde Actions. El workflow queda activo en la rama predeterminada del repositorio.

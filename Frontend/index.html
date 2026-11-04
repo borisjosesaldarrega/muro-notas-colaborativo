@@ -1,162 +1,543 @@
 <!doctype html>
-<html lang="es" data-theme="system">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#6956E8">
-  <title>Muro · Ideas que se mueven juntas</title>
-  <script src="/inicio-tema.js"></script>
+  <meta name="theme-color" content="#6d4aff">
+  <title>Muro Colaborativo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
-  <link rel="stylesheet" href="/original-theme.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+  <!-- VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO / VERIFICACIÓN / CONFIRMACIÓN / RECUPERACIÓN) -->
   <main id="authView" class="auth-shell">
-    <section class="auth-brand" aria-label="Presentación de Muro">
+    <section class="auth-brand">
       <div class="brand-mark">M</div>
-      <div><p class="eyebrow inverse">Ideas que conectan</p><h1>Ideas que se pegan,<br>equipos que conectan.</h1><p>Tu espacio colaborativo, sencillo y en tiempo real.</p></div>
-      <div class="demo-notes" aria-hidden="true"><span>Las mejores ideas empiezan pequeñas.</span><span>Todos pueden escribir, mover y construir.</span><span>Compartir</span></div>
+      <div>
+        <p class="eyebrow">Ideas que conectan</p>
+        <h1>Tu equipo, en un mismo muro.</h1>
+        <p>Crea, organiza y comparte notas adhesivas en tiempo real desde cualquier dispositivo.</p>
+      </div>
+      <div class="demo-notes" aria-hidden="true">
+        <span>Investigar</span><span>Diseñar</span><span>Compartir</span>
+      </div>
     </section>
+
     <section class="auth-panel">
-      <form id="loginForm" class="auth-card auth-form" data-auth-form="login">
+      <!-- 1. LOGIN -->
+      <form id="loginForm" class="auth-card" novalidate>
         <div class="mobile-logo"><span class="brand-mark">M</span> Muro</div>
-        <p class="eyebrow">Bienvenido de nuevo</p><h2>¡Hola de nuevo! 👋</h2><p class="muted">Entra para ver qué está pensando tu equipo.</p>
-        <label for="loginEmail">Correo electrónico</label><input id="loginEmail" type="email" autocomplete="email" placeholder="nombre@correo.com" required>
-        <label for="loginPassword">Contraseña</label><input id="loginPassword" type="password" autocomplete="current-password" minlength="4" required>
-        <button class="link-button" type="button" data-auth-view="recover">¿Olvidaste tu contraseña?</button>
-        <button class="primary-button full" type="submit">Ingresar</button>
-        <p class="switch-text">¿No tienes cuenta? <button type="button" data-auth-view="register">Regístrate</button></p>
+        <p class="eyebrow">Bienvenido de nuevo</p>
+        <h2>Inicia sesión</h2>
+        <p class="muted">Entra y continúa construyendo grandes ideas.</p>
+        <label>Correo electrónico
+          <input id="loginEmail" type="email" placeholder="nombre@correo.com" required autocomplete="email">
+          <span id="loginEmailError" class="field-error"></span>
+        </label>
+        <label>Contraseña
+          <input id="loginPassword" type="password" minlength="4" placeholder="••••••••" required autocomplete="current-password">
+          <span id="loginPasswordError" class="field-error"></span>
+        </label>
+        <button class="link-button" type="button" data-view="recover">¿Olvidaste tu contraseña?</button>
+        <button class="primary-button" type="submit">Ingresar al muro</button>
+        <p class="switch-text">¿No tienes cuenta? <button type="button" data-view="register">Regístrate</button></p>
       </form>
-      <form id="registerForm" class="auth-card auth-form hidden" data-auth-form="register">
-        <p class="eyebrow">Crea tu espacio</p><h2>Crea tu cuenta ✦</h2><p class="muted">Únete al muro y empieza a compartir ideas con tu equipo.</p>
-        <label for="registerName">Nombre visible</label><input id="registerName" autocomplete="name" maxlength="40" required>
-        <label for="registerEmail">Correo electrónico</label><input id="registerEmail" type="email" autocomplete="email" required>
-        <label for="registerEmailConfirmation">Confirmar correo electrónico</label><input id="registerEmailConfirmation" type="email" autocomplete="email" required>
-        <label for="registerPassword">Contraseña</label><input id="registerPassword" type="password" autocomplete="new-password" minlength="8" required>
-        <label for="registerPasswordConfirmation">Confirmar contraseña</label><input id="registerPasswordConfirmation" type="password" autocomplete="new-password" minlength="8" required>
-        <button class="primary-button full" type="submit">Crear cuenta</button>
-        <p class="switch-text">¿Ya tienes cuenta? <button type="button" data-auth-view="login">Inicia sesión</button></p>
+
+      <!-- 2. REGISTRO (PASO 1) -->
+      <form id="registerForm" class="auth-card hidden" novalidate>
+        <p class="eyebrow">Paso 1 de 3 · Registro</p>
+        <h2>Crea tu cuenta</h2>
+        <p class="muted">Tu cuenta se registra de forma segura en el backend.</p>
+        <label>Nombre y Apellido
+          <input id="registerName" maxlength="40" placeholder="Ej: Pierina Medranda" required autocomplete="name">
+          <span id="registerNameError" class="field-error"></span>
+        </label>
+        <label>Correo electrónico
+          <input id="registerEmail" type="email" placeholder="nombre@correo.com" required autocomplete="email">
+          <span id="registerEmailError" class="field-error"></span>
+        </label>
+        <label>Contraseña
+          <input id="registerPassword" type="password" minlength="4" maxlength="128" placeholder="Mínimo 4 caracteres" required autocomplete="new-password">
+          <span id="registerPasswordError" class="field-error"></span>
+        </label>
+        <label>Confirmar Contraseña
+          <input id="registerConfirmPassword" type="password" minlength="4" maxlength="128" placeholder="Repite tu contraseña" required autocomplete="new-password">
+          <span id="registerConfirmError" class="field-error"></span>
+        </label>
+        <button class="primary-button" type="submit">Continuar a Verificación</button>
+        <p class="switch-text">¿Ya tienes cuenta? <button type="button" data-view="login">Inicia sesión</button></p>
       </form>
-      <form id="recoverForm" class="auth-card auth-form hidden" data-auth-form="recover">
-        <p class="eyebrow">Recupera tu acceso</p><h2>¿Olvidaste tu contraseña?</h2><p class="muted">Te enviaremos un enlace seguro para recuperar el acceso.</p>
-        <label for="recoverEmail">Correo electrónico</label><input id="recoverEmail" type="email" autocomplete="email" required>
-        <button class="primary-button full" type="submit">Enviar enlace</button>
-        <p class="switch-text"><button type="button" data-auth-view="login">Volver al inicio</button></p>
+
+      <!-- 3. VERIFICAR CÓDIGO (PASO 2) -->
+      <form id="verifyForm" class="auth-card hidden">
+        <p class="eyebrow">Paso 2 de 3 · Verificación</p>
+        <h2>Revisa tu correo</h2>
+        <p class="muted">Ingresa el código de 6 dígitos que enviamos a <strong id="verifyEmailTarget" style="color:var(--ink);">tu correo</strong>.</p>
+
+        <div class="code-inputs-group">
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required autofocus>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+        </div>
+
+        <div class="resend-block">
+          <span id="countdownText" class="muted">Reenviar código en <b id="countdownTimer">00:45</b></span>
+          <button id="resendCodeBtn" type="button" class="link-button" style="display:none; float:none;">Reenviar nuevo código</button>
+        </div>
+
+        <button class="primary-button" type="submit">Verificar código</button>
+        <p class="switch-text"><button type="button" data-view="register">← Volver al registro</button></p>
       </form>
-      <form id="verifyCodeForm" class="auth-card auth-form hidden" data-auth-form="verify">
-        <p class="eyebrow" id="verifyCodeEyebrow">Verificación</p><h2 id="verifyCodeTitle">Escribe tu código</h2><p id="verifyCodeMessage" class="muted">Usa el código de 8 dígitos que enviamos a tu correo.</p>
-        <label for="verificationEmail">Correo electrónico</label><input id="verificationEmail" type="email" autocomplete="email" readonly required>
-        <label for="verificationCode">Código de 8 dígitos</label><input id="verificationCode" inputmode="numeric" autocomplete="one-time-code" minlength="8" maxlength="8" pattern="[0-9]{8}" placeholder="00000000" required>
-        <button class="primary-button full" type="submit">Verificar código</button>
-        <p class="switch-text"><button id="resendVerificationCode" type="button">Reenviar código</button> · <button type="button" data-auth-view="login">Volver al inicio</button></p>
+
+      <!-- 4. CONFIRMACIÓN EXITOSA (PASO 3) -->
+      <form id="confirmForm" class="auth-card hidden text-center">
+        <div class="confirm-circle">✓</div>
+        <p class="eyebrow">Paso 3 de 3 · Cuenta Activada</p>
+        <h2>¡Todo listo!</h2>
+        <p class="muted">Tu cuenta ha sido verificada correctamente. Ya puedes ingresar y comenzar a colaborar en los muros.</p>
+        <button id="enterAfterConfirmBtn" class="primary-button" type="button">Ingresar al Muro</button>
+        <p class="switch-text"><button type="button" data-view="login">Volver al inicio de sesión</button></p>
       </form>
-      <section id="recoverSuccess" class="auth-card auth-form hidden" data-auth-form="success" aria-live="polite">
-        <div class="success-icon">✓</div><p class="eyebrow">Correo enviado</p><h2>Revisa tu bandeja de entrada</h2><p class="muted">Abre el enlace seguro que enviamos para continuar.</p><button class="primary-button full" type="button" data-auth-view="login">Volver al inicio</button>
-      </section>
+
+      <!-- 5. RECUPERAR CONTRASEÑA -->
+      <form id="recoverForm" class="auth-card hidden">
+        <p class="eyebrow">Recupera tu acceso</p><h2>Restablecer contraseña</h2>
+        <p class="muted">Ingresa tu correo para recibir un enlace de recuperación.</p>
+        <label>Correo electrónico<input id="recoverEmail" type="email" required></label>
+        <button class="primary-button" type="submit">Enviar enlace</button>
+        <p class="switch-text"><button type="button" data-view="login">Volver al inicio</button></p>
+      </form>
     </section>
   </main>
 
-  <main id="appView" class="app-shell hidden">
+  <!-- VISTA 2: DASHBOARD DE MIS MUROS / SALAS (CARA DE USUARIO) -->
+  <main id="wallsView" class="walls-shell hidden">
     <header class="topbar">
-      <button id="homeButton" class="app-brand" type="button" aria-label="Ir a Mis muros"><span class="brand-mark">M</span><span><strong>Muro</strong><small id="headerContext">Mis muros</small></span></button>
+      <a class="app-brand" href="#"><span class="brand-mark">M</span><span>Muro</span></a>
+      <div class="board-name"><small>Espacio de trabajo</small><strong>Mis Muros y Salas</strong></div>
       <div class="top-actions">
-        <span class="presence"><i></i><b id="onlineCount">0</b> <span id="onlineLabel">conectados</span></span>
-        <div class="avatar-wrap">
-          <button id="avatarButton" class="avatar-button" type="button" aria-label="Abrir menú de usuario" aria-haspopup="menu" aria-expanded="false"><span id="avatarImage" class="avatar-face">U</span><i class="online-dot" aria-hidden="true"></i></button>
-          <div id="userMenu" class="user-menu hidden" role="menu" aria-label="Menú de usuario">
-            <div class="user-menu-head"><span id="menuAvatar" class="avatar-face">U</span><div><strong id="menuName">Usuario</strong><small id="menuEmail"></small></div></div>
-            <button type="button" role="menuitem" data-open-screen="profile">Mi perfil</button>
-            <button type="button" role="menuitem" data-open-screen="invitations">Invitaciones</button>
-            <button type="button" role="menuitem" data-open-screen="reports">Mis reportes</button>
-            <button type="button" role="menuitem" data-open-screen="settings">Configuración</button>
-            <button id="menuAdmin" class="hidden" type="button" role="menuitem" data-open-screen="admin">Panel superadmin</button>
-            <hr><button id="logoutButton" class="menu-danger" type="button" role="menuitem">Cerrar sesión</button>
-          </div>
-        </div>
+        <button id="createWallBtn" class="primary-button compact">＋ Crear Muro</button>
+        <button id="wallsProfileBtn" class="avatar" title="Perfil">P</button>
       </div>
     </header>
-
-    <section id="dashboardView" class="page-shell">
-      <div class="page-heading"><div><p class="eyebrow">Tus espacios</p><h1>Mis muros</h1><p class="muted">Organiza ideas y personas en espacios separados.</p></div><button id="createWallButton" class="primary-button" type="button">＋ Crear nuevo muro</button></div>
-      <div id="wallsGrid" class="walls-grid" aria-live="polite"></div>
-    </section>
-
-    <section id="boardView" class="board-view hidden">
-      <section class="toolbar" aria-label="Herramientas del muro">
-        <div class="board-copy"><h1>Tormenta de ideas</h1><p>Arrastra las notas, escribe y construyamos algo genial.</p></div>
-        <button id="backToWalls" class="secondary-button compact" type="button">← Mis muros</button>
-        <button id="newNoteButton" class="primary-button compact" type="button">＋ Nueva nota</button>
-        <div class="color-filter" role="group" aria-label="Filtrar por color">
-          <button class="swatch all active" type="button" data-filter="all" aria-label="Mostrar todos los colores"></button>
-          <button class="swatch yellow" type="button" data-filter="amarillo" aria-label="Filtrar por amarillo"></button>
-          <button class="swatch pink" type="button" data-filter="rosa" aria-label="Filtrar por rosa"></button>
-          <button class="swatch blue" type="button" data-filter="azul" aria-label="Filtrar por azul"></button>
-          <button class="swatch green" type="button" data-filter="verde" aria-label="Filtrar por verde"></button>
-          <button class="swatch purple" type="button" data-filter="lila" aria-label="Filtrar por lila"></button>
-        </div>
-        <button id="membersButton" class="secondary-button compact" type="button">Miembros</button>
-        <button id="reportButton" class="secondary-button compact" type="button">Reportar</button>
-        <span id="connectionStatus" class="status" role="status"><i></i> Conectando…</span>
-      </section>
-      <section id="board" class="board" aria-label="Muro colaborativo"></section>
-    </section>
-
-    <section id="screenView" class="page-shell hidden">
-      <div class="screen-header"><button id="closeScreen" class="secondary-button compact" type="button">← Volver</button><div><p id="screenEyebrow" class="eyebrow">Tu cuenta</p><h1 id="screenTitle">Mi perfil</h1></div></div>
-      <div id="profileScreen" class="screen-card hidden">
-        <form id="profileForm" class="profile-layout">
-          <div class="avatar-editor"><span id="profileAvatarPreview" class="avatar-preview">U</span><label class="secondary-button upload-button">Cambiar fotografía<input id="profileAvatarInput" type="file" accept="image/png,image/jpeg,image/webp"></label><button id="removeAvatar" class="link-button" type="button">Usar iniciales</button></div>
-          <div><label for="profileNameInput">Nombre visible</label><input id="profileNameInput" maxlength="40" required><label for="profileEmailInput">Correo registrado</label><input id="profileEmailInput" readonly><label for="profileCreatedInput">Cuenta creada</label><input id="profileCreatedInput" readonly><button class="primary-button" type="submit">Guardar cambios</button></div>
-        </form>
+    <section class="walls-section">
+      <div class="walls-header-title">
+        <h2>Selecciona un Muro Colaborativo</h2>
+        <p class="muted">Entra a una sala para colaborar en tiempo real o crea un nuevo muro para tu proyecto.</p>
       </div>
-      <div id="settingsScreen" class="settings-layout hidden">
-        <nav class="settings-nav" aria-label="Secciones de configuración"><button class="active" data-settings-tab="account">Cuenta</button><button data-settings-tab="appearance">Apariencia</button><button data-settings-tab="preferences">Preferencias</button><button data-settings-tab="danger">Zona de peligro</button></nav>
-        <div class="screen-card settings-content">
-          <section data-settings-panel="account"><h2>Cuenta</h2><form id="passwordForm"><label for="currentPassword">Contraseña actual</label><input id="currentPassword" type="password" required><label for="newPassword">Nueva contraseña</label><input id="newPassword" type="password" minlength="8" required><button class="primary-button" type="submit">Cambiar contraseña</button></form></section>
-          <section class="hidden" data-settings-panel="appearance"><h2>Apariencia</h2><p class="muted">Elige cómo quieres ver Muro.</p><div class="theme-grid"><label><input type="radio" name="theme" value="light"><span class="theme-preview light-preview"><i></i><b>Claro</b></span></label><label><input type="radio" name="theme" value="dark"><span class="theme-preview dark-preview"><i></i><b>Oscuro</b></span></label><label><input type="radio" name="theme" value="system"><span class="theme-preview system-preview"><i></i><b>Automático</b></span></label></div></section>
-          <section class="hidden" data-settings-panel="preferences"><h2>Preferencias</h2><label class="setting-row"><span><strong>Confirmar antes de eliminar</strong><small>Evita acciones destructivas accidentales.</small></span><input id="confirmDeleteSetting" type="checkbox"></label><label class="setting-row"><span><strong>Notas compactas</strong><small>Muestra notas ligeramente más pequeñas.</small></span><input id="compactNotesSetting" type="checkbox"></label><label class="setting-row"><span><strong>Notificaciones</strong><small>Muestra avisos dentro de la aplicación.</small></span><input id="notificationsSetting" type="checkbox"></label></section>
-          <section class="hidden danger-zone" data-settings-panel="danger"><h2>Zona de peligro</h2><p>Eliminar la cuenta cerrará tu sesión y retirará tus accesos. Esta acción requiere tu contraseña.</p><button id="deleteAccountButton" class="danger-button" type="button">Eliminar cuenta</button></section>
-        </div>
-      </div>
-      <div id="invitationsScreen" class="screen-card hidden">
-        <div class="section-heading"><div><h2>Invitaciones</h2><p class="muted">Acepta con el enlace o el código de 6 dígitos. Cada invitación vence y solo puede usarse una vez.</p></div></div>
-        <form id="invitationCodeForm" class="inline-form"><input id="invitationCode" inputmode="text" maxlength="128" placeholder="Código o token del enlace" required><select id="invitationAnswer"><option value="aceptar">Aceptar</option><option value="rechazar">Rechazar</option></select><button class="primary-button" type="submit">Confirmar</button></form>
-        <div id="invitationsList" class="data-list"></div>
-      </div>
-      <div id="reportsScreen" class="screen-card hidden">
-        <div class="section-heading"><div><h2>Mis reportes</h2><p class="muted">Aquí verás únicamente tus solicitudes y la respuesta del equipo.</p></div><button id="newReportButton" class="primary-button compact" type="button">Nuevo reporte</button></div>
-        <div id="reportsList" class="data-list"></div>
-      </div>
-      <div id="adminScreen" class="admin-layout hidden">
-        <nav class="admin-nav"><button class="active" data-admin-tab="summary">Resumen privado</button><button data-admin-tab="reports">Reportes</button></nav>
-        <div class="admin-content"><section id="adminSummary" data-admin-panel="summary"></section><section id="adminReports" class="hidden" data-admin-panel="reports"></section></div>
+      <form id="acceptInvitationForm" class="invitation-accept-bar">
+        <div><strong>¿Recibiste una invitación?</strong><small>Usa el código de 8 letras y números o abre el enlace compartido.</small><small id="acceptInvitationPreview" class="muted"></small></div>
+        <input id="acceptInvitationCode" maxlength="128" autocomplete="off" placeholder="Ej. A7K9M2QX" required>
+        <button class="secondary-button compact" type="submit">Unirse</button>
+      </form>
+      <div id="wallsGrid" class="walls-grid">
+        <!-- Tarjetas dinámicas de salas -->
       </div>
     </section>
   </main>
 
-  <dialog id="noteDialog" aria-labelledby="noteDialogTitle"><form id="noteForm"><div class="dialog-head"><div><p class="eyebrow">Nueva idea</p><h2 id="noteDialogTitle">Crear una nota</h2></div><button id="closeNoteDialog" class="close-button" type="button" aria-label="Cerrar">×</button></div><label for="noteText">Contenido</label><textarea id="noteText" maxlength="280" rows="5" required></textarea><div id="characterCount" class="character-count">0 / 280</div><fieldset><legend>Color</legend><div class="color-options"><label><input type="radio" name="color" value="amarillo" checked><span class="yellow"></span><span class="sr-only">Amarillo</span></label><label><input type="radio" name="color" value="rosa"><span class="pink"></span><span class="sr-only">Rosa</span></label><label><input type="radio" name="color" value="azul"><span class="blue"></span><span class="sr-only">Azul</span></label><label><input type="radio" name="color" value="verde"><span class="green"></span><span class="sr-only">Verde</span></label><label><input type="radio" name="color" value="lila"><span class="purple"></span><span class="sr-only">Lila</span></label></div></fieldset><div class="dialog-actions"><button id="cancelNote" class="secondary-button" type="button">Cancelar</button><button id="saveNote" class="primary-button" type="submit">Publicar nota</button></div></form></dialog>
+  <!-- VISTA 3: LIENZO Y TABLERO DEL MURO ACTIVO (CARA DE USUARIO) -->
+  <main id="appView" class="app-shell hidden">
+    <header class="topbar">
+      <button id="backToWallsButton" class="secondary-button compact" title="Volver a la lista de salas">← Mis Muros</button>
+      <div class="board-name">
+        <small>Muro activo</small>
+        <strong id="currentWallTitle">Muro de ideas</strong>
+      </div>
+      <div class="top-actions">
+        <button id="inviteButton" class="primary-button compact" title="Invitar y compartir enlace">👥 Compartir / Invitar</button>
+        <button id="deleteWallBtn" class="danger-button compact hidden" title="Eliminar este muro">🗑️ Eliminar Sala</button>
+        <span class="presence"><i></i><b id="onlineCount">1</b> conectados</span>
+        <button id="profileButton" class="avatar" title="Perfil">P</button>
+      </div>
+    </header>
+    <section class="toolbar">
+      <button id="newNoteButton" class="primary-button compact">＋ Nueva nota</button>
+      <div class="color-filter" aria-label="Filtrar por color">
+        <button class="swatch active" data-filter="all" title="Todos"></button>
+        <button class="swatch yellow" data-filter="amarillo"></button>
+        <button class="swatch pink" data-filter="rosa"></button>
+        <button class="swatch blue" data-filter="azul"></button>
+        <button class="swatch green" data-filter="verde"></button>
+      </div>
+      <span id="connectionStatus" class="status">Sincronizado</span>
+    </section>
+    <section id="board" class="board" aria-label="Muro colaborativo"></section>
+  </main>
 
-  <dialog id="wallDialog" aria-labelledby="wallDialogTitle"><form id="wallForm"><div class="dialog-head"><div><p class="eyebrow">Nuevo espacio</p><h2 id="wallDialogTitle">Crear muro</h2></div><button id="closeWallDialog" class="close-button" type="button" aria-label="Cerrar">×</button></div><label for="wallName">Nombre</label><input id="wallName" maxlength="60" required><label for="wallDescription">Descripción</label><textarea id="wallDescription" maxlength="160" rows="3"></textarea><div class="dialog-actions"><button id="cancelWall" class="secondary-button" type="button">Cancelar</button><button class="primary-button" type="submit">Crear muro</button></div></form></dialog>
+  <!-- VISTA 4: PANEL DE SUPERADMINISTRADOR (MODO ESPECTADOR / MONITOREO) -->
+  <main id="adminView" class="admin-shell hidden">
+    <div class="admin-layout">
+      <!-- SIDEBAR LATERAL DE ADMINISTRACIÓN -->
+      <aside class="admin-sidebar">
+        <div class="admin-sidebar-header">
+          <span class="brand-mark">M</span>
+          <div>
+            <strong>Muro Admin</strong>
+            <small class="admin-badge">👁️ Monitor</small>
+          </div>
+        </div>
 
-  <dialog id="membersDialog" aria-labelledby="membersDialogTitle"><div class="dialog-body"><div class="dialog-head"><div><p class="eyebrow">Colaboración</p><h2 id="membersDialogTitle">Miembros del muro</h2></div><button id="closeMembersDialog" class="close-button" type="button" aria-label="Cerrar">×</button></div><form id="inviteMemberForm" class="inline-form"><input id="memberEmail" type="email" placeholder="correo registrado" required><select id="memberRole"><option value="editor">Editor</option><option value="lector">Lector</option></select><button class="primary-button" type="submit">Invitar</button></form><div id="membersList" class="members-list"></div></div></dialog>
+        <nav class="admin-nav">
+          <button class="admin-nav-item active" data-admin-tab="resumen">
+            <span class="nav-icon">📊</span> Resumen General
+          </button>
+          <button class="admin-nav-item" data-admin-tab="salas">
+            <span class="nav-icon">🚪</span> Salas y Muros
+          </button>
+          <button class="admin-nav-item" data-admin-tab="notas">
+            <span class="nav-icon">📝</span> Notas Globales
+          </button>
+          <button class="admin-nav-item" data-admin-tab="usuarios">
+            <span class="nav-icon">👥</span> Usuarios
+          </button>
+          <button class="admin-nav-item" data-admin-tab="reportes">
+            <span class="nav-icon">🚩</span> Reportes
+            <span id="adminPendingBadge" class="nav-count-badge">0</span>
+          </button>
+        </nav>
 
-  <dialog id="invitationResultDialog" aria-labelledby="invitationResultTitle"><div class="dialog-body"><div class="dialog-head"><div><p class="eyebrow">Invitación creada</p><h2 id="invitationResultTitle">Comparte el acceso</h2></div><button id="closeInvitationResult" class="close-button" type="button" aria-label="Cerrar">×</button></div><p class="muted">Envía uno de estos datos al correo indicado. El código y el enlace vencen en 24 horas y funcionan una sola vez.</p><label for="invitationResultCode">Código</label><input id="invitationResultCode" readonly><label for="invitationResultLink">Enlace</label><textarea id="invitationResultLink" rows="3" readonly></textarea><button id="copyInvitation" class="primary-button full" type="button">Copiar enlace y código</button></div></dialog>
+        <div class="admin-sidebar-footer">
+          <div class="admin-user-info">
+            <div class="avatar" id="adminAvatar">AD</div>
+            <div>
+              <strong id="adminUserName">Superadministrador</strong>
+              <small class="muted" style="color:#b2acc9;">Solo espectador</small>
+            </div>
+          </div>
+          <button id="adminExitBtn" class="secondary-button compact" style="width:100%; margin-top:12px;">← Volver al Muro</button>
+        </div>
+      </aside>
 
-  <dialog id="reportDialog" aria-labelledby="reportDialogTitle"><form id="reportForm"><div class="dialog-head"><div><p class="eyebrow">Ayuda y seguridad</p><h2 id="reportDialogTitle">Crear reporte</h2></div><button id="closeReportDialog" class="close-button" type="button" aria-label="Cerrar">×</button></div><label for="reportReason">Motivo</label><select id="reportReason" required><option value="fallo_aplicacion">Fallo de la aplicación</option><option value="contenido_ofensivo">Contenido ofensivo</option><option value="spam">Spam</option><option value="enlace_inseguro">Enlace inseguro</option><option value="otro">Otro</option></select><label for="reportDetail">Descripción</label><textarea id="reportDetail" minlength="10" maxlength="1000" rows="6" required></textarea><p class="muted">No copies contenido privado innecesario. El administrador recibe tu descripción, no las notas del muro.</p><div class="dialog-actions"><button id="cancelReport" class="secondary-button" type="button">Cancelar</button><button class="primary-button" type="submit">Enviar reporte</button></div></form></dialog>
+      <!-- CONTENIDO PRINCIPAL DEL DASHBOARD ESPECTADOR -->
+      <section class="admin-main">
+        <header class="admin-topbar">
+          <div>
+            <h1 id="adminTabTitle">Resumen del Sistema</h1>
+            <p class="muted" style="margin:4px 0 0; font-size:0.9rem;">Monitoreo y supervisión en tiempo real del muro colaborativo.</p>
+          </div>
+          <div class="spectator-indicator">
+            <span class="live-dot"></span>
+            <span>Modo Espectador Activo</span>
+          </div>
+        </header>
 
-  <dialog id="reportResponseDialog" aria-labelledby="reportResponseTitle"><form id="reportResponseForm"><div class="dialog-head"><div><p class="eyebrow">Atención de reporte</p><h2 id="reportResponseTitle">Responder al usuario</h2></div><button id="closeReportResponse" class="close-button" type="button" aria-label="Cerrar">×</button></div><input id="reportResponseId" type="hidden"><label for="reportResponseStatus">Decisión</label><select id="reportResponseStatus"><option value="resuelto">Resuelto</option><option value="rechazado">Rechazado</option></select><label for="reportResponseText">Respuesta</label><textarea id="reportResponseText" minlength="3" maxlength="1000" rows="5" required></textarea><div class="dialog-actions"><button id="cancelReportResponse" class="secondary-button" type="button">Cancelar</button><button class="primary-button" type="submit">Enviar respuesta</button></div></form></dialog>
+        <!-- PESTAÑA 1: RESUMEN GENERAL -->
+        <div id="adminTabResumen" class="admin-tab-content">
+          <div class="admin-spectator-alert">
+            <span style="font-size:1.3rem;">ℹ️</span>
+            <div>
+              <strong>Panel de Monitoreo:</strong> Puedes supervisar en tiempo real las estadísticas, usuarios y notas activas. Por política de supervisión pura, las acciones de edición y eliminación están deshabilitadas.
+            </div>
+          </div>
 
-  <dialog id="recoveryPasswordDialog" aria-labelledby="recoveryPasswordTitle"><form id="recoveryPasswordForm"><div class="dialog-head"><div><p class="eyebrow">Recupera tu acceso</p><h2 id="recoveryPasswordTitle">Crea una nueva contraseña</h2></div></div><p class="muted">Usa al menos 8 caracteres y repítela para confirmar.</p><label for="recoveryPassword">Nueva contraseña</label><input id="recoveryPassword" type="password" autocomplete="new-password" minlength="8" required><label for="recoveryPasswordConfirmation">Confirmar contraseña</label><input id="recoveryPasswordConfirmation" type="password" autocomplete="new-password" minlength="8" required><button class="primary-button full" type="submit">Guardar nueva contraseña</button></form></dialog>
+          <!-- 4 Métricas Clave (Pág 20 del PDF) -->
+          <div class="admin-metrics-grid">
+            <article class="metric-card">
+              <span class="metric-icon purple">👥</span>
+              <div>
+                <small>Usuarios Registrados</small>
+                <strong id="metricUsersCount">1</strong>
+              </div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon yellow">📝</span>
+              <div>
+                <small>Notas en Tableros</small>
+                <strong id="metricNotesCount">0</strong>
+              </div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon blue">🚪</span>
+              <div>
+                <small>Salas Creadas</small>
+                <strong id="metricWallsCount">1</strong>
+              </div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon red">🚩</span>
+              <div>
+                <small>Reportes de Contenido</small>
+                <strong id="metricReportsCount">0</strong>
+              </div>
+            </article>
+          </div>
 
-  <dialog id="confirmDialog" aria-labelledby="confirmTitle"><form method="dialog" class="confirm-card"><div class="warning-icon">!</div><h2 id="confirmTitle">Confirmar acción</h2><p id="confirmMessage"></p><label id="confirmInputWrap" class="hidden" for="confirmInput">Confirmación</label><input id="confirmInput" class="hidden"><div class="dialog-actions"><button id="confirmCancel" class="secondary-button" value="cancel">Cancelar</button><button id="confirmAccept" class="danger-button" value="confirm">Confirmar</button></div></form></dialog>
+          <!-- Actividad Semanal de Notas & Moderación Pendiente -->
+          <div class="admin-grid-two">
+            <div class="admin-card">
+              <div class="admin-card-head">
+                <h3>Actividad de Notas (Semanal)</h3>
+                <small class="muted">Volumen de aportes recibidos</small>
+              </div>
+              <div class="activity-chart">
+                <div class="chart-col"><div class="bar" style="height:35%;"></div><span>Lun</span></div>
+                <div class="chart-col"><div class="bar" style="height:65%;"></div><span>Mar</span></div>
+                <div class="chart-col"><div class="bar" style="height:50%;"></div><span>Mié</span></div>
+                <div class="chart-col"><div class="bar" style="height:85%;"></div><span>Jue</span></div>
+                <div class="chart-col"><div class="bar" style="height:75%;"></div><span>Vie</span></div>
+                <div class="chart-col"><div class="bar active" style="height:100%;"></div><span>Sáb</span></div>
+                <div class="chart-col"><div class="bar" style="height:45%;"></div><span>Dom</span></div>
+              </div>
+            </div>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/runtime-config.js"></script>
-  <script src="/vendor/supabase.js"></script>
-  <script src="/supabase-client.js"></script>
-  <script src="/netlify-socket.js"></script>
-  <script src="/app.js"></script>
+            <div class="admin-card">
+              <div class="admin-card-head">
+                <h3>Moderación Pendiente</h3>
+                <small class="muted">Reportes de usuarios</small>
+              </div>
+              <div id="adminRecentReports" class="admin-reports-list">
+                <!-- Cargado dinámicamente -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla de Usuarios Recientes -->
+          <div class="admin-card" style="margin-top:24px;">
+            <div class="admin-card-head">
+              <h3>Usuarios Recientes Monitoreados</h3>
+              <small class="muted">Supervisión sin alteración</small>
+            </div>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Usuario</th>
+                    <th>Correo Electrónico</th>
+                    <th>Rol</th>
+                    <th>Muros Creados</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="adminRecentUsersTable">
+                  <!-- Cargado dinámicamente -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- PESTAÑA 2: SALAS Y MUROS -->
+        <div id="adminTabSalas" class="admin-tab-content hidden">
+          <div class="admin-card-head">
+            <h3>Muros Activos en la Plataforma</h3>
+            <small class="muted">Espacios colaborativos creados por los equipos</small>
+          </div>
+          <div id="adminWallsGrid" class="walls-grid" style="margin-top:20px;">
+            <!-- Cargado dinámicamente -->
+          </div>
+        </div>
+
+        <!-- PESTAÑA 3: NOTAS GLOBALES -->
+        <div id="adminTabNotas" class="admin-tab-content hidden">
+          <div class="admin-card-head">
+            <h3>Notas en Tiempo Real</h3>
+            <small class="muted">Visualización continua de ideas de los participantes</small>
+          </div>
+          <div id="adminNotesGrid" class="admin-notes-grid" style="margin-top:20px;">
+            <!-- Cargado dinámicamente -->
+          </div>
+        </div>
+
+        <!-- PESTAÑA 4: USUARIOS -->
+        <div id="adminTabUsuarios" class="admin-tab-content hidden">
+          <div class="admin-card-head">
+            <h3>Directorio de Cuentas</h3>
+            <input id="adminUserSearch" type="search" placeholder="🔍 Buscar por nombre o correo..." style="max-width:320px; padding:10px 14px; border-radius:12px; border:1px solid var(--line);">
+          </div>
+          <div class="admin-table-wrap" style="margin-top:16px;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Correo Electrónico</th>
+                  <th>Rol Asignado</th>
+                  <th>Estado</th>
+                  <th>Permiso del Panel</th>
+                </tr>
+              </thead>
+              <tbody id="adminAllUsersTable">
+                <!-- Cargado dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PESTAÑA 5: REPORTES -->
+        <div id="adminTabReportes" class="admin-tab-content hidden">
+          <div class="admin-card-head">
+            <h3>Bandeja de Reportes de Contenido</h3>
+            <small class="muted">Alertas enviadas con el botón 🚩 por los usuarios</small>
+          </div>
+          <div class="admin-table-wrap" style="margin-top:16px;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Motivo</th>
+                  <th>Detalle del reporte</th>
+                  <th>Muro Afectado</th>
+                  <th>Fecha</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="adminAllReportsTable">
+                <!-- Cargado dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- MODAL: CREAR NOTA -->
+  <dialog id="noteDialog">
+    <form id="noteForm" method="dialog">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Nueva idea</p><h3>Crear una nota</h3></div>
+        <button class="close-button" value="cancel" type="button">&times;</button>
+      </div>
+      <label>Contenido<textarea id="noteText" maxlength="280" rows="5" placeholder="Escribe tu idea…" required></textarea></label>
+      <div id="characterCount" style="text-align:right; font-size:0.78rem; color:var(--muted); margin-top:4px; font-weight:600;">0 / 280</div>
+      <fieldset>
+        <legend>Color</legend>
+        <div class="color-options">
+          <label><input type="radio" name="color" value="amarillo" checked><span class="yellow"></span></label>
+          <label><input type="radio" name="color" value="rosa"><span class="pink"></span></label>
+          <label><input type="radio" name="color" value="azul"><span class="blue"></span></label>
+          <label><input type="radio" name="color" value="verde"><span class="green"></span></label>
+          <label><input type="radio" name="color" value="lila"><span class="purple"></span></label>
+        </div>
+      </fieldset>
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary-button" type="button">Cancelar</button>
+        <button id="saveNote" type="submit" class="primary-button">Publicar nota</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL: CREAR UN MURO / SALA -->
+  <dialog id="wallDialog">
+    <form id="wallForm">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Nuevo Espacio</p><h3>Crear un Muro</h3></div>
+        <button class="close-button" id="closeWallModal" type="button">&times;</button>
+      </div>
+      <label>Nombre del Muro<input id="wallNameInput" placeholder="Ej: Tormenta de Ideas" required maxlength="60"></label>
+      <label>Descripción<input id="wallDescInput" placeholder="Ej: Espacio para ideas del equipo" maxlength="160"></label>
+      <div class="dialog-actions">
+        <button id="cancelWallModal" type="button" class="secondary-button">Cancelar</button>
+        <button id="saveWallBtn" type="submit" class="primary-button">Crear Muro</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL UNIFICADO: INVITAR COLABORADORES Y COPIAR ENLACE -->
+  <dialog id="inviteDialog">
+    <form id="inviteForm">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Colaboración</p><h3>Compartir e Invitar</h3></div>
+        <button class="close-button" id="closeInviteModal" type="button">&times;</button>
+      </div>
+
+      <!-- El código se genera en el servidor y se puede compartir por cualquier medio. -->
+      <div style="background: #f5f3fa; padding: 16px; border-radius: 14px; margin-bottom: 20px;">
+        <label style="margin-top:0; font-weight:700; font-size:0.88rem; color: var(--ink);">Código de invitación</label>
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <input id="inviteCodeOutput" type="text" readonly aria-label="Código de invitación" placeholder="Pulsa Generar código" style="background:#fff; font-size:1.1rem; font-weight:800; letter-spacing:.15em; padding:10px;" />
+          <input id="shareLinkInput" class="hidden" type="text" readonly />
+          <button id="copyShareLinkBtn" type="button" class="secondary-button compact" style="white-space:nowrap; padding:10px 14px;">📋 Copiar código</button>
+        </div>
+      </div>
+
+      <!-- Bloque 2: permisos del código -->
+      <div id="inviteEmailSection">
+        <p class="muted" style="margin-bottom:10px; font-weight:600;">Quien use el código recibirá este permiso:</p>
+        <div id="inviteOwnerOnlyNotice" class="hidden" style="margin-bottom:12px; padding:10px 14px; background:#fffbeb; border:1px solid #fef3c7; border-radius:10px; font-size:0.83rem; color:#92400e;">
+          ⚠️ Solo la persona propietaria de esta sala puede invitar o cambiar permisos de miembros.
+        </div>
+        <label>Rol de permisos
+          <select id="inviteRoleSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);">
+            <option value="editor">Editor (Puede crear, mover y editar notas)</option>
+            <option value="lector">Lector (Solo puede ver el muro)</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- Bloque 3: Miembros actuales de la sala con sus roles del backend -->
+      <div id="wallMembersContainer" class="invite-members-list">
+        <div class="invite-members-title">
+          <span>👥 Miembros con acceso a esta sala</span>
+          <small id="wallMembersCount" class="muted">1 miembro</small>
+        </div>
+        <div id="wallMembersList" style="max-height: 180px; overflow-y: auto;">
+          <!-- Lista dinámica de miembros reales del backend -->
+        </div>
+      </div>
+
+      <div class="dialog-actions">
+        <button id="cancelInviteModal" type="button" class="secondary-button">Cerrar</button>
+        <button id="sendInviteBtn" type="submit" class="primary-button">Generar código</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL: REPORTAR CONTENIDO / NOTA -->
+  <dialog id="reportDialog">
+    <form id="reportForm">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Moderación</p><h3>Reportar Contenido</h3></div>
+        <button class="close-button" id="closeReportModal" type="button">&times;</button>
+      </div>
+      <p class="muted">Indica el motivo de tu reporte para enviar la revisión al superadministrador.</p>
+      <label>Motivo del reporte
+        <select id="reportReasonSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);" required>
+          <option value="Contenido ofensivo">Contenido ofensivo o inapropiado</option>
+          <option value="Spam repetido">Spam o mensajes repetidos</option>
+          <option value="Enlace inseguro">Enlace no seguro</option>
+          <option value="Otro">Otro motivo</option>
+        </select>
+      </label>
+      <label>Detalle opcional<input id="reportDetailInput" placeholder="Escribe detalles del reporte..." maxlength="200"></label>
+      <div class="dialog-actions">
+        <button id="cancelReportModal" type="button" class="secondary-button">Cancelar</button>
+        <button id="sendReportBtn" type="submit" class="danger-button" style="margin-top:0;">Enviar Reporte</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- PANEL LATERAL DE PERFIL -->
+  <aside id="sidePanel" class="side-panel" aria-hidden="true">
+    <button id="closePanel" class="close-button">&times;</button>
+    <div id="profilePanel">
+      <p class="eyebrow">Tu cuenta</p>
+      <h2 id="profileName">Usuario</h2>
+      <p id="profileEmail" class="muted"></p>
+      <div id="profileRoleBadge" class="profile-role-tag usuario" style="margin-top:6px; display:inline-block;">Rol: Usuario</div>
+
+      <!-- Ventanita exclusiva que aparece solo para Superadministrador -->
+      <div id="profileAdminAccess" class="hidden" style="margin:24px 0 16px; padding:16px; background: rgba(109, 74, 255, 0.08); border: 1px solid rgba(109, 74, 255, 0.22); border-radius: 14px; text-align: left;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+          <span style="font-size:1.2rem;">👁️</span>
+          <strong style="color:var(--brand); font-size:0.95rem;">Panel de Monitoreo</strong>
+        </div>
+        <p class="muted" style="font-size:0.82rem; margin:0 0 14px 0; line-height:1.4;">Acceso exclusivo de Superadministrador en modo espectador (auditoría en tiempo real).</p>
+        <button id="openAdminFromProfileBtn" class="primary-button compact" style="width:100%;">📊 Ingresar al Panel de Admin</button>
+      </div>
+
+      <button id="logoutButton" class="danger-button" style="margin-top:20px;">Cerrar sesión</button>
+    </div>
+  </aside>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

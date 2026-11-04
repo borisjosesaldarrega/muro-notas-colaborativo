@@ -17,6 +17,7 @@ const MAX_COORDINATE = 4000;
 const GENERAL_WALL_ID = '00000000-0000-0000-0000-000000000001';
 const REPORT_REASONS = new Set(['fallo_aplicacion', 'contenido_ofensivo', 'spam', 'enlace_inseguro', 'otro']);
 const INVITATION_TTL = 24 * 60 * 60 * 1000;
+const INVITATION_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
 function sha256(value) {
   return crypto.createHash('sha256').update(String(value)).digest('hex');
@@ -24,8 +25,13 @@ function sha256(value) {
 
 function invitationSecrets() {
   const token = crypto.randomBytes(32).toString('base64url');
-  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+  const code = Array.from({ length: 8 }, () => INVITATION_ALPHABET[crypto.randomInt(0, INVITATION_ALPHABET.length)]).join('');
   return { token, code, tokenHash: sha256(token), codeHash: sha256(code), expiresAt: Date.now() + INVITATION_TTL };
+}
+
+function normalizeInvitationSecret(value) {
+  const secret = cleanText(value, 200);
+  return /^[a-z0-9]{8}$/i.test(secret) ? secret.toUpperCase() : secret;
 }
 
 function cleanText(value, max = 280) {
@@ -132,15 +138,21 @@ function createMuroServer(options = {}) {
     if (!config) return res.status(503).json({ ok: false, error: 'Supabase público no está configurado.' });
     return res.json(config);
   });
-  app.use(express.static(path.join(__dirname, 'public')));
+  // Render publica la actualización visual de Pierina desde Frontend/. El
+  // backend y las rutas de salud permanecen en esta misma aplicación.
+  app.use(express.static(path.join(__dirname, 'Frontend')));
   app.get('/api/health', async (_req, res) => {
     await ready;
+    let database = storage.schemaReady ? 'ready' : 'unavailable';
+    if (storage.schemaReady) {
+      try { await store.ping(); } catch { database = 'unreachable'; }
+    }
     res.json({
-      ok: true,
+      ok: database !== 'unreachable',
       notes: walls.reduce((sum, wall) => sum + wall.notes.length, 0),
       walls: walls.length,
       users: io.engine.clientsCount,
-      storage: { ...storage }
+      storage: { ...storage, database }
     });
   });
 
@@ -462,16 +474,10 @@ function createMuroServer(options = {}) {
       const wall = findWall(payload.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'El muro no existe.');
       if (!canOwn(wall, user)) return fail(acknowledge, 'Solo la persona propietaria puede invitar miembros.');
-      const email = validEmail(payload.email);
-      const target = users.find((item) => item.email === email);
-      if (!target) return fail(acknowledge, 'No existe una cuenta registrada con ese correo.');
-      if (target.id === user.id) return fail(acknowledge, 'No puedes invitarte a tu propio muro.');
-      if (wall.members[target.id]) return fail(acknowledge, 'Esa persona ya es miembro del muro.');
       const role = MEMBER_ROLES.has(payload.role) && payload.role !== 'propietario' ? payload.role : 'editor';
-      const pending = invitations.find((item) => item.wallId === wall.id && item.email === email && item.status === 'pendiente' && item.expiresAt > Date.now());
-      if (pending) return fail(acknowledge, 'Ya existe una invitación pendiente para ese correo.');
+      invitations.filter((item) => item.wallId === wall.id && item.status === 'pendiente').forEach((item) => { item.status = 'cancelada'; });
       const secrets = invitationSecrets();
-      const invitation = { id: crypto.randomUUID(), wallId: wall.id, email, role, invitedBy: user.id, status: 'pendiente', createdAt: Date.now(), ...secrets };
+      const invitation = { id: crypto.randomUUID(), wallId: wall.id, email: null, role, invitedBy: user.id, status: 'pendiente', createdAt: Date.now(), ...secrets };
       if (storage.schemaReady) {
         try {
           const saved = await store.createInvitation(invitation, socket.data.accessToken);
@@ -480,7 +486,6 @@ function createMuroServer(options = {}) {
       }
       invitations.push(invitation);
       const link = `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}`;
-      for (const peer of io.sockets.sockets.values()) if (findUser(peer)?.id === target.id) peer.emit('invitation:received');
       acknowledge({ ok: true, invitation: invitationView(invitation, user), code: secrets.code, link, members: wallMembers(wall) });
     });
 
@@ -493,29 +498,42 @@ function createMuroServer(options = {}) {
         } catch { return fail(acknowledge, 'No se pudieron cargar las invitaciones.'); }
       }
       invitations.forEach((item) => { if (item.status === 'pendiente' && item.expiresAt <= Date.now()) item.status = 'vencida'; });
-      acknowledge({ ok: true, invitations: invitations.filter((item) => item.invitedBy === user.id || item.email === user.email).map((item) => invitationView(item, user)) });
+      acknowledge({ ok: true, invitations: invitations.filter((item) => item.invitedBy === user.id).map((item) => invitationView(item, user)) });
     });
 
     socket.on('invitation:answer', async (payload = {}, acknowledge = () => {}) => {
       const user = requireUser(socket, acknowledge); if (!user) return;
-      const secret = cleanText(payload.secret, 200); const answer = payload.answer === 'rechazar' ? 'rechazar' : 'aceptar';
+      const secret = normalizeInvitationSecret(payload.secret); const answer = 'aceptar';
       if (!secret) return fail(acknowledge, 'Escribe el código o abre el enlace de invitación.');
       const secretHash = sha256(secret);
       if (storage.schemaReady) {
         try {
           const result = await store.answerInvitation(secretHash, answer, socket.data.accessToken);
           replaceState(await store.loadState());
-          return acknowledge({ ok: true, wallId: result.sala_id, status: result.estado });
-        } catch { return fail(acknowledge, 'La invitación no es válida, venció o ya fue utilizada.'); }
+          return acknowledge({ ok: true, wallId: result.sala_id, wallName: result.sala_nombre, invitedBy: result.invitado_por_nombre, status: result.estado });
+        } catch { return fail(acknowledge, 'Sala no encontrada.'); }
       }
       const invitation = invitations.find((item) => item.tokenHash === secretHash || item.codeHash === secretHash);
-      if (!invitation || invitation.email !== user.email || invitation.status !== 'pendiente' || invitation.expiresAt <= Date.now()) return fail(acknowledge, 'La invitación no es válida, venció o ya fue utilizada.');
-      invitation.status = answer === 'aceptar' ? 'aceptada' : 'rechazada';
-      if (answer === 'aceptar') {
-        const wall = findWall(invitation.wallId); if (!wall || wall.members[user.id]) return fail(acknowledge, 'La invitación ya no se puede aceptar.');
-        wall.members[user.id] = invitation.role;
+      if (!invitation || invitation.status !== 'pendiente' || invitation.expiresAt <= Date.now()) return fail(acknowledge, 'Sala no encontrada.');
+      const wall = findWall(invitation.wallId); if (!wall || wall.members[user.id]) return fail(acknowledge, 'Sala no encontrada.');
+      wall.members[user.id] = invitation.role;
+      acknowledge({ ok: true, wallId: invitation.wallId, wallName: wall.name, invitedBy: users.find((item) => item.id === invitation.invitedBy)?.name || 'Propietario', status: 'aceptada' });
+    });
+
+    socket.on('invitation:preview', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      const secret = normalizeInvitationSecret(payload.secret);
+      if (!secret) return fail(acknowledge, 'Escribe el código de invitación.');
+      const secretHash = sha256(secret);
+      if (storage.schemaReady) {
+        try {
+          const result = await store.previewInvitation(secretHash, socket.data.accessToken);
+          return acknowledge({ ok: true, invitation: { wallId: result.sala_id, wallName: result.sala_nombre, invitedBy: result.invitado_por_nombre, role: result.rol, expiresAt: Date.parse(result.vence_en) } });
+        } catch { return fail(acknowledge, 'Sala no encontrada.'); }
       }
-      acknowledge({ ok: true, wallId: invitation.wallId, status: invitation.status });
+      const invitation = invitations.find((item) => item.tokenHash === secretHash || item.codeHash === secretHash);
+      if (!invitation || invitation.status !== 'pendiente' || invitation.expiresAt <= Date.now()) return fail(acknowledge, 'Sala no encontrada.');
+      acknowledge({ ok: true, invitation: { wallId: invitation.wallId, wallName: findWall(invitation.wallId)?.name || 'Muro', invitedBy: users.find((item) => item.id === invitation.invitedBy)?.name || 'Propietario', role: invitation.role, expiresAt: invitation.expiresAt } });
     });
 
     socket.on('invitation:cancel', async (payload = {}, acknowledge = () => {}) => {

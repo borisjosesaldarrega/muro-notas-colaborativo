@@ -2,7 +2,7 @@
 
 **Sistema analizado:** Muro Colaborativo DZ  
 **Arquitectura:** frontend JavaScript desplegado en Netlify, Supabase Auth/Postgres/Realtime y modo alternativo Express + Socket.IO.  
-**Fecha:** 26 de octubre de 2026  
+**Fecha:** 4 de noviembre de 2026
 **Alcance:** código, migraciones SQL, configuración de Netlify/Supabase y dependencias npm de esta copia del proyecto.
 
 ## Resumen ejecutivo
@@ -23,12 +23,12 @@ Quedan como trabajo prioritario A06 (cuotas antiabuso) y A09 (auditoría persist
 
 | Riesgo | ¿Aplica? | Dónde | Cómo podría explotarse | Solución definida | Estado | Prioridad | Responsable |
 |---|---|---|---|---|---|---|---|
-| **A01 Control de acceso roto** | Sí | `server.js`; RLS de `muro_salas`, `muro_sala_miembros`, `muro_notas`, `muro_invitaciones` y `muro_reportes` | Cambiar/adivinar el UUID de un muro o nota; crear una membresía sin aceptar; responder una invitación ajena; leer reportes de otra persona; enviar `role: superadmin` desde DevTools | Identidad derivada de sesión; membresía por muro; alta directa revocada; token/código de un uso ligado al correo; reportes propios y RPC administrativa; pruebas IDOR y de privacidad | **Corregido y probado** | Alta | Boris / Backend / BD |
+| **A01 Control de acceso roto** | Sí | `server.js`; RLS de `muro_salas`, `muro_sala_miembros`, `muro_notas`, `muro_invitaciones` y `muro_reportes` | Cambiar/adivinar el UUID de un muro o nota; crear una membresía sin código; usar un código vencido; leer reportes de otra persona; enviar `role: superadmin` desde DevTools | Identidad derivada de sesión; membresía por muro; alta directa revocada; código aleatorio de 8 caracteres con hash y vencimiento; una cuenta solo puede unirse una vez y el código admite varios miembros; reportes propios y RPC administrativa | **Corregido y probado** | Alta | Boris / Backend / BD |
 | **A02 Configuración de seguridad incorrecta** | Sí | `netlify.toml`, `server.js`, `.env`, `supabase/config.toml` | Clickjacking, carga de scripts no autorizados, MIME sniffing, filtración de secretos o configuración de desarrollo en producción | CSP, `frame-ancestors`, `nosniff`, COOP/CORP, Permissions Policy, Referrer Policy y HSTS; publicar solo URL y clave publicable; secretos únicamente en servidor | **Corregido; verificar en despliegue** | Media | DevOps |
 | **A03 Cadena de suministro** | Sí | `package.json`, `package-lock.json`, dependencias npm | Una dependencia vulnerable permite denegación de servicio; antes del ajuste `engine.io` tenía un aviso alto y había avisos en `qs`/Express | Mantener lockfile, ejecutar `npm audit` en cada entrega, revisar nombres/propietarios de paquetes y activar Dependabot | **Corregido: 0 avisos** | Alta | Equipo / DevOps |
 | **A04 Fallas criptográficas** | Sí | Supabase Auth, variables de entorno, transporte Netlify/Supabase | Robo de sesión por HTTP, secreto privado en el navegador o contraseñas manejadas por código propio | Supabase Auth administra hash y tokens; HTTPS + HSTS; solo clave publicable en frontend; nunca registrar ni versionar secretos; bloquear el modo memoria en producción | Mitigado; queda validar el modo de producción | Alta | Backend / DevOps |
 | **A05 Inyección** | Sí | Notas, nombres, perfiles y filtros enviados desde `public/app.js` y `public/netlify-socket.js` | Una nota con `<img onerror=...>` intenta XSS; SQL malicioso en texto o correo | La UI usa `textContent`/`textarea`; el SDK de Supabase separa datos de consultas; restricciones SQL validan longitud, color y rol; evitar `innerHTML` y SQL dinámico | Mitigado y revisado | Media | Frontend / BD |
-| **A06 Diseño inseguro** | Sí | Creación de notas, invitaciones, reportes y recuperación de acceso | Una cuenta automatizada crea miles de notas/reportes o envía invitaciones repetidas, agotando recursos | Invitación pendiente única por sala/correo, expiración, un solo uso y límites de tamaño ya aplicados; faltan cuota global, límite por minuto y CAPTCHA | **Parcialmente corregido; cuota pendiente** | Alta | Boris / Backend / BD |
+| **A06 Diseño inseguro** | Sí | Creación de notas, invitaciones, reportes y recuperación de acceso | Una cuenta automatizada crea miles de notas/reportes o genera invitaciones repetidas, agotando recursos | Un solo código activo por sala, expiración, hash y membresía única por cuenta; faltan cuota global, límite por minuto y CAPTCHA | **Parcialmente corregido; cuota pendiente** | Alta | Boris / Backend / BD |
 | **A07 Fallas de autenticación** | Sí | Supabase Auth y `supabase/config.toml` | Fuerza bruta, cuentas con claves débiles, OTP reutilizable o cambio de contraseña sin reautenticación | Mensaje genérico, 10 intentos de login/registro cada 5 minutos, contraseña robusta, correo confirmado, reautenticación para cambiar clave y OTP breve; habilitar CAPTCHA en producción | **Configuración corregida; aplicar en Supabase remoto** | Alta | Backend / DevOps |
 | **A08 Integridad de software o datos** | Sí | Sesiones Supabase, `package-lock.json`, scripts locales servidos desde `/vendor` | Token alterado, paquete modificado o script externo sustituido | Supabase verifica la firma y expiración del JWT; no se usa `decode()` como autorización; scripts propios/locales bajo CSP; lockfile versionado y build reproducible | Mitigado | Media | Backend / DevOps |
 | **A09 Registro y alertas** | Sí | Borrado de notas/muros, cambios de miembros y decisiones sobre reportes | Un usuario autorizado borra o cambia contenido y no queda evidencia persistente de quién, cuándo y desde dónde | Crear `muro_auditoria` de solo inserción mediante triggers/RPC; registrar actor, acción, recurso, fecha y resultado sin tokens ni contenido sensible; alertar por volumen anormal | **Pendiente** | Alta | BD / DevOps |
@@ -48,7 +48,10 @@ Quedan como trabajo prioritario A06 (cuotas antiabuso) y A09 (auditoría persist
 - `supabase/migrations/20261027002032_completar_invitaciones_y_reportes.sql` crea invitaciones con hashes, vencimiento y transición atómica a membresía; también completa creación, toma y respuesta de reportes con autor derivado de `auth.uid()`.
 - `supabase/migrations/20261027002607_bloquear_altas_directas_de_miembros.sql` elimina la RPC antigua que agregaba miembros sin aceptación y revoca el `INSERT` directo a `authenticated`.
 - `test/invitations-reports-contract.test.js` verifica que los secretos no se almacenen en claro, que la membresía solo aparezca al aceptar y que el panel de reportes no consulte notas ni nombres de muros privados.
-- `scripts/verify-supabase.js --auth` ejecutó contra el proyecto remoto Auth, RLS, invitación de un uso y reporte con respuesta; los cinco controles informaron `passed`.
+- `scripts/verify-supabase.js --auth` ejecuta contra el proyecto remoto Auth, RLS, dos altas distintas con el mismo código de sala y el recorrido de reportes.
+- `supabase/migrations/20261104221056_codigo_invitacion_8_y_vista_previa.sql` elimina la dependencia del correo invitado, crea códigos de 8 caracteres y permite inspeccionar únicamente el nombre del muro, la persona invitante, el rol y el vencimiento antes de unirse.
+- `supabase/migrations/20261104221929_codigo_sala_reutilizable.sql` mantiene un código activo por sala y permite que varias cuentas lo utilicen sin consumirlo; la restricción única de membresía impide repetir el alta de una misma cuenta.
+- `.github/workflows/supabase-uptime.yml` consulta cada seis horas una ruta de salud que ejecuta una lectura real en Supabase y deja un fallo visible si la base no responde.
 
 ## Corrección probada: A10 y creación atómica
 
@@ -144,8 +147,8 @@ No conviene hacer un solo commit: en la exposición debe poder mostrarse qué ri
 ## Verificación ejecutada
 
 ```text
-npm test       -> 16/16 pruebas aprobadas en la copia completa
-npm test       -> 11/11 pruebas aprobadas en la rama de despliegue
+npm test       -> 27/27 pruebas aprobadas en la copia completa
+npm test       -> 12/12 pruebas aprobadas en la carpeta Backend
 npm audit      -> 0 vulnerabilidades
 npm run check  -> debe ejecutarse antes de publicar o entregar
 npm run verify:supabase -- --auth

@@ -38,7 +38,7 @@ async function main() {
     const temporaryUsers = [];
     try {
       const sessions = [];
-      for (const label of ['owner', 'outsider']) {
+      for (const label of ['owner', 'outsider', 'guest']) {
         const email = `codex-${label}-${suffix}@example.invalid`;
         const { data: created, error: createError } = await services.adminClient.auth.admin.createUser({
           email,
@@ -58,9 +58,10 @@ async function main() {
       result.authentication = 'passed';
 
       if (schemaReady) {
-        const [owner, outsider] = sessions;
+        const [owner, outsider, guest] = sessions;
         const ownerClient = services.createUserClient(owner.token);
         const outsiderClient = services.createUserClient(outsider.token);
+        const guestClient = services.createUserClient(guest.token);
         const noteId = crypto.randomUUID();
         const { data: wallId, error: wallError } = await ownerClient.rpc('muro_crear_sala', {
           nombre_nuevo: 'RLS temporal',
@@ -105,13 +106,11 @@ async function main() {
           : 'failed';
 
         const token = crypto.randomBytes(32).toString('base64url');
-        const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        const code = Array.from({ length: 8 }, () => alphabet[crypto.randomInt(0, alphabet.length)]).join('');
         const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
-        const outsiderProfile = await outsiderClient.from('muro_usuarios').select('correo').eq('id', outsider.id).single();
-        if (outsiderProfile.error) throw outsiderProfile.error;
-        const { data: invitation, error: invitationError } = await ownerClient.rpc('muro_crear_invitacion', {
+        const { data: invitation, error: invitationError } = await ownerClient.rpc('muro_crear_invitacion_codigo', {
           sala_objetivo: wallId,
-          correo_objetivo: outsiderProfile.data.correo,
           rol_objetivo: 'lector',
           token_hash_nuevo: digest(token),
           codigo_hash_nuevo: digest(code),
@@ -119,10 +118,13 @@ async function main() {
         });
         if (invitationError || !invitation?.id) throw invitationError || new Error('No se creó la invitación.');
         const { error: directMemberError } = await ownerClient.from('muro_sala_miembros').insert({ sala_id: wallId, usuario_id: outsider.id, rol: 'lector' });
+        const { data: preview, error: previewError } = await outsiderClient.rpc('muro_inspeccionar_invitacion', { secreto_hash: digest(code) });
         const { data: accepted, error: acceptError } = await outsiderClient.rpc('muro_responder_invitacion', { secreto_hash: digest(code), respuesta: 'aceptar' });
         const { error: reuseError } = await outsiderClient.rpc('muro_responder_invitacion', { secreto_hash: digest(code), respuesta: 'aceptar' });
+        const { data: guestAccepted, error: guestAcceptError } = await guestClient.rpc('muro_responder_invitacion', { secreto_hash: digest(code), respuesta: 'aceptar' });
         const { data: membership, error: membershipError } = await outsiderClient.from('muro_sala_miembros').select('rol').eq('sala_id', wallId).eq('usuario_id', outsider.id).single();
-        result.invitations = Boolean(directMemberError) && !acceptError && accepted?.estado === 'aceptada' && Boolean(reuseError) && !membershipError && membership?.rol === 'lector' ? 'passed' : 'failed';
+        const { data: guestMembership, error: guestMembershipError } = await guestClient.from('muro_sala_miembros').select('rol').eq('sala_id', wallId).eq('usuario_id', guest.id).single();
+        result.invitations = Boolean(directMemberError) && !previewError && preview?.sala_id === wallId && !acceptError && accepted?.estado === 'aceptada' && Boolean(reuseError) && !guestAcceptError && guestAccepted?.estado === 'aceptada' && !membershipError && membership?.rol === 'lector' && !guestMembershipError && guestMembership?.rol === 'lector' ? 'passed' : 'failed';
 
         const { data: report, error: reportError } = await outsiderClient.rpc('muro_crear_reporte', { motivo_nuevo: 'fallo_aplicacion', detalle_nuevo: 'Verificación temporal del circuito completo.', sala_objetivo: wallId, nota_objetivo: null });
         if (reportError || !report?.id) throw reportError || new Error('No se creó el reporte.');

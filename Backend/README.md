@@ -14,8 +14,8 @@ Este backend reemplaza la demostración que guardaba todo en memoria. Mantiene u
 - Privacidad de muros: ser superadministrador no concede acceso automático a muros ajenos.
 - Persistencia en Supabase con modo en memoria para pruebas locales.
 - Creación atómica de sala y membresía propietaria mediante la RPC `muro_crear_sala`.
-- Invitaciones con enlace y código de un solo uso, hash SHA-256, vencimiento, aceptación, rechazo, reenvío y cancelación.
-- Alta de miembros únicamente después de aceptar una invitación válida.
+- Un código activo por sala, alfanumérico, con hash SHA-256 y vencimiento; varias cuentas pueden usarlo para unirse.
+- Alta de miembros únicamente después de usar un código válido de 8 caracteres; no se solicita correo del invitado.
 - Reportes privados con bandeja del usuario, recepción del superadmin, toma, respuesta y notificación en tiempo real.
 
 ## Ejecutar
@@ -32,9 +32,11 @@ Para activar Supabase, copia `.env.example` como `.env` y completa las variables
 
 ## Cierre de invitaciones y reportes
 
+La persona propietaria genera el código desde la interfaz y decide el rol. Quien quiera unirse escribe el código en la pestaña **Unirse**; la vista previa muestra el muro y quién generó la invitación. Un código inexistente, vencido o ya utilizado responde `Sala no encontrada` y no crea membresías.
+
 Responsable de implementación y corrección: **Boris Salda Vargas**.
 
-La entrega anterior había dejado estos dos módulos como pendientes. Boris terminó el contrato del backend y su interfaz: la persona propietaria genera enlace y código, Supabase conserva únicamente los hashes, el destinatario acepta o rechaza, y solo la aceptación crea la membresía. También quedaron disponibles consulta, reenvío y cancelación, con controles de destinatario, duplicados, vencimiento y reutilización.
+La entrega anterior había dejado estos dos módulos como pendientes. Boris terminó el contrato del backend y su interfaz: la persona propietaria genera el código, Supabase conserva únicamente el hash y cada cuenta que lo utiliza recibe su propia membresía. Al generar uno nuevo se cancela el anterior; también se controlan vencimiento, duplicados y permisos.
 
 En reportes, el autor sale siempre de la sesión. Cada persona ve únicamente sus solicitudes; el superadmin recibe, toma y responde sin obtener por ello acceso al contenido de muros privados. La respuesta vuelve solamente a la persona que creó el reporte. Las pruebas cubren el recorrido correcto y los intentos no autorizados.
 
