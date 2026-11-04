@@ -492,6 +492,24 @@
     }
   }
 
+  function openAdminDetailModal(eyebrow, title, items = []) {
+    if ($('#adminDetailEyebrow')) $('#adminDetailEyebrow').textContent = eyebrow;
+    if ($('#adminDetailTitle')) $('#adminDetailTitle').textContent = title;
+    const container = $('#adminDetailContent');
+    if (container) {
+      container.innerHTML = items.map((it) => `
+        <div class="admin-detail-row">
+          <span class="admin-detail-label">${it.label}:</span>
+          <span class="admin-detail-value">${it.value}</span>
+        </div>
+      `).join('');
+    }
+    $('#adminDetailDialog')?.showModal();
+  }
+
+  $('#closeAdminDetailBtn')?.addEventListener('click', () => $('#adminDetailDialog')?.close());
+  $('#closeAdminDetailActionBtn')?.addEventListener('click', () => $('#adminDetailDialog')?.close());
+
   function renderAdminReports(reports = []) {
     const reportsContainer = $('#adminRecentReports');
     if (!reportsContainer) return;
@@ -504,14 +522,25 @@
 
     reports.slice(0, 4).forEach((rep) => {
       const item = document.createElement('div');
-      item.className = 'report-item';
+      item.className = 'report-item admin-inspectable';
+      item.style.cursor = 'pointer';
+      item.title = 'Haz clic para inspeccionar detalles';
       item.innerHTML = `
         <div class="report-item-info">
           <strong>${rep.reason}</strong>
           <small>${rep.wallName} · ${rep.detail}</small>
         </div>
-        <span class="status-badge pending">👁️ Pendiente</span>
+        <span class="status-badge pending">👁️ Ver</span>
       `;
+      item.addEventListener('click', () => {
+        openAdminDetailModal('Reporte de Moderación', `Motivo: ${rep.reason}`, [
+          { label: 'Motivo', value: rep.reason },
+          { label: 'Explicación / Detalle', value: rep.detail || 'Sin detalles' },
+          { label: 'Muro Afectado', value: rep.wallName || 'Muro de ideas' },
+          { label: 'Fecha de Reporte', value: timeAgo(rep.createdAt) },
+          { label: 'Estado', value: '👁️ Supervisión Activa (Solo Lectura)' }
+        ]);
+      });
       reportsContainer.appendChild(item);
     });
   }
@@ -552,11 +581,15 @@
 
     walls.forEach((w) => {
       const card = document.createElement('article');
-      card.className = 'wall-card';
+      card.className = 'wall-card admin-inspectable';
+      card.title = 'Haz clic para inspeccionar detalles en solo lectura';
       const membersCount = w.members ? w.members.length : (w.membersCount || 1);
+      const shortCode = (w.id || 'general').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
+
       card.innerHTML = `
         <div class="wall-card-head">
           <span class="wall-card-badge">👁️ Monitoreo</span>
+          <small class="muted" style="font-family:monospace; font-weight:700;">#${shortCode}</small>
         </div>
         <div>
           <h3>${w.name}</h3>
@@ -564,9 +597,34 @@
         </div>
         <div class="wall-card-footer">
           <span class="wall-card-meta">📝 ${w.notesCount ?? 0} notas · 👥 ${membersCount} miembro(s)</span>
-          <small class="muted">Solo lectura</small>
+          <button type="button" class="secondary-button compact view-spectator-btn" style="font-size:0.8rem; padding:6px 12px;">👁️ Ver Muro</button>
         </div>
       `;
+
+      // Clic en la tarjeta: abre modal de inspección detallada en solo lectura
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.view-spectator-btn')) return;
+        openAdminDetailModal('Inspección de Sala', w.name, [
+          { label: 'Nombre de la Sala', value: w.name },
+          { label: 'Descripción', value: w.description || 'Sin descripción' },
+          { label: 'Código de Acceso', value: shortCode },
+          { label: 'ID de Sala', value: w.id },
+          { label: 'Notas Publicadas', value: `${w.notesCount ?? 0} notas adhesivas` },
+          { label: 'Miembros Asignados', value: `${membersCount} persona(s)` },
+          { label: 'Fecha de Registro', value: timeAgo(w.createdAt) },
+          { label: 'Modo de Acceso', value: '👁️ Solo Lectura (Supervisión Pura)' }
+        ]);
+      });
+
+      // Botón para entrar al tablero en modo espectador (solo lectura)
+      card.querySelector('.view-spectator-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        $('#adminView')?.classList.add('hidden');
+        if (window.MuroBoard) {
+          window.MuroBoard.selectWall(w.id, w.name, 'lector', true);
+        }
+      });
+
       adminWallsGrid.appendChild(card);
     });
   }
@@ -587,7 +645,8 @@
       const card = document.createElement('article');
       const colorMap = { amarillo: 'yellow', rosa: 'pink', azul: 'blue', verde: 'green', lila: 'purple' };
       const colorClass = colorMap[n.color] || 'yellow';
-      card.className = `note-monitor-card ${colorClass}`;
+      card.className = `note-monitor-card ${colorClass} admin-inspectable`;
+      card.title = 'Haz clic para inspeccionar detalles';
       card.innerHTML = `
         <p>${n.texto}</p>
         <div class="note-monitor-meta">
@@ -595,6 +654,18 @@
           <span>🕒 ${timeAgo(n.updatedAt)}</span>
         </div>
       `;
+
+      card.addEventListener('click', () => {
+        openAdminDetailModal('Inspección de Nota', `Nota de ${n.autor || 'Usuario'}`, [
+          { label: 'Autor Real', value: n.autor || 'Invitado' },
+          { label: 'Color de Nota', value: n.color || 'amarillo' },
+          { label: 'Contenido Completo', value: n.texto },
+          { label: 'Última Edición', value: timeAgo(n.updatedAt) },
+          { label: 'Posición en Lienzo', value: `X: ${Math.round(n.x || 0)}px, Y: ${Math.round(n.y || 0)}px` },
+          { label: 'Modo', value: '👁️ Solo Lectura' }
+        ]);
+      });
+
       adminNotesGrid.appendChild(card);
     });
   }
@@ -635,13 +706,28 @@
 
     reports.forEach((rep) => {
       const tr = document.createElement('tr');
+      tr.className = 'admin-inspectable';
+      tr.title = 'Haz clic para ver el detalle del reporte';
+      tr.style.cursor = 'pointer';
       tr.innerHTML = `
         <td><strong>${rep.reason}</strong></td>
         <td>${rep.detail}</td>
         <td>${rep.wallName || 'Muro de ideas'}</td>
         <td>${timeAgo(rep.createdAt)}</td>
-        <td><span class="status-badge pending">👁️ Pendiente</span></td>
+        <td><span class="status-badge pending">👁️ Ver</span></td>
       `;
+
+      tr.addEventListener('click', () => {
+        openAdminDetailModal('Detalle de Reporte', `Motivo: ${rep.reason}`, [
+          { label: 'Motivo del Reporte', value: rep.reason },
+          { label: 'Detalles / Justificación', value: rep.detail || 'Sin detalles' },
+          { label: 'Muro Afectado', value: rep.wallName || 'Muro de ideas' },
+          { label: 'Nota Asociada', value: rep.noteId || 'General' },
+          { label: 'Fecha de Reporte', value: timeAgo(rep.createdAt) },
+          { label: 'Estado', value: '👁️ Monitoreo Activo (Modo Auditoría)' }
+        ]);
+      });
+
       allReportsTable.appendChild(tr);
     });
   }
@@ -706,6 +792,102 @@
 
   // Acceso exclusivo al panel de monitoreo desde el perfil
   $('#openAdminFromProfileBtn')?.addEventListener('click', () => openAdminDashboard(currentUser));
+
+  /* ==========================================
+     CAMBIO DE CONTRASEÑA CON CÓDIGO AL CORREO
+     ========================================== */
+
+  let pendingPasswordChange = null;
+
+  $('#toggleChangePasswordBtn')?.addEventListener('click', () => {
+    const form = $('#changePasswordForm');
+    if (!form) return;
+    const isHidden = form.classList.toggle('hidden');
+    $('#toggleChangePasswordBtn').textContent = isHidden ? 'Configurar' : 'Cerrar';
+    if (!isHidden) {
+      $('#cpStepCurrent')?.classList.remove('hidden');
+      $('#cpStepNew')?.classList.add('hidden');
+      $('#cpCurrentPassword').value = '';
+    }
+  });
+
+  $('#cpRequestCodeBtn')?.addEventListener('click', () => {
+    const currentPass = $('#cpCurrentPassword')?.value;
+    if (!currentPass || currentPass.length < 4) {
+      return toast('Ingresa tu contraseña actual.');
+    }
+
+    const socket = window.MuroBoard?.getSocket();
+    if (!socket) return toast('Conexión con el servidor no disponible.');
+
+    // Validar contraseña actual con el backend
+    socket.emit('auth:password:verify-current', { currentPassword: currentPass }, (res) => {
+      if (!res || !res.ok) {
+        return toast(res?.error || 'La contraseña actual no es correcta.');
+      }
+
+      // Generar código numérico de 6 dígitos
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      pendingPasswordChange = {
+        currentPassword: currentPass,
+        code,
+        expires: Date.now() + 10 * 60 * 1000
+      };
+
+      // Enviar código al correo real del usuario
+      sendVerificationEmail(currentUser.email, code, currentUser.name);
+
+      $('#cpStepCurrent')?.classList.add('hidden');
+      $('#cpStepNew')?.classList.remove('hidden');
+      $('#cpVerificationCode').value = '';
+      $('#cpNewPassword').value = '';
+      $('#cpConfirmPassword').value = '';
+      setTimeout(() => $('#cpVerificationCode')?.focus(), 100);
+
+      toast(`✉️ Código de 6 dígitos enviado a tu correo (${currentUser.email})`);
+    });
+  });
+
+  $('#changePasswordForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!pendingPasswordChange) {
+      toast('Solicita primero el código de verificación.');
+      return;
+    }
+
+    const enteredCode = $('#cpVerificationCode')?.value.trim();
+    const newPass = $('#cpNewPassword')?.value;
+    const confirmPass = $('#cpConfirmPassword')?.value;
+
+    if (enteredCode !== pendingPasswordChange.code) {
+      return toast('❌ Código incorrecto. Revisa el código de 6 dígitos enviado a tu correo.');
+    }
+
+    const passErr = validatePassword(newPass);
+    if (passErr) return toast(passErr);
+
+    if (newPass !== confirmPass) {
+      return toast('Las nuevas contraseñas no coinciden.');
+    }
+
+    const socket = window.MuroBoard?.getSocket();
+    if (!socket) return toast('Conexión con el servidor no disponible.');
+
+    socket.emit('auth:password', {
+      currentPassword: pendingPasswordChange.currentPassword,
+      newPassword: newPass
+    }, (res) => {
+      if (res && res.ok) {
+        toast('✅ ¡Contraseña cambiada exitosamente!');
+        pendingPasswordChange = null;
+        $('#changePasswordForm')?.reset();
+        $('#changePasswordForm')?.classList.add('hidden');
+        $('#toggleChangePasswordBtn').textContent = 'Configurar';
+      } else {
+        toast(res?.error || 'No se pudo actualizar la contraseña.');
+      }
+    });
+  });
 
   $('#closePanel')?.addEventListener('click', () => $('#sidePanel')?.classList.remove('open'));
   $('#logoutButton')?.addEventListener('click', () => {
