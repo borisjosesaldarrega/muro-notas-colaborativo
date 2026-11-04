@@ -14,7 +14,9 @@ window.MuroBoard = (function () {
     walls: [],
     filter: 'all',
     online: 1,
+    roomOnlineCount: 1,
     user: null,
+    spectatorMode: false,
     currentWall: { id: 'general', name: 'Muro de ideas', role: 'propietario' },
     reportingNoteId: null
   };
@@ -57,55 +59,94 @@ window.MuroBoard = (function () {
     if (!note || !note.id || note.id === 'bienvenida') return;
     state.notes.set(note.id, note);
 
+    const currentUserId = state.user?.id;
+    const currentUserName = state.user?.name;
+    const isAuthor = (note.authorId && currentUserId && note.authorId === currentUserId) ||
+                     (note.autor && currentUserName && note.autor.toLowerCase() === currentUserName.toLowerCase());
+    const isWallOwner = state.currentWall?.role === 'propietario' ||
+                        (state.currentWall?.ownerId && currentUserId && state.currentWall.ownerId === currentUserId);
+    const isReadOnly = state.spectatorMode || state.currentWall?.role === 'lector';
+    const canDelete = !isReadOnly && (isAuthor || isWallOwner);
+    const canEdit = !isReadOnly;
+
     let element = document.querySelector(`[data-note-id="${CSS.escape(note.id)}"]`);
 
     if (!element) {
       element = document.createElement('article');
-      element.className = `note ${colorClass(note.color)}`;
+      element.className = `note ${colorClass(note.color)}${isReadOnly ? ' readonly' : ''}`;
       element.dataset.noteId = note.id;
 
       element.innerHTML = `
         <div class="note-header">
-          <div class="color-picker-mini" title="Cambiar color">
-            <button class="dot yellow" data-color="amarillo"></button>
-            <button class="dot pink" data-color="rosa"></button>
-            <button class="dot blue" data-color="azul"></button>
-            <button class="dot green" data-color="verde"></button>
-            <button class="dot purple" data-color="lila"></button>
+          <div class="note-controls-left">
+            <button class="note-size-toggle" type="button" title="Ajustar tamaño">Tamaño</button>
+            <div class="color-picker-mini" title="Cambiar color">
+              <button class="dot yellow" data-color="amarillo"></button>
+              <button class="dot pink" data-color="rosa"></button>
+              <button class="dot blue" data-color="azul"></button>
+              <button class="dot green" data-color="verde"></button>
+              <button class="dot purple" data-color="lila"></button>
+            </div>
           </div>
           <div style="display:flex; gap:4px; align-items:center;">
             <button class="note-report" title="Reportar contenido indebido" style="border:0; background:none; cursor:pointer; font-size:0.9rem;">🚩</button>
-            <button class="note-delete" title="Eliminar nota">&times;</button>
+            <button class="note-delete" title="Eliminar nota" style="${canDelete ? '' : 'display:none;'}">&times;</button>
           </div>
         </div>
-        <textarea maxlength="280" aria-label="Contenido de la nota" placeholder="Escribe tu idea..."></textarea>
+        <textarea maxlength="280" aria-label="Contenido de la nota" placeholder="Escribe tu idea..." ${isReadOnly ? 'readonly' : ''}></textarea>
         <div class="note-footer">
-          <span class="author-tag"></span>
+          <span class="author-tag" title="Creado por ${note.autor || 'Usuario'}">👤 ${note.autor || 'Usuario'}</span>
           <small class="time-tag"></small>
         </div>
       `;
 
       if (board) board.appendChild(element);
-      setupDrag(element);
+      if (!isReadOnly) setupDrag(element);
 
-      const textarea = element.querySelector('textarea');
-      textarea.addEventListener('change', (event) => {
-        const newText = event.target.value.trim();
-        const current = state.notes.get(note.id);
-        if (!newText) {
-          textarea.value = current?.texto || '';
-          return toast('La nota no puede quedar vacía.');
-        }
-        if (socket) {
-          socket.emit('note:update', { id: note.id, texto: newText, color: current?.color });
+      // Botón para ajustar tamaño (pequeño / normal / grande) para no amontonarse
+      const sizeToggleBtn = element.querySelector('.note-size-toggle');
+      sizeToggleBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (element.classList.contains('size-sm')) {
+          element.classList.remove('size-sm');
+          element.classList.add('size-lg');
+          sizeToggleBtn.textContent = 'G';
+        } else if (element.classList.contains('size-lg')) {
+          element.classList.remove('size-lg');
+          sizeToggleBtn.textContent = 'M';
+        } else {
+          element.classList.add('size-sm');
+          sizeToggleBtn.textContent = 'P';
         }
       });
 
-      element.querySelector('.note-delete').addEventListener('click', (e) => {
+      const textarea = element.querySelector('textarea');
+      if (canEdit) {
+        textarea.addEventListener('change', (event) => {
+          const newText = event.target.value.trim();
+          const current = state.notes.get(note.id);
+          if (!newText) {
+            textarea.value = current?.texto || '';
+            return toast('La nota no puede quedar vacía.');
+          }
+          if (socket) {
+            socket.emit('note:update', { id: note.id, texto: newText, color: current?.color });
+          }
+        });
+      }
+
+      element.querySelector('.note-delete')?.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (!canDelete) {
+          return toast('Solo el autor de la nota o el dueño de la sala pueden eliminarla.');
+        }
         if (confirm('¿Deseas eliminar esta nota adhesiva?')) {
           if (socket) {
-            socket.emit('note:delete', { id: note.id });
+            socket.emit('note:delete', { id: note.id }, (res) => {
+              if (res && !res.ok) {
+                toast(res.error || 'No tienes permiso para eliminar esta nota.');
+              }
+            });
           } else {
             state.notes.delete(note.id);
             element.remove();
@@ -114,7 +155,7 @@ window.MuroBoard = (function () {
         }
       });
 
-      element.querySelector('.note-report').addEventListener('click', (e) => {
+      element.querySelector('.note-report')?.addEventListener('click', (e) => {
         e.stopPropagation();
         state.reportingNoteId = note.id;
         $('#reportForm')?.reset();
@@ -124,11 +165,12 @@ window.MuroBoard = (function () {
       element.querySelectorAll('.dot').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
+          if (!canEdit) return;
           const selectedColor = btn.dataset.color;
           const current = state.notes.get(note.id);
           if (current && current.color !== selectedColor) {
             current.color = selectedColor;
-            element.className = `note ${colorClass(selectedColor)}${state.filter !== 'all' && state.filter !== selectedColor ? ' filtered' : ''}`;
+            element.className = `note ${colorClass(selectedColor)}${element.classList.contains('size-sm') ? ' size-sm' : ''}${element.classList.contains('size-lg') ? ' size-lg' : ''}${state.filter !== 'all' && state.filter !== selectedColor ? ' filtered' : ''}`;
             if (socket) {
               socket.emit('note:update', { id: note.id, texto: textarea.value, color: selectedColor });
             }
@@ -137,14 +179,36 @@ window.MuroBoard = (function () {
       });
     }
 
-    element.className = `note ${colorClass(note.color)}${state.filter !== 'all' && state.filter !== note.color ? ' filtered' : ''}`;
+    const currentClasses = ['note', colorClass(note.color)];
+    if (element.classList.contains('size-sm')) currentClasses.push('size-sm');
+    if (element.classList.contains('size-lg')) currentClasses.push('size-lg');
+    if (isReadOnly) currentClasses.push('readonly');
+    if (state.filter !== 'all' && state.filter !== note.color) currentClasses.push('filtered');
+    element.className = currentClasses.join(' ');
+
     const textarea = element.querySelector('textarea');
     if (document.activeElement !== textarea) {
       textarea.value = note.texto || '';
     }
+    textarea.readOnly = isReadOnly;
 
+    // Actualizar visibilidad del botón borrar según permisos reales
+    const deleteBtn = element.querySelector('.note-delete');
+    if (deleteBtn) {
+      deleteBtn.style.display = canDelete ? 'grid' : 'none';
+    }
+
+    const colorPicker = element.querySelector('.color-picker-mini');
+    if (colorPicker) {
+      colorPicker.style.display = canEdit ? 'flex' : 'none';
+    }
+
+    // Nombre real del autor abajo
     const authorTag = element.querySelector('.author-tag');
-    if (authorTag) authorTag.textContent = note.autor || 'Invitado';
+    if (authorTag) {
+      authorTag.textContent = `👤 ${note.autor || 'Usuario'}`;
+      authorTag.setAttribute('title', `Creado por ${note.autor || 'Usuario'}`);
+    }
 
     const timeTag = element.querySelector('.time-tag');
     if (timeTag) timeTag.textContent = timeAgo(note.updatedAt);
@@ -264,18 +328,27 @@ window.MuroBoard = (function () {
     }
   }
 
-  function selectWall(wallId, wallName, role = 'propietario') {
+  function selectWall(wallId, wallName, role = 'propietario', isSpectator = false) {
+    state.spectatorMode = Boolean(isSpectator);
     state.currentWall = { id: wallId, name: wallName, role };
     window.location.hash = `wall=${wallId}`;
 
     $('#wallsView')?.classList.add('hidden');
+    $('#adminView')?.classList.add('hidden');
     $('#appView')?.classList.remove('hidden');
     if ($('#currentWallTitle')) $('#currentWallTitle').textContent = wallName || 'Muro de ideas';
 
-    // El botón de eliminar sala solo aparece si la persona es la dueña del muro
+    // Banner de modo espectador
+    const spectatorBanner = $('#spectatorBanner');
+    if (spectatorBanner) spectatorBanner.classList.toggle('hidden', !state.spectatorMode);
+
+    const newNoteBtn = $('#newNoteButton');
+    if (newNoteBtn) newNoteBtn.classList.toggle('hidden', state.spectatorMode);
+
+    // El botón de eliminar sala solo aparece si la persona es la dueña del muro y no es espectador
     const deleteBtn = $('#deleteWallBtn');
     if (deleteBtn) {
-      deleteBtn.classList.toggle('hidden', role !== 'propietario' && wallId !== 'general');
+      deleteBtn.classList.toggle('hidden', state.spectatorMode || (role !== 'propietario' && wallId !== 'general'));
     }
 
     state.notes.clear();
@@ -289,7 +362,7 @@ window.MuroBoard = (function () {
             name: res.wall.name,
             description: res.wall.description,
             ownerId: res.wall.ownerId,
-            role: res.wall.role,
+            role: isSpectator ? 'lector' : res.wall.role,
             members: res.members || []
           };
           if (res.notes) {
@@ -348,9 +421,18 @@ window.MuroBoard = (function () {
       updateNoteCount();
     });
 
+    // Conteo en tiempo real de personas dentro de esta sala específica
+    socket.on('wall:users:count', (data) => {
+      const count = typeof data === 'object' ? data.count : data;
+      state.roomOnlineCount = count;
+      if ($('#onlineCount')) $('#onlineCount').textContent = count;
+    });
+
     socket.on('users:count', (count) => {
       state.online = count;
-      if ($('#onlineCount')) $('#onlineCount').textContent = count;
+      if (!state.currentWall?.id || state.currentWall.id === 'general') {
+        if ($('#onlineCount')) $('#onlineCount').textContent = count;
+      }
       if ($('#usersStat')) $('#usersStat').textContent = count;
     });
   }
@@ -531,17 +613,35 @@ window.MuroBoard = (function () {
     });
   }
 
-  // Modal Compartir e Invitar (Unificado según reglas del Backend)
+  // 3 Métodos de Invitación a la Sala (Código, URL, Cuenta)
+  $$('[data-invite-tab]').forEach((tabBtn) => {
+    tabBtn.addEventListener('click', () => {
+      $$('[data-invite-tab]').forEach((b) => b.classList.remove('active'));
+      tabBtn.classList.add('active');
+      const target = tabBtn.dataset.inviteTab;
+      $('#inviteTabCode')?.classList.toggle('hidden', target !== 'code');
+      $('#inviteTabUrl')?.classList.toggle('hidden', target !== 'url');
+      $('#inviteTabAccount')?.classList.toggle('hidden', target !== 'account');
+    });
+  });
+
+  // Modal Compartir e Invitar (3 Métodos)
   $('#inviteButton')?.addEventListener('click', () => {
     $('#inviteForm')?.reset();
-    
-    // Rellenar automáticamente el enlace directo de la sala
+
+    // 1. Código de Sala
+    const wallId = state.currentWall?.id || 'general';
+    const shortCode = wallId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || 'GENERAL';
+    const codeDisplay = $('#wallCodeDisplay');
+    if (codeDisplay) codeDisplay.textContent = shortCode;
+
+    // 2. Enlace directo a la sala
     const shareInput = $('#shareLinkInput');
     if (shareInput) {
       shareInput.value = `${window.location.origin}${window.location.pathname}#wall=${state.currentWall.id}`;
     }
 
-    // Regla estricta del backend: Solo la persona propietaria puede invitar miembros
+    // 3. Regla estricta del backend: Solo la persona propietaria puede invitar miembros
     const isOwner = state.currentWall?.role === 'propietario';
     const ownerNotice = $('#inviteOwnerOnlyNotice');
     const emailInput = $('#inviteEmailInput');
@@ -553,12 +653,30 @@ window.MuroBoard = (function () {
     if (roleSelect) roleSelect.disabled = !isOwner;
     if (sendBtn) sendBtn.disabled = !isOwner;
 
+    // Resetear a la pestaña 1 (Código)
+    $$('[data-invite-tab]').forEach((b) => b.classList.remove('active'));
+    document.querySelector('[data-invite-tab="code"]')?.classList.add('active');
+    $('#inviteTabCode')?.classList.remove('hidden');
+    $('#inviteTabUrl')?.classList.add('hidden');
+    $('#inviteTabAccount')?.classList.add('hidden');
+
     // Renderizar miembros reales de la sala
     renderWallMembers(state.currentWall?.members || []);
 
     $('#inviteDialog')?.showModal();
   });
 
+  // Copiar código de sala
+  $('#copyCodeBtn')?.addEventListener('click', () => {
+    const code = $('#wallCodeDisplay')?.textContent;
+    if (code) {
+      navigator.clipboard.writeText(code).then(() => {
+        toast(`📋 Código de sala copiado: ${code}`);
+      }).catch(() => toast(`Código: ${code}`));
+    }
+  });
+
+  // Copiar enlace directo
   $('#copyShareLinkBtn')?.addEventListener('click', () => {
     const shareInput = $('#shareLinkInput');
     if (shareInput && shareInput.value) {
@@ -574,10 +692,11 @@ window.MuroBoard = (function () {
   $('#closeInviteModal')?.addEventListener('click', () => $('#inviteDialog')?.close());
   $('#cancelInviteModal')?.addEventListener('click', () => $('#inviteDialog')?.close());
 
+  // Enviar invitación directa a la cuenta
   $('#inviteForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const email = $('#inviteEmailInput').value.trim().toLowerCase();
-    const role = $('#inviteRoleSelect').value;
+    const email = $('#inviteEmailInput')?.value.trim().toLowerCase();
+    const role = $('#inviteRoleSelect')?.value || 'editor';
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) return toast('Ingresa el correo del invitado.');
@@ -588,14 +707,43 @@ window.MuroBoard = (function () {
         if (res && res.ok) {
           state.currentWall.members = res.members || [];
           renderWallMembers(state.currentWall.members);
-          $('#inviteEmailInput').value = '';
-          toast(`¡Invitación exitosa! ${email} ahora es ${role}.`);
+          if ($('#inviteEmailInput')) $('#inviteEmailInput').value = '';
+          toast(`¡Invitación exitosa! ${email} ahora tiene acceso como ${role}.`);
         } else {
           toast(res?.error || 'No se pudo enviar la invitación.');
         }
       });
     } else {
       toast('Conexión con el servidor no disponible.');
+    }
+  });
+
+  // Modal Unirse con Código
+  $('#joinCodeBtn')?.addEventListener('click', () => {
+    $('#joinCodeForm')?.reset();
+    $('#joinCodeDialog')?.showModal();
+    setTimeout(() => $('#joinCodeInput')?.focus(), 80);
+  });
+  $('#closeJoinCodeModal')?.addEventListener('click', () => $('#joinCodeDialog')?.close());
+  $('#cancelJoinCodeModal')?.addEventListener('click', () => $('#joinCodeDialog')?.close());
+
+  $('#joinCodeForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = $('#joinCodeInput')?.value.trim().toUpperCase();
+    if (!code) return toast('Escribe el código de la sala.');
+
+    if (socket) {
+      socket.emit('wall:join-code', { code }, (res) => {
+        if (res && res.ok) {
+          $('#joinCodeDialog')?.close();
+          selectWall(res.wallId, res.wall.name, res.wall.role);
+          toast(`¡Te has unido exitosamente a la sala "${res.wall.name}"!`);
+        } else {
+          toast(res?.error || 'Código no válido o sala no encontrada.');
+        }
+      });
+    } else {
+      toast('Servidor no conectado.');
     }
   });
 

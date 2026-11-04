@@ -121,6 +121,7 @@
       <a class="app-brand" href="#"><span class="brand-mark">M</span><span>Muro</span></a>
       <div class="board-name"><small>Espacio de trabajo</small><strong>Mis Muros y Salas</strong></div>
       <div class="top-actions">
+        <button id="joinCodeBtn" class="secondary-button compact">🔑 Unirse con Código</button>
         <button id="createWallBtn" class="primary-button compact">＋ Crear Muro</button>
         <button id="wallsProfileBtn" class="avatar" title="Perfil">P</button>
       </div>
@@ -147,10 +148,13 @@
       <div class="top-actions">
         <button id="inviteButton" class="primary-button compact" title="Invitar y compartir enlace">👥 Compartir / Invitar</button>
         <button id="deleteWallBtn" class="danger-button compact hidden" title="Eliminar este muro">🗑️ Eliminar Sala</button>
-        <span class="presence"><i></i><b id="onlineCount">1</b> conectados</span>
+        <span class="presence" title="Personas conectadas a esta sala"><i></i><b id="onlineCount">1</b> en esta sala</span>
         <button id="profileButton" class="avatar" title="Perfil">P</button>
       </div>
     </header>
+    <div id="spectatorBanner" class="spectator-room-banner hidden">
+      <span>👁️</span> <span><strong>Modo Visualizador (Superadmin):</strong> Acceso de supervisión en tiempo real. Edición deshabilitada.</span>
+    </div>
     <section class="toolbar">
       <button id="newNoteButton" class="primary-button compact">＋ Nueva nota</button>
       <div class="color-filter" aria-label="Filtrar por color">
@@ -432,42 +436,66 @@
     </form>
   </dialog>
 
-  <!-- MODAL UNIFICADO: INVITAR COLABORADORES Y COPIAR ENLACE -->
+  <!-- MODAL: 3 MÉTODOS DE INVITACIÓN A LA SALA (CÓDIGO, URL, CUENTA DIRECTA) -->
   <dialog id="inviteDialog">
     <form id="inviteForm">
       <div class="dialog-head">
-        <div><p class="eyebrow">Colaboración</p><h3>Compartir e Invitar</h3></div>
+        <div><p class="eyebrow">Colaboración</p><h3>Invitar a esta Sala</h3></div>
         <button class="close-button" id="closeInviteModal" type="button">&times;</button>
       </div>
-      
-      <!-- Bloque 1: Enlace directo a la sala (estilo Figma / Google Docs) -->
-      <div style="background: #f5f3fa; padding: 16px; border-radius: 14px; margin-bottom: 20px;">
-        <label style="margin-top:0; font-weight:700; font-size:0.88rem; color: var(--ink);">🔗 Enlace directo a esta sala</label>
-        <div style="display:flex; gap:10px; margin-top:8px;">
-          <input id="shareLinkInput" type="text" readonly style="background:#fff; font-size:0.85rem; padding:10px;" />
-          <button id="copyShareLinkBtn" type="button" class="secondary-button compact" style="white-space:nowrap; padding:10px 14px;">📋 Copiar</button>
+
+      <!-- Selector de Métodos de Invitación -->
+      <div class="invite-methods-tabs">
+        <button type="button" class="invite-tab-btn active" data-invite-tab="code">🔑 Código de Sala</button>
+        <button type="button" class="invite-tab-btn" data-invite-tab="url">🔗 Enlace URL</button>
+        <button type="button" class="invite-tab-btn" data-invite-tab="account">✉️ Invitación Directa</button>
+      </div>
+
+      <!-- MÉTODO 1: MEDIANTE CÓDIGO DE SALA -->
+      <div id="inviteTabCode" class="invite-tab-pane">
+        <p class="muted" style="margin:0 0 12px; font-size:0.9rem;">Comparte este código para que tu compañero ingrese desde "Unirse con Código":</p>
+        <div class="code-share-box">
+          <div class="code-value-wrapper">
+            <span class="code-sub">CÓDIGO DE SALA</span>
+            <strong id="wallCodeDisplay" class="code-big-text">CARGANDO...</strong>
+          </div>
+          <button id="copyCodeBtn" type="button" class="primary-button compact">📋 Copiar Código</button>
         </div>
       </div>
 
-      <!-- Bloque 2: Invitar por correo -->
-      <div id="inviteEmailSection">
-        <p class="muted" style="margin-bottom:10px; font-weight:600;">O invita a un colaborador por correo electrónico:</p>
+      <!-- MÉTODO 2: MEDIANTE ENLACE (URL) -->
+      <div id="inviteTabUrl" class="invite-tab-pane hidden">
+        <p class="muted" style="margin:0 0 12px; font-size:0.9rem;">Copia el enlace directo para enviarlo por WhatsApp, Teams o correo:</p>
+        <div style="background: #f5f3fa; padding: 16px; border-radius: 14px; margin-bottom: 12px;">
+          <label style="margin-top:0; font-weight:700; font-size:0.88rem; color: var(--ink);">🔗 Enlace directo a esta sala</label>
+          <div style="display:flex; gap:10px; margin-top:8px;">
+            <input id="shareLinkInput" type="text" readonly style="background:#fff; font-size:0.85rem; padding:10px;" />
+            <button id="copyShareLinkBtn" type="button" class="secondary-button compact" style="white-space:nowrap; padding:10px 14px;">📋 Copiar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MÉTODO 3: INVITACIÓN DIRECTA MEDIANTE LA CUENTA -->
+      <div id="inviteTabAccount" class="invite-tab-pane hidden">
         <div id="inviteOwnerOnlyNotice" class="hidden" style="margin-bottom:12px; padding:10px 14px; background:#fffbeb; border:1px solid #fef3c7; border-radius:10px; font-size:0.83rem; color:#92400e;">
           ⚠️ Solo la persona propietaria de esta sala puede invitar o cambiar permisos de miembros.
         </div>
-        <label>Correo electrónico<input id="inviteEmailInput" type="email" placeholder="compañero@correo.com"></label>
-        <label>Rol de permisos
+        <label>Correo electrónico registrado
+          <input id="inviteEmailInput" type="email" placeholder="usuario@correo.com">
+        </label>
+        <label>Permiso en la sala
           <select id="inviteRoleSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);">
-            <option value="editor">Editor (Puede crear, mover y editar notas)</option>
-            <option value="lector">Lector (Solo puede ver el muro)</option>
+            <option value="editor">Editor (Puede crear, mover y editar sus notas)</option>
+            <option value="lector">Lector (Solo puede visualizar el muro)</option>
           </select>
         </label>
+        <button id="sendInviteBtn" type="submit" class="primary-button" style="width:100%; margin-top:14px;">✉️ Enviar Invitación a la Cuenta</button>
       </div>
 
-      <!-- Bloque 3: Miembros actuales de la sala con sus roles del backend -->
-      <div id="wallMembersContainer" class="invite-members-list">
+      <!-- Miembros actuales de la sala con tiempo real -->
+      <div id="wallMembersContainer" class="invite-members-list" style="margin-top:20px;">
         <div class="invite-members-title">
-          <span>👥 Miembros con acceso a esta sala</span>
+          <span>👥 Miembros de esta sala</span>
           <small id="wallMembersCount" class="muted">1 miembro</small>
         </div>
         <div id="wallMembersList" style="max-height: 180px; overflow-y: auto;">
@@ -477,7 +505,6 @@
 
       <div class="dialog-actions">
         <button id="cancelInviteModal" type="button" class="secondary-button">Cerrar</button>
-        <button id="sendInviteBtn" type="submit" class="primary-button">Enviar Invitación</button>
       </div>
     </form>
   </dialog>
@@ -506,6 +533,43 @@
     </form>
   </dialog>
 
+  <!-- MODAL: UNIRSE A SALA CON CÓDIGO -->
+  <dialog id="joinCodeDialog">
+    <form id="joinCodeForm">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Acceso Rápido</p><h3>Unirse con Código</h3></div>
+        <button class="close-button" id="closeJoinCodeModal" type="button">&times;</button>
+      </div>
+      <p class="muted">Ingresa el código proporcionado por la persona que creó la sala:</p>
+      <label>Código de la Sala
+        <input id="joinCodeInput" placeholder="Ej: 8A4F12 o ID de la sala" required maxlength="60" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;">
+      </label>
+      <div class="dialog-actions">
+        <button id="cancelJoinCodeModal" type="button" class="secondary-button">Cancelar</button>
+        <button id="submitJoinCodeBtn" type="submit" class="primary-button">Entrar a la Sala →</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL DE INSPECCIÓN VISUAL PARA SUPERADMIN (SOLO LECTURA) -->
+  <dialog id="adminDetailDialog">
+    <div style="padding:28px;">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow" id="adminDetailEyebrow">Inspección de Tarjeta</p>
+          <h3 id="adminDetailTitle">Detalle de Información</h3>
+        </div>
+        <button class="close-button" id="closeAdminDetailBtn" type="button">&times;</button>
+      </div>
+      <div id="adminDetailContent" class="admin-detail-content" style="margin-top:16px;">
+        <!-- Contenido dinámico cargado en solo lectura -->
+      </div>
+      <div class="dialog-actions" style="margin-top:24px;">
+        <button id="closeAdminDetailActionBtn" type="button" class="secondary-button">Cerrar Inspección</button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- PANEL LATERAL DE PERFIL -->
   <aside id="sidePanel" class="side-panel" aria-hidden="true">
     <button id="closePanel" class="close-button">&times;</button>
@@ -516,13 +580,48 @@
       <div id="profileRoleBadge" class="profile-role-tag usuario" style="margin-top:6px; display:inline-block;">Rol: Usuario</div>
       
       <!-- Ventanita exclusiva que aparece solo para Superadministrador -->
-      <div id="profileAdminAccess" class="hidden" style="margin:24px 0 16px; padding:16px; background: rgba(109, 74, 255, 0.08); border: 1px solid rgba(109, 74, 255, 0.22); border-radius: 14px; text-align: left;">
+      <div id="profileAdminAccess" class="hidden" style="margin:20px 0 16px; padding:16px; background: rgba(109, 74, 255, 0.08); border: 1px solid rgba(109, 74, 255, 0.22); border-radius: 14px; text-align: left;">
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
           <span style="font-size:1.2rem;">👁️</span>
           <strong style="color:var(--brand); font-size:0.95rem;">Panel de Monitoreo</strong>
         </div>
         <p class="muted" style="font-size:0.82rem; margin:0 0 14px 0; line-height:1.4;">Acceso exclusivo de Superadministrador en modo espectador (auditoría en tiempo real).</p>
         <button id="openAdminFromProfileBtn" class="primary-button compact" style="width:100%;">📊 Ingresar al Panel de Admin</button>
+      </div>
+
+      <!-- SECCIÓN DE CAMBIO DE CONTRASEÑA CON CÓDIGO AL CORREO -->
+      <div class="profile-security-card" style="margin-top:18px; padding:16px; border:1px solid var(--line); border-radius:14px; background:#faf9fd; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong style="font-size:0.92rem; color:var(--ink);">🔐 Cambiar Contraseña</strong>
+          <button id="toggleChangePasswordBtn" type="button" class="link-button" style="margin:0; font-size:0.82rem;">Configurar</button>
+        </div>
+
+        <form id="changePasswordForm" class="hidden" style="margin-top:14px;">
+          <!-- Paso 1: Contraseña Actual -->
+          <div id="cpStepCurrent">
+            <label style="margin-top:0; font-size:0.85rem;">Contraseña Actual
+              <input id="cpCurrentPassword" type="password" placeholder="Tu contraseña actual" required style="padding:10px 12px; font-size:0.88rem;">
+            </label>
+            <button id="cpRequestCodeBtn" type="button" class="secondary-button compact" style="width:100%; margin-top:10px;">Solicitar Código al Correo</button>
+          </div>
+
+          <!-- Paso 2: Código + Nueva Contraseña -->
+          <div id="cpStepNew" class="hidden" style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--line);">
+            <div style="font-size:0.8rem; color:#6d4aff; font-weight:700; margin-bottom:8px;">
+              ✉️ Código enviado a tu correo. Revisa tu bandeja.
+            </div>
+            <label style="margin-top:6px; font-size:0.85rem;">Código de 6 dígitos
+              <input id="cpVerificationCode" type="text" maxlength="6" placeholder="Ej: 489201" pattern="[0-9]{6}" required style="padding:10px 12px; letter-spacing:3px; font-weight:700; text-align:center;">
+            </label>
+            <label style="margin-top:8px; font-size:0.85rem;">Nueva Contraseña
+              <input id="cpNewPassword" type="password" minlength="4" placeholder="Mínimo 4 caracteres" required style="padding:10px 12px; font-size:0.88rem;">
+            </label>
+            <label style="margin-top:8px; font-size:0.85rem;">Confirmar Nueva Contraseña
+              <input id="cpConfirmPassword" type="password" minlength="4" placeholder="Repite tu nueva contraseña" required style="padding:10px 12px; font-size:0.88rem;">
+            </label>
+            <button id="cpSubmitBtn" type="submit" class="primary-button compact" style="width:100%; margin-top:12px;">Confirmar Cambio</button>
+          </div>
+        </form>
       </div>
 
       <button id="logoutButton" class="danger-button" style="margin-top:20px;">Cerrar sesión</button>
