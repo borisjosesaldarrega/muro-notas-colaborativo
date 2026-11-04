@@ -983,3 +983,5 @@ input.is-invalid {
 .invitation-accept-bar div { display:grid; gap:3px; }
 .invitation-accept-bar small { color:var(--muted); }
 @media (max-width: 760px) { .invitation-accept-bar { grid-template-columns:1fr; } }
+
+/* El frontend publicado se valida en cada despliegue de la rama de integración. */
