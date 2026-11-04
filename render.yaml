@@ -5,6 +5,7 @@ services:
     plan: free
     buildCommand: npm ci
     startCommand: npm start
+    autoDeploy: true
     healthCheckPath: /api/health
     envVars:
       - key: NEXT_PUBLIC_SUPABASE_URL
