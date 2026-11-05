@@ -675,7 +675,45 @@ legend { font-weight: 700; margin-bottom: 10px; }
 .admin-user-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  min-width: 0;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+  background: rgba(255,255,255,.045);
+}
+.admin-user-info .avatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.12);
+  background: linear-gradient(145deg, #4a3f72, #322a50);
+  box-shadow: 0 5px 0 rgba(10,7,25,.16);
+  cursor: default;
+}
+.admin-user-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+#adminUserName {
+  display: block;
+  overflow: hidden;
+  color: #fff;
+  font-size: .9rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-user-role {
+  overflow: hidden;
+  color: #bdb5d7;
+  font-size: .7rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-main {

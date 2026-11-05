@@ -39,6 +39,8 @@ test('expone configuración de cuenta, temas e invitación con lenguaje claro', 
   assert.match(css, /\.account-settings-dialog::\-webkit-scrollbar-thumb/);
   assert.match(css, /scrollbar-color:\s*#8f7cf8\s+#eeeaff/);
   assert.match(css, /html\[data-theme="dark"\] \.account-settings-dialog/);
+  assert.match(css, /\.admin-user-info \.avatar[\s\S]*place-items:\s*center/);
+  assert.match(html, /class="admin-user-role">Ayuda y moderación/);
 });
 
 test('sincroniza el correo confirmado de Auth con el perfil público', () => {
