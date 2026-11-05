@@ -116,8 +116,20 @@ test('reserva un nombre de usuario único sin distinguir mayúsculas', async () 
 test('sincroniza el ciclo de vida de notas entre clientes', async () => {
   const admin = clients[0];
   const member = clients[1];
+  const adminPresence = once(admin, 'users:count');
   assert.equal((await ack(admin, 'wall:select', { id: 'general' })).ok, true);
+  assert.equal(await adminPresence, 1);
+  const memberPresence = once(member, 'users:count');
   assert.equal((await ack(member, 'wall:select', { id: 'general' })).ok, true);
+  assert.equal(await memberPresence, 2);
+
+  const duplicateMember = await connect();
+  assert.equal((await ack(duplicateMember, 'auth:login', { email: 'brenda@example.com', password: 'clave45678' })).ok, true);
+  const duplicatePresence = once(duplicateMember, 'users:count');
+  assert.equal((await ack(duplicateMember, 'wall:select', { id: 'general' })).ok, true);
+  assert.equal(await duplicatePresence, 2, 'dos pestañas de la misma cuenta cuentan como una persona');
+  assert.equal((await ack(duplicateMember, 'wall:leave')).ok, true);
+  duplicateMember.close();
 
   const createdEvent = once(member, 'note:created');
   const created = await ack(admin, 'note:create', { texto: 'Idea compartida', color: 'rosa', x: 120, y: 85 });
@@ -126,10 +138,15 @@ test('sincroniza el ciclo de vida de notas entre clientes', async () => {
   assert.equal((await ack(admin, 'note:create', { texto: '   ', color: 'rosa' })).ok, false);
   assert.equal((await ack(admin, 'note:create', { texto: 'Color inválido', color: 'negro' })).ok, false);
 
-  const updatedEvent = once(member, 'note:updated');
-  const updated = await ack(admin, 'note:update', { id: created.note.id, texto: 'Idea refinada', color: 'azul' });
+  const updatedEvent = once(admin, 'note:updated');
+  const updated = await ack(member, 'note:update', { id: created.note.id, texto: 'Idea refinada', color: 'azul' });
   assert.equal(updated.ok, true);
-  assert.equal((await updatedEvent).note.color, 'azul');
+  const updatedNote = (await updatedEvent).note;
+  assert.equal(updatedNote.color, 'azul');
+  assert.equal(updatedNote.authorId, created.note.authorId);
+  assert.equal(updatedNote.autor, created.note.autor);
+  assert.equal(updatedNote.editorId, server.users.find((user) => user.email === 'brenda@example.com').id);
+  assert.equal(updatedNote.editor, 'Brenda Editora');
 
   const movedEvent = once(member, 'note:moved');
   assert.equal((await ack(admin, 'note:move', { id: created.note.id, x: -30, y: 99999 })).ok, true);

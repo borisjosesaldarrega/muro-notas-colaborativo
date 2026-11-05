@@ -459,6 +459,8 @@ button { cursor: pointer; }
   margin-top: auto;
 }
 .author-tag { font-weight: 700; color: #3b374d; }
+.note-credits { display: flex; min-width: 0; flex-direction: column; line-height: 1.2; }
+.editor-tag { margin-top: 2px; color: #686178; font-size: 0.62rem; font-weight: 600; }
 .time-tag { color: #757085; font-size: 0.68rem; }
 
 .note.filtered { opacity: .12; pointer-events: none; }

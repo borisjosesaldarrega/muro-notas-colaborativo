@@ -136,6 +136,23 @@ test('ajusta las notas al contenido y sincroniza el nombre visible de su autor',
   assert.match(migration, /nota\.autor_id = usuario\.id/i);
 });
 
+test('preserva la autoría, identifica a quien edita y cuenta personas únicas por muro', () => {
+  const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
+  const server = readFileSync(join(root, 'server.js'), 'utf8');
+  const store = readFileSync(join(root, 'lib/supabase-store.js'), 'utf8');
+  const migration = readFileSync(join(root, 'supabase/migrations/20261105203500_preservar_autoria_y_registrar_edicion.sql'), 'utf8');
+  assert.match(migration, /new\.autor_id := old\.autor_id/i);
+  assert.match(migration, /new\.nombre_autor := old\.nombre_autor/i);
+  assert.match(migration, /new\.editado_por_id := actor_id/i);
+  assert.match(store, /editado_por_id,nombre_editor/);
+  assert.doesNotMatch(store, /delete row\.autor_id/);
+  assert.match(board, /Creada por \$\{note\.autor/);
+  assert.match(board, /Editada por \$\{note\.editor\}/);
+  assert.match(server, /const userIds = new Set\(\)/);
+  assert.match(server, /connectedUserCount\(wallId/);
+  assert.doesNotMatch(server, /io\.emit\('users:count', io\.engine\.clientsCount\)/);
+});
+
 test('permite reportar miembros y notifica las medidas por correo sin revelar al reportante', () => {
   const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
   const app = readFileSync(join(root, 'Frontend/js/app.js'), 'utf8');

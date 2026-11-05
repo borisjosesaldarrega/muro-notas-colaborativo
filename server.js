@@ -164,7 +164,7 @@ function createMuroServer(options = {}) {
       ok: database !== 'unreachable',
       notes: walls.reduce((sum, wall) => sum + wall.notes.length, 0),
       walls: walls.length,
-      users: io.engine.clientsCount,
+      users: connectedUserCount(),
       storage: { ...storage, database }
     });
   });
@@ -240,15 +240,32 @@ function createMuroServer(options = {}) {
     return { token, user: publicUser(user) };
   }
 
+  function connectedUserCount(wallId = null, excludedSocketId = '') {
+    const userIds = new Set();
+    for (const client of io.sockets.sockets.values()) {
+      if (client.id === excludedSocketId || !client.data.userId) continue;
+      if (wallId && client.data.wallId !== wallId) continue;
+      userIds.add(client.data.userId);
+    }
+    return userIds.size;
+  }
+
+  function emitWallPresence(wallId, excludedSocketId = '') {
+    if (wallId) io.to(`wall:${wallId}`).emit('users:count', connectedUserCount(wallId, excludedSocketId));
+  }
+
   function leaveCurrentWall(socket) {
-    if (socket.data.wallId) socket.leave(`wall:${socket.data.wallId}`);
+    const previousWallId = socket.data.wallId;
+    if (previousWallId) socket.leave(`wall:${previousWallId}`);
     socket.data.wallId = null;
+    emitWallPresence(previousWallId);
   }
 
   function joinWall(socket, wall) {
     leaveCurrentWall(socket);
     socket.data.wallId = wall.id;
     socket.join(`wall:${wall.id}`);
+    emitWallPresence(wall.id);
   }
 
   function emitAdminSnapshot() {
@@ -262,7 +279,6 @@ function createMuroServer(options = {}) {
     socket.use(async (_packet, next) => {
       try { await ready; next(); } catch (error) { next(error); }
     });
-    io.emit('users:count', io.engine.clientsCount);
     socket.emit('auth:required');
 
     socket.on('auth:register', async (payload = {}, acknowledge = () => {}) => {
@@ -462,10 +478,16 @@ function createMuroServer(options = {}) {
       }
       walls.forEach((wall) => {
         wall.notes.forEach((note) => {
-          if (note.authorId !== user.id || note.autor === user.name) return;
-          note.autor = user.name;
-          note.updatedAt = Date.now();
-          io.to(`wall:${wall.id}`).emit('note:updated', { wallId: wall.id, note });
+          let changed = false;
+          if (note.authorId === user.id && note.autor !== user.name) {
+            note.autor = user.name;
+            changed = true;
+          }
+          if (note.editorId === user.id && note.editor !== user.name) {
+            note.editor = user.name;
+            changed = true;
+          }
+          if (changed) io.to(`wall:${wall.id}`).emit('note:updated', { wallId: wall.id, note });
         });
       });
       acknowledge({ ok: true, user: publicUser(user) });
@@ -549,6 +571,11 @@ function createMuroServer(options = {}) {
       if (!wallRole(wall, user)) return fail(acknowledge, 'No tienes acceso a este muro.');
       joinWall(socket, wall);
       acknowledge({ ok: true, wall: wallSummary(wall, user), notes: wall.notes, members: wallMembers(wall) });
+    });
+
+    socket.on('wall:leave', (_payload = {}, acknowledge = () => {}) => {
+      leaveCurrentWall(socket);
+      acknowledge({ ok: true });
     });
 
     socket.on('wall:update', async (payload = {}, acknowledge = () => {}) => {
@@ -743,6 +770,8 @@ function createMuroServer(options = {}) {
       if (payload.color !== undefined && !COLORS.has(payload.color)) return fail(acknowledge, 'El color no es válido.');
       note.texto = texto;
       if (payload.color) note.color = payload.color;
+      note.editor = user.name;
+      note.editorId = user.id;
       note.updatedAt = Date.now();
       if (storage.schemaReady) {
         try { await store.updateNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar la nota. Inténtalo nuevamente.'); }
@@ -895,9 +924,9 @@ function createMuroServer(options = {}) {
             store.listAdminUsers()
           ]);
           if (summaryResult.error) return fail(acknowledge, 'No se pudo cargar el resumen administrativo.');
-          acknowledge({ ok: true, users: adminUsers, totals: summaryResult.data, connected: io.engine.clientsCount });
+          acknowledge({ ok: true, users: adminUsers, totals: summaryResult.data, connected: connectedUserCount() });
         } catch { return fail(acknowledge, 'No se pudo cargar el directorio de usuarios.'); }
-      } else acknowledge({ ok: true, users: users.map(publicUser), walls: walls.map((wall) => ({ ...wallSummary(wall, user), members: wallMembers(wall) })), totals: { usuarios: users.length, salas: walls.length, notas: walls.reduce((sum, wall) => sum + wall.notes.length, 0), reportes_pendientes: reports.filter((item) => ['pendiente', 'en_revision'].includes(item.status)).length }, connected: io.engine.clientsCount });
+      } else acknowledge({ ok: true, users: users.map(publicUser), walls: walls.map((wall) => ({ ...wallSummary(wall, user), members: wallMembers(wall) })), totals: { usuarios: users.length, salas: walls.length, notas: walls.reduce((sum, wall) => sum + wall.notes.length, 0), reportes_pendientes: reports.filter((item) => ['pendiente', 'en_revision'].includes(item.status)).length }, connected: connectedUserCount() });
     });
 
     socket.on('admin:user:discipline', async (payload = {}, acknowledge = () => {}) => {
@@ -954,7 +983,7 @@ function createMuroServer(options = {}) {
       emitAdminSnapshot();
     });
 
-    socket.on('disconnect', () => io.emit('users:count', io.engine.clientsCount));
+    socket.on('disconnect', () => emitWallPresence(socket.data.wallId, socket.id));
   });
 
   return { app, httpServer, io, users, sessions, walls, invitations, reports, ready, storage };
