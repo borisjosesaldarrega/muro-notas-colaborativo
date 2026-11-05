@@ -523,13 +523,14 @@ legend { font-weight: 700; margin-bottom: 10px; }
 .text-center { text-align: center; }
 
 .code-inputs-group {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 8px;
   margin: 24px 0 16px;
 }
 .code-digit {
-  width: 48px;
+  width: 100%;
+  min-width: 0;
   height: 56px;
   text-align: center;
   font-size: 1.6rem;
@@ -1045,7 +1046,8 @@ input.is-invalid {
   .toolbar .compact:first-letter { font-size: 1.2rem; }
   .auth-card { box-shadow: none; background: transparent; }
   .auth-panel { background: #fff; }
-  .code-digit { width: 40px; height: 48px; font-size: 1.3rem; }
+  .code-inputs-group { gap: 5px; }
+  .code-digit { width: 100%; height: 46px; padding: 0; font-size: 1.08rem; }
 }
 .invitation-accept-bar { display:grid; grid-template-columns:minmax(220px,1fr) minmax(180px,260px) 120px auto; gap:10px; align-items:center; margin:18px 0 24px; padding:15px 18px; border:1px solid var(--line); border-radius:16px; background:var(--surface); }
 .invitation-accept-bar div { display:grid; gap:3px; }
@@ -1540,9 +1542,13 @@ button .ui-icon { margin-right: 7px; }
   box-shadow: 9px 10px 0 rgba(42, 31, 80, .08), 0 20px 35px rgba(42,31,80,.08);
   transform: rotate(-.4deg);
 }
-.wall-card:nth-child(3n+2) { background: #ffe5ee; transform: rotate(.45deg); }
-.wall-card:nth-child(3n) { background: #e0f7ef; }
-.wall-card::before { content: ''; position: absolute; width: 58px; height: 15px; top: -9px; left: calc(50% - 29px); border-radius: 3px; background: rgba(255,255,255,.72); }
+.wall-card.wall-color-yellow { background: #fff8cf; }
+.wall-card.wall-color-pink { background: #ffe5ee; }
+.wall-card.wall-color-blue { background: #dff2ff; }
+.wall-card.wall-color-green { background: #e0f7ef; }
+.wall-card.wall-color-purple { background: #eee6ff; }
+.wall-card::before { content: ''; position: absolute; width: 48px; height: 14px; top: -8px; left: 36px; border-radius: 3px; background: rgba(255,255,255,.72); transform: rotate(-4deg); }
+.wall-card::after { content: ''; position: absolute; width: 48px; height: 14px; top: -8px; right: 36px; border-radius: 3px; background: rgba(255,255,255,.66); transform: rotate(4deg); }
 .wall-card:hover { transform: translateY(-5px) rotate(0); box-shadow: 10px 14px 0 rgba(42,31,80,.07), 0 26px 44px rgba(81,61,148,.12); }
 .wall-card-footer { border-color: rgba(85,75,112,.14); }
 .wall-card-meta { display: inline-flex; align-items: center; gap: 6px; }
@@ -1587,8 +1593,9 @@ button .ui-icon { margin-right: 7px; }
 .theme-picker { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
 .theme-picker label { margin: 0; cursor: pointer; }
 .theme-picker input { position: absolute; opacity: 0; pointer-events: none; }
-.theme-picker label > span { min-height: 116px; display: grid; align-content: start; gap: 4px; padding: 10px; border: 2px solid #ebe7f3; border-radius: 15px; background: #fff; }
-.theme-picker input:checked + span { border-color: #6658f5; box-shadow: 0 0 0 3px rgba(102,88,245,.1); }
+.theme-picker label > span { position: relative; min-height: 116px; display: grid; align-content: start; gap: 4px; padding: 10px; border: 2px solid #ebe7f3; border-radius: 15px; background: #fff; }
+.theme-picker input:checked + span { border-color: #6658f5; box-shadow: 0 0 0 3px rgba(102,88,245,.18); }
+.theme-picker input:checked + span::after { content: '✓'; position: absolute; top: 7px; right: 7px; width: 24px; height: 24px; display: grid; place-items: center; border: 2px solid #fff; border-radius: 50%; color: #fff; background: #6658f5; font-size: .76rem; font-weight: 900; box-shadow: 0 3px 0 rgba(62,43,139,.18); }
 .theme-picker small { color: #7c758d; font-size: .7rem; }
 .theme-preview { height: 45px; margin-bottom: 4px; border-radius: 9px; border: 1px solid #ded9ea; }
 .light-preview { background: linear-gradient(135deg,#fff 60%,#ede9ff 60%); }
@@ -1618,7 +1625,6 @@ html[data-theme="dark"] .topbar,
 html[data-theme="dark"] .auth-card,
 html[data-theme="dark"] dialog form,
 html[data-theme="dark"] .side-panel,
-html[data-theme="dark"] .wall-card,
 html[data-theme="dark"] .invitation-accept-bar,
 html[data-theme="dark"] .admin-card,
 html[data-theme="dark"] .metric-card { color: #f4f1ff; background: #29223f; border-color: #443b5c; }
@@ -1642,7 +1648,13 @@ html[data-theme="dark"] .settings-section,
 html[data-theme="dark"] .profile-menu-button,
 html[data-theme="dark"] .theme-picker label > span,
 html[data-theme="dark"] .invite-code-card { color: #f4f1ff; background: #211c33; border-color: #443b5c; }
-html[data-theme="dark"] .wall-card { box-shadow: 9px 10px 0 rgba(0,0,0,.22); }
+html[data-theme="dark"] .wall-card { color: #282337; border-color: rgba(255,255,255,.6); box-shadow: 9px 10px 0 rgba(0,0,0,.22); }
+html[data-theme="dark"] .wall-card h3 { color: #282337; }
+html[data-theme="dark"] .wall-card p,
+html[data-theme="dark"] .wall-card-meta { color: #625b73; }
+html[data-theme="dark"] .wall-card-footer { border-color: rgba(73,62,98,.16); }
+html[data-theme="dark"] .theme-picker input:checked + span { border-color: #a998ff; background: #342a4d; box-shadow: 0 0 0 3px rgba(169,152,255,.24), inset 0 0 0 1px rgba(255,255,255,.08); }
+html[data-theme="dark"] .theme-picker input:checked + span::after { color: #211a37; background: #c8bbff; border-color: #342a4d; }
 html[data-theme="dark"] .admin-table th,
 html[data-theme="dark"] .admin-table td { border-color: #443b5c; color: #eeeaf9; }
 
@@ -1776,4 +1788,93 @@ html[data-theme="dark"] .admin-guide-grid p { color: #c1bacf; }
   .auth-panel { background-image: radial-gradient(circle, rgba(102,88,245,.13) 1.2px, transparent 1.2px); background-size: 26px 26px; }
   .mobile-logo { width: fit-content; padding: 8px 14px 8px 8px; border: 1px solid #e6e0f5; border-radius: 17px; background: rgba(255,255,255,.82); box-shadow: 6px 7px 0 rgba(60,42,121,.08); }
   html[data-theme="dark"] .mobile-logo { color: #fff; background: #352c4c; border-color: #514663; }
+}
+
+/* Muros personalizables: el color pertenece al muro, no al tema de la interfaz. */
+.wall-card-menu { position: relative; z-index: 4; }
+.wall-card-menu-trigger {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(53,45,72,.16);
+  border-radius: 12px;
+  color: #41394f;
+  background: rgba(255,255,255,.58);
+  cursor: pointer;
+}
+.wall-card-menu-trigger:hover,
+.wall-card-menu-trigger[aria-expanded="true"] { background: #fff; transform: translateY(-1px); box-shadow: 0 4px 0 rgba(52,43,78,.1); }
+.wall-card-menu-trigger svg { width: 20px; height: 20px; fill: currentColor; }
+.wall-card-menu-popover {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  width: 142px;
+  padding: 6px;
+  display: grid;
+  gap: 3px;
+  border: 1px solid #e4deef;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(42,31,80,.18);
+}
+.wall-card-menu-popover.hidden { display: none; }
+.wall-card-menu-popover button { min-height: 38px; padding: 0 11px; border: 0; border-radius: 9px; color: #393145; background: transparent; text-align: left; font-weight: 750; cursor: pointer; }
+.wall-card-menu-popover button:hover { background: #f2effb; }
+.wall-card-menu-popover button.danger { color: #bd3655; }
+.wall-card-menu-popover button.danger:hover { background: #fff0f4; }
+
+.wall-color-fieldset { margin-top: 14px; padding: 14px 16px 16px; border: 1px solid #e8e2f2; border-radius: 16px; }
+.wall-color-fieldset legend { padding: 0 6px; color: var(--ink); font-weight: 800; }
+.wall-color-fieldset .field-hint { display: block; margin: 0 0 12px; }
+.wall-color-options { display: flex; flex-wrap: wrap; gap: 11px; }
+.wall-color-options label { margin: 0; cursor: pointer; }
+.wall-color-options input { position: absolute; opacity: 0; pointer-events: none; }
+.wall-color-options span { width: 38px; height: 38px; display: block; border: 3px solid #fff; border-radius: 13px; box-shadow: 0 0 0 1px #d9d2e5, 0 4px 0 rgba(58,45,93,.08); }
+.wall-color-options .yellow { background: #ffe58f; }
+.wall-color-options .pink { background: #ffb7c7; }
+.wall-color-options .blue { background: #a9d9f2; }
+.wall-color-options .green { background: #afe3bd; }
+.wall-color-options .purple { background: #d1b7f3; }
+.wall-color-options input:checked + span { box-shadow: 0 0 0 3px #6658f5, 0 5px 0 rgba(58,45,93,.12); transform: rotate(-3deg) scale(1.04); }
+.username-unique-hint { color: #725ecb !important; font-weight: 700; }
+
+html[data-theme="dark"] .wall-card-menu-trigger { color: #3b3349; background: rgba(255,255,255,.62); }
+html[data-theme="dark"] .wall-card-menu-popover { border-color: #5b506d; background: #302746; }
+html[data-theme="dark"] .wall-card-menu-popover button { color: #f6f2ff; }
+html[data-theme="dark"] .wall-card-menu-popover button:hover { background: #463a61; }
+html[data-theme="dark"] .wall-card-menu-popover button.danger { color: #ffabc0; }
+html[data-theme="dark"] .wall-card-menu-popover button.danger:hover { background: #563048; }
+html[data-theme="dark"] .wall-color-fieldset { border-color: #514663; }
+html[data-theme="dark"] .username-unique-hint { color: #c4b8ff !important; }
+
+/* Primera impresión más cálida sin repetir la marca. */
+.auth-card::before { left: 12%; transform: rotate(-5deg); }
+.auth-card::after {
+  content: '';
+  position: absolute;
+  width: 58px;
+  height: 15px;
+  top: -9px;
+  right: 12%;
+  border-radius: 4px;
+  background: rgba(255,224,235,.9);
+  transform: rotate(5deg);
+  box-shadow: 0 2px 4px rgba(49,36,91,.08);
+  pointer-events: none;
+}
+.auth-card h2 { position: relative; }
+.auth-card h2::after { content: ''; width: 44px; height: 4px; display: block; margin-top: 8px; border-radius: 999px; background: linear-gradient(90deg,#ffb7c7 0 33%,#ffe58f 33% 66%,#a9d9f2 66%); }
+.demo-notes span { animation: note-bob 4.2s ease-in-out infinite; }
+.demo-notes span:nth-child(2) { animation-delay: -.7s; }
+.demo-notes span:nth-child(3) { animation-delay: -1.4s; }
+@keyframes note-bob { 0%,100% { margin-top: 0; } 50% { margin-top: -5px; } }
+
+.invitation-accept-bar::after { content: ''; position: absolute; top: -8px; right: 42px; width: 52px; height: 13px; border-radius: 3px; background: rgba(255,218,232,.78); transform: rotate(2deg); }
+
+@media (max-width: 600px) {
+  .wall-card { min-height: 250px; }
+  .wall-card-menu-popover { right: -2px; }
+  .invitation-accept-bar::after { right: 28px; }
 }

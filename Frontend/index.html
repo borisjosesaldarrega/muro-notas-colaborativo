@@ -34,13 +34,13 @@
         <div class="mobile-logo"><span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span> Muro</div>
         <p class="eyebrow">Bienvenido de nuevo</p>
         <h2>Inicia sesión</h2>
-        <p class="muted">Entra y continúa construyendo grandes ideas.</p>
+        <p class="muted">Accede a tus muros y continúa trabajando con tu equipo.</p>
         <label>Correo electrónico
           <input id="loginEmail" type="email" placeholder="nombre@correo.com" required autocomplete="email">
           <span id="loginEmailError" class="field-error"></span>
         </label>
         <label>Contraseña
-          <input id="loginPassword" type="password" minlength="4" placeholder="••••••••" required autocomplete="current-password">
+          <input id="loginPassword" type="password" minlength="10" placeholder="••••••••••" required autocomplete="current-password">
           <span id="loginPasswordError" class="field-error"></span>
         </label>
         <button class="link-button" type="button" data-view="recover">¿Olvidaste tu contraseña?</button>
@@ -52,24 +52,25 @@
       <form id="registerForm" class="auth-card hidden" novalidate>
         <p class="eyebrow">Paso 1 de 3 · Registro</p>
         <h2>Crea tu cuenta</h2>
-        <p class="muted">Tu cuenta se registra de forma segura en el backend.</p>
-        <label>Nombre y Apellido
-          <input id="registerName" maxlength="40" placeholder="Ej: Pierina Medranda" required autocomplete="name">
+        <p class="muted">Regístrate para compartir ideas y trabajar con tu equipo.</p>
+        <label>Nombre de usuario
+          <input id="registerName" minlength="3" maxlength="40" placeholder="Ej: Pierina Saldarreaga" required autocomplete="nickname">
           <span id="registerNameError" class="field-error"></span>
+          <small class="field-hint username-unique-hint">Elige un nombre único para identificarte en Muro.</small>
         </label>
         <label>Correo electrónico
           <input id="registerEmail" type="email" placeholder="nombre@correo.com" required autocomplete="email">
           <span id="registerEmailError" class="field-error"></span>
         </label>
         <label>Contraseña
-          <input id="registerPassword" type="password" minlength="4" maxlength="128" placeholder="Mínimo 4 caracteres" required autocomplete="new-password">
+          <input id="registerPassword" type="password" minlength="10" maxlength="128" placeholder="Mínimo 10 caracteres" required autocomplete="new-password">
           <span id="registerPasswordError" class="field-error"></span>
         </label>
-        <label>Confirmar Contraseña
-          <input id="registerConfirmPassword" type="password" minlength="4" maxlength="128" placeholder="Repite tu contraseña" required autocomplete="new-password">
+        <label>Confirmar contraseña
+          <input id="registerConfirmPassword" type="password" minlength="10" maxlength="128" placeholder="Repite tu contraseña" required autocomplete="new-password">
           <span id="registerConfirmError" class="field-error"></span>
         </label>
-        <button class="primary-button" type="submit">Continuar a Verificación</button>
+        <button class="primary-button" type="submit">Continuar</button>
         <p class="switch-text">¿Ya tienes cuenta? <button type="button" data-view="login">Inicia sesión</button></p>
       </form>
 
@@ -77,10 +78,12 @@
       <form id="verifyForm" class="auth-card hidden">
         <p class="eyebrow">Paso 2 de 3 · Verificación</p>
         <h2>Revisa tu correo</h2>
-        <p class="muted">Ingresa el código de 6 dígitos que enviamos a <strong id="verifyEmailTarget" style="color:var(--ink);">tu correo</strong>.</p>
+        <p class="muted">Ingresa el código de 8 dígitos que enviamos a <strong id="verifyEmailTarget" style="color:var(--ink);">tu correo</strong>.</p>
 
         <div class="code-inputs-group">
           <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required autofocus>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
           <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
           <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
           <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
@@ -90,7 +93,7 @@
 
         <div class="resend-block">
           <span id="countdownText" class="muted">Reenviar código en <b id="countdownTimer">00:45</b></span>
-          <button id="resendCodeBtn" type="button" class="link-button" style="display:none; float:none;">Reenviar nuevo código</button>
+          <button id="resendCodeBtn" type="button" class="link-button" style="display:none; float:none;">Reenviar código</button>
         </div>
 
         <button class="primary-button" type="submit">Verificar código</button>
@@ -99,18 +102,20 @@
 
       <!-- 4. CONFIRMACIÓN EXITOSA (PASO 3) -->
       <form id="confirmForm" class="auth-card hidden text-center">
-        <div class="confirm-circle">✓</div>
-        <p class="eyebrow">Paso 3 de 3 · Cuenta Activada</p>
-        <h2>¡Todo listo!</h2>
-        <p class="muted">Tu cuenta ha sido verificada correctamente. Ya puedes ingresar y comenzar a colaborar en los muros.</p>
-        <button id="enterAfterConfirmBtn" class="primary-button" type="button">Ingresar al Muro</button>
-        <p class="switch-text"><button type="button" data-view="login">Volver al inicio de sesión</button></p>
+          <div class="confirm-circle">✓</div>
+          <p class="eyebrow">Paso 3 de 3 · Cuenta activada</p>
+          <h2>¡Todo listo!</h2>
+          <p class="muted">Tu cuenta está verificada. Ya puedes acceder a tus muros y comenzar a colaborar.</p>
+          <button id="enterAfterConfirmBtn" class="primary-button" type="button">Ir a mis muros</button>
+          <p class="switch-text">
+              <button type="button" data-view="login">Volver al inicio de sesión</button>
+          </p>
       </form>
 
       <!-- 5. RECUPERAR CONTRASEÑA -->
       <form id="recoverForm" class="auth-card hidden">
         <p class="eyebrow">Recupera tu acceso</p><h2>Restablecer contraseña</h2>
-        <p class="muted">Ingresa tu correo para recibir un enlace de recuperación.</p>
+        <p class="muted">Escribe tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.</p>
         <label>Correo electrónico<input id="recoverEmail" type="email" required></label>
         <button class="primary-button" type="submit">Enviar enlace</button>
         <p class="switch-text"><button type="button" data-view="login">Volver al inicio</button></p>
@@ -122,19 +127,19 @@
   <main id="wallsView" class="walls-shell hidden">
     <header class="topbar">
       <a class="app-brand" href="#"><span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span><span>Muro</span></a>
-      <div class="board-name"><small>Espacio de trabajo</small><strong>Mis Muros y Salas</strong></div>
+      <div class="board-name"><small>Espacio de trabajo</small><strong>Mis muros y salas</strong></div>
       <div class="top-actions">
-        <button id="createWallBtn" class="primary-button compact">＋ Crear Muro</button>
+        <button id="createWallBtn" class="primary-button compact">＋ Crear muro</button>
         <button id="wallsProfileBtn" class="avatar" title="Perfil">P</button>
       </div>
     </header>
     <section class="walls-section">
       <div class="walls-header-title">
-        <h2>Selecciona un Muro Colaborativo</h2>
-        <p class="muted">Entra a una sala para colaborar en tiempo real o crea un nuevo muro para tu proyecto.</p>
+        <h2>Selecciona un muro</h2>
+        <p class="muted">Selecciona un muro para continuar o crea uno nuevo para tu equipo.</p>
       </div>
       <form id="acceptInvitationForm" class="invitation-accept-bar">
-        <div><strong>¿Recibiste una invitación?</strong><small>Usa el código de 8 letras y números o abre el enlace compartido.</small><small id="acceptInvitationPreview" class="muted"></small></div>
+        <div><strong>¿Recibiste una invitación?</strong><small>Introduce el código de invitación o abre el enlace que recibiste.</small><small id="acceptInvitationPreview" class="muted"></small></div>
         <input id="acceptInvitationCode" maxlength="128" autocomplete="off" placeholder="Ej. A7K9M2QX" required>
         <button class="btn-join-code" type="submit"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 7a5 5 0 1 0-3.8 4.85L12 13.65V16h2v2h2v2h3v-3.35l-5.2-5.2A5 5 0 0 0 14 7Zm-7 2a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>Unirse</button>
       </form>
@@ -147,9 +152,9 @@
   <!-- VISTA 3: LIENZO Y TABLERO DEL MURO ACTIVO (CARA DE USUARIO) -->
   <main id="appView" class="app-shell hidden">
     <header class="topbar board-topbar">
-      <button id="backToWallsButton" class="board-brand" title="Volver a Mis Muros" aria-label="Volver a Mis Muros">
+      <button id="backToWallsButton" class="board-brand" title="Volver a mis muros" aria-label="Volver a mis muros">
         <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span>
-        <span class="board-brand-copy"><strong>Muro</strong><small>Ideas que se mueven juntas</small></span>
+        <span class="board-brand-copy"><strong>Muro</strong><small>Ideas que conectan</small></span>
       </button>
       <span class="presence board-presence"><i></i><span id="connectionStatus">Conectado</span> · <b id="onlineCount">1</b> <span class="presence-label">personas</span></span>
       <div class="top-actions board-actions">
@@ -162,7 +167,7 @@
     <section class="toolbar board-toolbar">
       <div class="board-heading">
         <h1 id="currentWallTitle">Muro de ideas</h1>
-        <p>Arrastra las notas, escribe y construyamos algo genial.</p>
+        <p>Organiza tus notas y colabora con tu equipo en tiempo real.</p>
       </div>
       <div class="board-tools">
         <div class="color-filter" aria-label="Filtrar por color">
@@ -182,7 +187,7 @@
     </section>
     <section id="board" class="board" aria-label="Muro colaborativo">
       <div id="boardStage" class="board-stage"><div id="boardSurface" class="board-surface"></div></div>
-      <p class="board-help">Doble clic en el tablero para crear una nota · Arrastra para mover</p>
+      <p class="board-help">Haz doble clic para crear una nota · Arrastra las notas para moverlas</p>
     </section>
   </main>
 
@@ -194,7 +199,7 @@
         <div class="admin-sidebar-header">
           <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span>
           <div>
-            <strong>Soporte Muro</strong>
+            <strong>Soporte de Muro</strong>
             <small class="admin-badge">AYUDA</small>
           </div>
         </div>
@@ -220,7 +225,7 @@
 
         <div class="admin-sidebar-tip">
           <svg class="tip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.7 8 11 4.6-1.3 8-5.9 8-11V5l-8-3Zm0 3 5 1.9V11c0 3.5-2.1 6.8-5 8-2.9-1.2-5-4.5-5-8V6.9L12 5Zm-1 3v5h2V8h-2Zm0 7v2h2v-2h-2Z"/></svg>
-          <div><strong>Privacidad activa</strong><small>No se muestran notas ni muros privados.</small></div>
+          <div><strong>Una comunidad respetuosa</strong><small>Ayudemos a mantener una comunidad segura y respetuosa.</small></div>
         </div>
 
         <div class="admin-sidebar-footer">
@@ -228,7 +233,7 @@
             <div class="avatar" id="adminAvatar">AD</div>
             <div>
               <strong id="adminUserName">Superadministrador</strong>
-              <small class="muted" style="color:#b2acc9;">Moderador</small>
+              <small class="muted" style="color:#b2acc9;">Moderación</small>
             </div>
           </div>
           <button id="adminExitBtn" class="secondary-button compact admin-exit"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5-7 7 7 7 1.4-1.4L6.8 13H21v-2H6.8l4.6-4.6L10 5Z"/></svg>Volver al muro</button>
@@ -250,46 +255,39 @@
 
         <!-- PESTAÑA 1: RESUMEN GENERAL -->
         <div id="adminTabResumen" class="admin-tab-content">
-          <div class="admin-spectator-alert">
-            <svg class="alert-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-1 5h2v2h-2V7Zm0 4h2v6h-2v-6Z"/></svg>
-            <div>
-              <strong>Privacidad primero:</strong> este panel trabaja con cuentas y reportes. No abre muros ni muestra notas privadas de los equipos.
-            </div>
-          </div>
-
           <!-- 4 Métricas Clave (Pág 20 del PDF) -->
           <div class="admin-metrics-grid">
             <article class="metric-card">
               <span class="metric-icon purple"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8 13c-4.4 0-7 2.2-7 5v2h14v-2c0-2.8-2.6-5-7-5Zm8-.8c-.7 0-1.4.1-2 .2 2 1.2 3 3.1 3 5.6v2h6v-2c0-3.2-2.7-5.8-7-5.8Z"/></svg></span>
               <div>
-                <small>Usuarios Registrados</small>
+                <small>Usuarios registrados</small>
                 <strong id="metricUsersCount">1</strong>
               </div>
             </article>
             <article class="metric-card">
               <span class="metric-icon yellow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5V3Zm9 2v3h3l-3-3ZM8 12h8v-2H8v2Zm0 4h8v-2H8v2Z"/></svg></span>
               <div>
-                <small>Reportes Pendientes</small>
+                <small>Reportes pendientes</small>
                 <strong id="metricReportsCount">0</strong>
               </div>
             </article>
             <article class="metric-card">
               <span class="metric-icon blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12v5h-2V5H7v14h8v-3h2v5H5V3Zm11 6 5 3-5 3v-2H9v-2h7V9Z"/></svg></span>
               <div>
-                <small>Casos Resueltos</small>
+                <small>Casos resueltos</small>
                 <strong id="metricResolvedCount">0</strong>
               </div>
             </article>
             <article class="metric-card">
               <span class="metric-icon red"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2h2v2h11l-2 4 2 4H7v10H5V2Zm2 4v4h7.8l-1-2 1-2H7Z"/></svg></span>
               <div>
-                <small>Cuentas Suspendidas</small>
+                <small>Cuentas suspendidas</small>
                 <strong id="metricSuspendedCount">0</strong>
               </div>
             </article>
           </div>
 
-          <!-- Actividad Semanal de Notas & Moderación Pendiente -->
+          <!-- Actividad Semanal de Notas & Moderación pendiente -->
           <div class="admin-grid-two">
             <div class="admin-card">
               <div class="admin-card-head"><h3>Cómo moderar</h3><small class="muted">Proceso claro y proporcional</small></div>
@@ -302,7 +300,7 @@
 
             <div class="admin-card">
               <div class="admin-card-head">
-                <h3>Moderación Pendiente</h3>
+                <h3>Moderación pendiente</h3>
                 <small class="muted">Reportes de usuarios</small>
               </div>
               <div id="adminRecentReports" class="admin-reports-list">
@@ -322,7 +320,7 @@
                 <thead>
                   <tr>
                     <th>Usuario</th>
-                    <th>Correo Electrónico</th>
+                    <th>Correo electrónico</th>
                     <th>Reportes recibidos</th>
                     <th>Estado</th>
                     <th>Acción</th>
@@ -339,7 +337,7 @@
         <!-- PESTAÑA 4: USUARIOS -->
         <div id="adminTabUsuarios" class="admin-tab-content hidden">
           <div class="admin-card-head">
-            <h3>Directorio de Cuentas</h3>
+            <h3>Directorio de cuentas</h3>
             <input id="adminUserSearch" type="search" placeholder="Buscar por nombre o correo..." style="max-width:320px; padding:10px 14px; border-radius:12px; border:1px solid var(--line);">
           </div>
           <div class="admin-table-wrap" style="margin-top:16px;">
@@ -347,7 +345,7 @@
               <thead>
                 <tr>
                   <th>Nombre</th>
-                  <th>Correo Electrónico</th>
+                  <th>Correo electrónico</th>
                   <th>Reportes recibidos</th>
                   <th>Última medida</th>
                   <th>Estado</th>
@@ -365,7 +363,7 @@
         <div id="adminTabReportes" class="admin-tab-content hidden">
           <div class="admin-card-head">
             <h3>Reportes de usuarios</h3>
-            <small class="muted">La persona reportada se revisa antes de aplicar una medida</small>
+            <small class="muted">Cada reporte se revisa antes de tomar una decisión.</small>
           </div>
           <div class="admin-table-wrap" style="margin-top:16px;">
             <table class="admin-table">
@@ -387,7 +385,7 @@
 
         <div id="adminTabHistorial" class="admin-tab-content hidden">
           <div class="admin-card-head">
-            <div><h3>Historial de medidas</h3><small class="muted">Decisiones registradas por cuenta</small></div>
+            <div><h3>Historial de medidas</h3><small class="muted">Medidas aplicadas a cada cuenta</small></div>
           </div>
           <div class="admin-table-wrap" style="margin-top:16px;">
             <table class="admin-table">
@@ -401,7 +399,7 @@
           <div class="admin-guide-grid">
             <article class="admin-card"><span class="guide-number">1</span><h3>Revisa el contexto</h3><p>Lee el reporte completo y comprueba si la cuenta tiene antecedentes antes de decidir.</p></article>
             <article class="admin-card"><span class="guide-number">2</span><h3>Aplica una medida proporcional</h3><p>Empieza con una advertencia; suspende o elimina únicamente cuando la gravedad lo justifique.</p></article>
-            <article class="admin-card"><span class="guide-number">3</span><h3>Protege la privacidad</h3><p>El soporte revisa cuentas y reportes. Nunca abre muros ni lee notas privadas.</p></article>
+            <article class="admin-card"><span class="guide-number">3</span><h3>Cuida la comunidad</h3><p>Mantén un trato respetuoso y aplica las normas de forma justa.</p></article>
           </div>
         </div>
       </section>
@@ -438,14 +436,24 @@
   <dialog id="wallDialog">
     <form id="wallForm">
       <div class="dialog-head">
-        <div><p class="eyebrow">Nuevo Espacio</p><h3>Crear un Muro</h3></div>
+        <div><p id="wallDialogEyebrow" class="eyebrow">Nuevo espacio</p><h3 id="wallDialogTitle">Crear un muro</h3></div>
         <button class="close-button" id="closeWallModal" type="button">&times;</button>
       </div>
-      <label>Nombre del Muro<input id="wallNameInput" placeholder="Ej: Tormenta de Ideas" required maxlength="60"></label>
-      <label>Descripción<input id="wallDescInput" placeholder="Ej: Espacio para ideas del equipo" maxlength="160"></label>
+      <label>Nombre del muro<input id="wallNameInput" placeholder="Ej.: Tormenta de ideas" required maxlength="60"></label>
+      <label>Descripción<input id="wallDescInput" placeholder="Ej.: Ideas del equipo" maxlength="160"></label>
+      <fieldset class="wall-color-fieldset">
+        <legend>Color del muro</legend>
+        <div class="wall-color-options" role="radiogroup" aria-label="Color del muro">
+          <label title="Amarillo"><input type="radio" name="wallColor" value="amarillo" checked><span class="yellow"></span></label>
+          <label title="Rosa"><input type="radio" name="wallColor" value="rosa"><span class="pink"></span></label>
+          <label title="Azul"><input type="radio" name="wallColor" value="azul"><span class="blue"></span></label>
+          <label title="Verde"><input type="radio" name="wallColor" value="verde"><span class="green"></span></label>
+          <label title="Lila"><input type="radio" name="wallColor" value="lila"><span class="purple"></span></label>
+        </div>
+      </fieldset>
       <div class="dialog-actions">
         <button id="cancelWallModal" type="button" class="secondary-button">Cancelar</button>
-        <button id="saveWallBtn" type="submit" class="primary-button">Crear Muro</button>
+        <button id="saveWallBtn" type="submit" class="primary-button">Crear muro</button>
       </div>
     </form>
   </dialog>
@@ -460,7 +468,7 @@
 
       <!-- El código se genera en el servidor y se puede compartir por cualquier medio. -->
       <div class="invite-code-card">
-        <div class="invite-step-title"><span>2</span><div><strong>Código de invitación</strong><small>Un código sirve para varias personas hasta que generes otro.</small></div></div>
+        <div class="invite-step-title"><span>2</span><div><strong>Código de invitación</strong><small>Este código permite que cualquier persona con quien lo compartas pueda unirse al muro. Permanecerá activo hasta que generes uno nuevo.</small></div></div>
         <div class="invite-code-row">
           <input id="inviteCodeOutput" type="text" readonly aria-label="Código de invitación" placeholder="Genera un código" />
           <input id="shareLinkInput" class="hidden" type="text" readonly />
@@ -470,14 +478,14 @@
 
       <!-- Bloque 2: permisos del código -->
       <div id="inviteEmailSection">
-        <div class="invite-step-title"><span>1</span><div><strong>Elige el permiso</strong><small>Quien use el código entrará con este rol.</small></div></div>
+        <div class="invite-step-title"><span>1</span><div><strong>Elige el permiso</strong><small>Las personas que utilicen el código tendrán el permiso seleccionado.</small></div></div>
         <div id="inviteOwnerOnlyNotice" class="hidden" style="margin-bottom:12px; padding:10px 14px; background:#fffbeb; border:1px solid #fef3c7; border-radius:10px; font-size:0.83rem; color:#92400e;">
-          Solo la persona propietaria de esta sala puede invitar o cambiar permisos de miembros.
+          Solo quien creó este muro puede invitar personas o cambiar sus permisos.
         </div>
-        <label>Rol de permisos
+        <label>Permiso de acceso
           <select id="inviteRoleSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);">
-            <option value="editor">Editor (Puede crear, mover y editar notas)</option>
-            <option value="lector">Lector (Solo puede ver el muro)</option>
+            <option value="editor">Editor (puede crear, mover y editar notas)</option>
+            <option value="lector">Lector (solo puede ver el muro)</option>
           </select>
         </label>
       </div>
@@ -507,7 +515,7 @@
         <div><p class="eyebrow">Cuidado de la comunidad</p><h3>Reportar usuario</h3></div>
         <button class="close-button" id="closeReportModal" type="button">&times;</button>
       </div>
-      <p class="muted">Como en un grupo de mensajería, reporta la cuenta y explica qué ocurrió. El equipo de soporte revisará el caso.</p>
+      <p class="muted">Describe lo ocurrido. Nuestro equipo de soporte revisará tu reporte.</p>
       <div class="reported-user-card"><span class="cute-ball">✦</span><div><small>Vas a reportar a</small><strong id="reportedUserName">Usuario</strong></div></div>
       <input id="reportedUserId" type="hidden">
       <label>Motivo del reporte
@@ -519,10 +527,10 @@
           <option value="otro">Otro motivo</option>
         </select>
       </label>
-      <label>¿Qué ocurrió?<textarea id="reportDetailInput" placeholder="Describe el comportamiento para que soporte pueda revisarlo..." maxlength="1000" rows="4" required></textarea></label>
+      <label>¿Qué ocurrió?<textarea id="reportDetailInput" placeholder="Explica lo sucedido para que podamos revisar el caso..." maxlength="1000" rows="4" required></textarea></label>
       <div class="dialog-actions">
         <button id="cancelReportModal" type="button" class="secondary-button">Cancelar</button>
-        <button id="sendReportBtn" type="submit" class="danger-button" style="margin-top:0;">Enviar Reporte</button>
+        <button id="sendReportBtn" type="submit" class="danger-button" style="margin-top:0;">Enviar reporte</button>
       </div>
     </form>
   </dialog>
@@ -551,7 +559,7 @@
           <option value="eliminar">Eliminar cuenta</option>
         </select>
       </label>
-      <label>Mensaje para el usuario<textarea id="moderationMessage" rows="4" maxlength="1000" placeholder="Explica la decisión y cómo puede corregir la situación." required></textarea></label>
+      <label>Mensaje para el usuario<textarea id="moderationMessage" rows="4" maxlength="1000" placeholder="Explica el motivo de la medida aplicada." required></textarea></label>
       <div class="dialog-actions"><button id="moderationCancel" type="button" class="secondary-button">Cancelar</button><button type="submit" class="primary-button">Aplicar medida</button></div>
     </form>
   </dialog>
@@ -576,7 +584,7 @@
       <div id="profileAdminAccess" class="profile-admin-access hidden">
         <div class="profile-admin-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4C6.5 4 2.2 8.6 1 12c1.2 3.4 5.5 8 11 8s9.8-4.6 11-8c-1.2-3.4-5.5-8-11-8Zm0 14c-4 0-7.4-3.1-8.8-6C4.6 9.1 8 6 12 6s7.4 3.1 8.8 6c-1.4 2.9-4.8 6-8.8 6Zm0-9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg><strong>Centro de ayuda</strong></div>
         <p class="muted" style="font-size:0.82rem; margin:0 0 14px 0; line-height:1.4;">Revisa reportes y aplica medidas a cuentas sin entrar en muros ni leer notas privadas.</p>
-        <button id="openAdminFromProfileBtn" class="primary-button compact" style="width:100%;">Abrir Centro de Ayuda</button>
+        <button id="openAdminFromProfileBtn" class="primary-button compact" style="width:100%;">Abrir centro de ayuda</button>
       </div>
 
       <button id="logoutButton" class="profile-logout" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9v2H7v14h7v2H5V3Zm11 5 5 4-5 4v-3H9v-2h7V8Z"/></svg>Cerrar sesión</button>
@@ -588,29 +596,29 @@
       <div class="dialog-head"><div><p class="eyebrow">Tu espacio personal</p><h3>Configuración de cuenta</h3></div><button id="closeAccountSettings" class="close-button" type="button" aria-label="Cerrar">&times;</button></div>
       <div class="settings-section">
         <div class="settings-section-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 6v2h18v-2c0-3.5-4-6-9-6Z"/></svg><div><strong>Perfil</strong><small>Cómo te ven las demás personas</small></div></div>
-        <div class="settings-action-row"><div><span>Nombre de usuario</span><strong id="settingsUsernameValue">Usuario</strong><small>Debe ser único dentro de Muro.</small></div><button id="openUsernameChange" type="button" class="secondary-button compact">Cambiar usuario</button></div>
-        <div class="settings-action-row"><div><span>Correo electrónico</span><strong id="settingsEmailValue">correo@ejemplo.com</strong><small>Se usa para entrar y recuperar la cuenta.</small></div><button id="openEmailChange" type="button" class="secondary-button compact">Cambiar correo</button></div>
-        <div class="settings-action-row"><div><span>Contraseña</span><strong>••••••••••</strong><small>Actualiza tu clave de acceso de forma segura.</small></div><button id="openPasswordChange" type="button" class="secondary-button compact">Cambiar contraseña</button></div>
+        <div class="settings-action-row"><div><span>Nombre de usuario</span><strong id="settingsUsernameValue">Usuario</strong><small class="username-unique-hint">Este nombre es único y será visible para los demás usuarios.</small></div><button id="openUsernameChange" type="button" class="secondary-button compact">Cambiar usuario</button></div>
+        <div class="settings-action-row"><div><span>Correo electrónico</span><strong id="settingsEmailValue">correo@ejemplo.com</strong><small>Lo utilizarás para iniciar sesión y recuperar tu cuenta.</small></div><button id="openEmailChange" type="button" class="secondary-button compact">Cambiar correo</button></div>
+        <div class="settings-action-row"><div><span>Contraseña</span><strong>••••••••••</strong><small>Cambia tu contraseña para proteger tu cuenta.</small></div><button id="openPasswordChange" type="button" class="secondary-button compact">Cambiar contraseña</button></div>
       </div>
       <div class="settings-section">
-        <div class="settings-section-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.5A7 7 0 0 1 12 3Zm-6 9a7 7 0 0 1 3.8-6.2A9 9 0 0 0 18.2 17 7 7 0 0 1 6 12Z"/></svg><div><strong>Apariencia</strong><small>Elige una jerarquía cómoda para tus ojos</small></div></div>
+        <div class="settings-section-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.5A7 7 0 0 1 12 3Zm-6 9a7 7 0 0 1 3.8-6.2A9 9 0 0 0 18.2 17 7 7 0 0 1 6 12Z"/></svg><div><strong>Apariencia</strong><small>Personaliza la apariencia de la aplicación.</small></div></div>
         <div class="theme-picker" role="radiogroup" aria-label="Tema de color">
-          <label><input type="radio" name="theme" value="system"><span><b class="theme-preview system-preview"></b><strong>Sistema</strong><small>Sigue tu dispositivo</small></span></label>
-          <label><input type="radio" name="theme" value="light"><span><b class="theme-preview light-preview"></b><strong>Claro</strong><small>Suave y luminoso</small></span></label>
-          <label><input type="radio" name="theme" value="dark"><span><b class="theme-preview dark-preview"></b><strong>Oscuro</strong><small>Contraste descansado</small></span></label>
+          <label><input type="radio" name="theme" value="system"><span><b class="theme-preview system-preview"></b><strong>Sistema</strong><small>Usa la configuración del dispositivo</small></span></label>
+          <label><input type="radio" name="theme" value="light"><span><b class="theme-preview light-preview"></b><strong>Claro</strong><small>Fondo claro</small></span></label>
+          <label><input type="radio" name="theme" value="dark"><span><b class="theme-preview dark-preview"></b><strong>Oscuro</strong><small>Fondo oscuro</small></span></label>
         </div>
       </div>
       <div class="settings-section settings-toggles"><label><input id="settingsConfirmDelete" type="checkbox">Confirmar antes de eliminar</label><label><input id="settingsCompactNotes" type="checkbox">Usar notas compactas</label></div>
-      <div class="dialog-actions"><button id="cancelAccountSettings" type="button" class="secondary-button">Cerrar</button><button type="submit" class="primary-button">Guardar apariencia</button></div>
+      <div class="dialog-actions"><button id="cancelAccountSettings" type="button" class="secondary-button">Cerrar</button><button type="submit" class="primary-button">Guardar</button></div>
     </form>
   </dialog>
 
   <dialog id="usernameDialog" class="account-action-dialog">
-    <form id="usernameForm"><div class="dialog-head"><div><p class="eyebrow">Perfil</p><h3>Cambiar nombre de usuario</h3></div><button class="close-button" type="button" data-close-dialog="usernameDialog">&times;</button></div><p class="muted">Elige un nombre único de 3 a 40 caracteres.</p><label>Nuevo nombre<input id="newUsername" minlength="3" maxlength="40" autocomplete="nickname" required></label><div class="dialog-actions"><button type="button" class="secondary-button" data-close-dialog="usernameDialog">Cancelar</button><button type="submit" class="primary-button">Guardar usuario</button></div></form>
+    <form id="usernameForm"><div class="dialog-head"><div><p class="eyebrow">Perfil</p><h3>Cambiar nombre de usuario</h3></div><button class="close-button" type="button" data-close-dialog="usernameDialog">&times;</button></div><p class="muted">Elige un nombre de usuario único de entre 3 y 40 caracteres.</p><label>Nuevo nombre<input id="newUsername" minlength="3" maxlength="40" autocomplete="nickname" required></label><div class="dialog-actions"><button type="button" class="secondary-button" data-close-dialog="usernameDialog">Cancelar</button><button type="submit" class="primary-button">Guardar usuario</button></div></form>
   </dialog>
 
   <dialog id="emailDialog" class="account-action-dialog">
-    <form id="emailForm"><div class="dialog-head"><div><p class="eyebrow">Acceso</p><h3>Cambiar correo</h3></div><button class="close-button" type="button" data-close-dialog="emailDialog">&times;</button></div><p class="muted">Te avisaremos si debes confirmar la nueva dirección.</p><label>Nuevo correo<input id="newEmail" type="email" autocomplete="email" required></label><label>Contraseña de tu cuenta<input id="emailCurrentPassword" type="password" autocomplete="current-password" required><small class="field-hint">La pedimos sólo para proteger el cambio de correo.</small></label><div class="dialog-actions"><button type="button" class="secondary-button" data-close-dialog="emailDialog">Cancelar</button><button type="submit" class="primary-button">Actualizar correo</button></div></form>
+    <form id="emailForm"><div class="dialog-head"><div><p class="eyebrow">Acceso</p><h3>Cambiar correo</h3></div><button class="close-button" type="button" data-close-dialog="emailDialog">&times;</button></div><p class="muted">Es posible que tengas que confirmar tu nuevo correo electrónico.</p><label>Nuevo correo<input id="newEmail" type="email" autocomplete="email" required></label><label>Contraseña de tu cuenta<input id="emailCurrentPassword" type="password" autocomplete="current-password" required><small class="field-hint">Te pedimos tu contraseña para confirmar que eres tú.</small></label><div class="dialog-actions"><button type="button" class="secondary-button" data-close-dialog="emailDialog">Cancelar</button><button type="submit" class="primary-button">Actualizar correo</button></div></form>
   </dialog>
 
   <dialog id="passwordDialog" class="account-action-dialog">

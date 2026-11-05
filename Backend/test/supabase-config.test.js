@@ -51,7 +51,7 @@ test('crea muro y propietario mediante una sola RPC transaccional', async () => 
     }
   };
   const store = new SupabaseStore({ createUserClient: () => client });
-  const wall = { id: 'wall-1', name: 'Ideas', description: '', ownerId: 'user-1', updatedAt: Date.now() };
+  const wall = { id: 'wall-1', name: 'Ideas', description: '', color: 'azul', ownerId: 'user-1', updatedAt: Date.now() };
 
   const createdId = await store.createWall(wall, 'user-token');
   await store.updateWall({ ...wall, name: 'Ideas actualizadas' }, 'user-token');
@@ -60,7 +60,7 @@ test('crea muro y propietario mediante una sola RPC transaccional', async () => 
   assert.deepEqual(calls[0], {
     operation: 'rpc',
     name: 'muro_crear_sala',
-    args: { nombre_nuevo: 'Ideas', descripcion_nueva: '' }
+    args: { nombre_nuevo: 'Ideas', descripcion_nueva: '', color_nuevo: 'azul' }
   });
   assert.equal(calls[1].operation, 'update');
   assert.equal(calls[1].row.propietario_id, undefined);

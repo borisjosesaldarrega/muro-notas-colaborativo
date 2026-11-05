@@ -7,7 +7,7 @@ Este backend reemplaza la demostración que guardaba todo en memoria. Mantiene u
 - Registro, inicio, restauración y cierre de sesión.
 - Recuperación y cambio de contraseña con verificación de la clave actual.
 - Nombre de usuario único, cambio seguro de correo y contraseña, y preferencias de apariencia persistentes.
-- Creación, edición, selección y eliminación de muros.
+- Creación, edición, color, selección y eliminación sincronizada de muros; editar o eliminar queda reservado al propietario/a.
 - Gestión de integrantes y permisos: propietario, editor y lector.
 - Creación, edición, movimiento fluido y eliminación de notas en tiempo real sobre un lienzo común para PC y móvil.
 - Panel protegido de ayuda y moderación: usuarios, reportes y medidas sobre cuentas.
@@ -42,4 +42,4 @@ En reportes, el autor sale siempre de la sesión y la cuenta denunciada debe com
 
 La propuesta visual de Pierina se conectó a estos eventos y Boris corrigió los problemas de presentación, modales, notas, responsividad y movimiento compartido. La misma versión se publica desde la raíz y queda reflejada en `Backend/`, `Frontend/` y `BaseDeDatos/` para la revisión por áreas.
 
-La configuración separa usuario, correo, contraseña y apariencia para que un fallo no bloquee las demás opciones. Permite elegir tema del sistema, claro u oscuro, usar notas compactas y decidir si se confirma antes de eliminar. Cuando Supabase confirma un nuevo correo, el trigger versionado mantiene el perfil público sincronizado.
+La configuración separa usuario, correo, contraseña y apariencia para que un fallo no bloquee las demás opciones. El tema del sistema, claro u oscuro se aplica y persiste al elegirlo; también se puede usar notas compactas y decidir si se confirma antes de eliminar. Cuando Supabase confirma un nuevo correo, el trigger versionado mantiene el perfil público sincronizado.

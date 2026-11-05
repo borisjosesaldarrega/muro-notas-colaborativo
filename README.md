@@ -5,7 +5,7 @@ Aplicación de notas adhesivas con el lenguaje visual original de Muro DZ y una 
 ## Funciones
 
 - Registro, inicio y restauración de sesión mediante Supabase Auth cuando el esquema está disponible.
-- Sesión persistente al recargar y cierre de sesión confirmado por Supabase; nombre de usuario único; cambios independientes de usuario, correo y contraseña; apariencia de sistema, clara u oscura y notas compactas persistentes.
+- Sesión persistente al recargar y cierre de sesión confirmado por Supabase; nombre de usuario único; cambios independientes de usuario, correo y contraseña; apariencia de sistema, clara u oscura con cambio inmediato y notas compactas persistentes.
 - Recuperación y cambio de contraseña.
 - Rol `superadmin` reservado a la cuenta propietaria y validado siempre en el backend.
 - Muros independientes con permisos `propietario`, `editor` y `lector`.
@@ -14,7 +14,7 @@ Aplicación de notas adhesivas con el lenguaje visual original de Muro DZ y una 
 - Códigos de invitación alfanuméricos de 8 caracteres, vista previa de la sala y alta de membresía únicamente al usarlos.
 - Reportes privados dirigidos a una cuenta que comparte el muro, con historial para advertencias, suspensiones, reactivación o eliminación.
 - Notas sincronizadas, arrastrables, con tamaño automático según el contenido y movimiento remoto fluido sin guardar cada fotograma.
-- Perfil, avatar y preferencias de apariencia.
+- Perfil, avatar, preferencias de apariencia y muros personalizables por color con edición o eliminación reservada al propietario/a.
 - Panel superadmin centrado en ayuda, usuarios y reportes; no abre muros ni notas privadas.
 - Diseño animado y amable: mascota circular, fondos pastel, cintas, botones redondeados y post-its adaptables.
 - Lienzo lógico compartido de `1800 × 1200`: en móvil se puede alejar, acercar y recorrer las mismas coordenadas que en PC.
@@ -60,9 +60,13 @@ El archivo `render.yaml` prepara un Web Service gratuito con `npm ci`, `npm star
 
 Render asignará la URL al completar el primer despliegue. Abre esa URL para probar la aplicación y añade también la URL a las Redirect URLs permitidas en la configuración de autenticación de Supabase. Después, configura `APP_URL` en Render con esa URL para los enlaces de recuperación de contraseña. No uses `localhost` como `APP_URL` en producción. No es necesario configurar `JWT_SECRET`, `FRONT_URL` ni `DATABASE_URL` para ejecutar este servicio.
 
+### Archivos activos en Render
+
+Render inicia `server.js`, que sirve `Frontend/index.html`. Esa página carga `Frontend/js/ui.js`, `Frontend/js/board.js` y `Frontend/js/app.js`; la persistencia activa está en `lib/supabase.js` y `lib/supabase-store.js`. La carpeta `public/` contiene el adaptador para la variante estática con Supabase y no reemplaza la versión servida por Render. `Backend/` conserva el espejo documentado del servidor para sus pruebas. Las copias históricas no se eliminan sin comprobar primero su uso.
+
 ## Preparar Supabase
 
-Las migraciones versionadas están en `supabase/migrations/`. Crean y actualizan las tablas `muro_usuarios`, `muro_configuraciones_usuario`, `muro_salas`, `muro_sala_miembros`, `muro_notas`, `muro_invitaciones`, `muro_reportes` y `muro_sanciones`, junto con índices, funciones y políticas RLS. La migración `20261027000508_corregir_a10_creacion_atomica_muro.sql` añade la RPC transaccional de muros. `20261027002032_completar_invitaciones_y_reportes.sql` termina los flujos que habían quedado incompletos, `20261027002607_bloquear_altas_directas_de_miembros.sql` cierra el atajo que permitía crear membresías sin aceptar una invitación, `20261105040901_reportes_por_usuario_y_sanciones.sql` relaciona cada denuncia con la cuenta reportada y conserva el historial de moderación, `20261105045727_sincronizar_cambio_correo_usuario.sql` mantiene el correo público alineado con Auth y `20261105143627_nombres_usuario_unicos.sql` reserva cada nombre de usuario sin distinguir mayúsculas. El prefijo `muro_` evita colisiones con otros esquemas.
+Las migraciones versionadas están en `supabase/migrations/`. Crean y actualizan las tablas `muro_usuarios`, `muro_configuraciones_usuario`, `muro_salas`, `muro_sala_miembros`, `muro_notas`, `muro_invitaciones`, `muro_reportes` y `muro_sanciones`, junto con índices, funciones y políticas RLS. La migración `20261027000508_corregir_a10_creacion_atomica_muro.sql` añade la RPC transaccional de muros. `20261027002032_completar_invitaciones_y_reportes.sql` termina los flujos que habían quedado incompletos, `20261027002607_bloquear_altas_directas_de_miembros.sql` cierra el atajo que permitía crear membresías sin aceptar una invitación, `20261105040901_reportes_por_usuario_y_sanciones.sql` relaciona cada denuncia con la cuenta reportada y conserva el historial de moderación, `20261105045727_sincronizar_cambio_correo_usuario.sql` mantiene el correo público alineado con Auth, `20261105143627_nombres_usuario_unicos.sql` reserva cada nombre de usuario sin distinguir mayúsculas y `20261105150734_agregar_color_a_muros.sql` incorpora el color dentro de la misma creación atómica del muro. El prefijo `muro_` evita colisiones con otros esquemas.
 
 ```bash
 npx supabase login

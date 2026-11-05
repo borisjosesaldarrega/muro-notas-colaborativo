@@ -54,13 +54,13 @@ test('sirve la aplicación y un estado de salud', async () => {
 test('registra, restaura y valida cuentas y roles en el servidor', async () => {
   const admin = await connect();
   const member = await connect();
-  const first = await ack(admin, 'auth:register', { name: 'Boris Admin', email: 'saldavargasboris@gmail.com', password: 'clave123', passwordConfirmation: 'clave123' });
-  const second = await ack(member, 'auth:register', { name: 'Brenda Editora', email: 'brenda@example.com', password: 'clave456', passwordConfirmation: 'clave456' });
+  const first = await ack(admin, 'auth:register', { name: 'Boris Admin', email: 'saldavargasboris@gmail.com', password: 'clave12345', passwordConfirmation: 'clave12345' });
+  const second = await ack(member, 'auth:register', { name: 'Brenda Editora', email: 'brenda@example.com', password: 'clave45678', passwordConfirmation: 'clave45678' });
   assert.equal(first.ok, true);
   assert.equal(first.user.role, 'superadmin');
   assert.equal(second.user.role, 'usuario');
   assert.equal(second.user.password, undefined);
-  assert.equal((await ack(await connect(), 'auth:register', { name: 'Error', email: 'error@example.com', password: 'clave789', passwordConfirmation: 'otra789' })).ok, false);
+  assert.equal((await ack(await connect(), 'auth:register', { name: 'Error', email: 'error@example.com', password: 'clave78901', passwordConfirmation: 'otra789012' })).ok, false);
   assert.equal((await ack(member, 'auth:login', { email: 'brenda@example.com', password: 'mal' })).ok, false);
 
   const restored = await connect();
@@ -76,24 +76,24 @@ test('actualiza el correo solo después de verificar la contraseña actual', asy
   const registered = await ack(socket, 'auth:register', {
     name: 'Cuenta Configuración',
     email: 'configuracion@example.com',
-    password: 'clave789',
-    passwordConfirmation: 'clave789'
+    password: 'clave78901',
+    passwordConfirmation: 'clave78901'
   });
   assert.equal(registered.ok, true);
 
   const rejected = await ack(socket, 'auth:email', { email: 'nuevo@example.com', currentPassword: 'incorrecta' });
   assert.equal(rejected.ok, false);
 
-  const changed = await ack(socket, 'auth:email', { email: 'nuevo@example.com', currentPassword: 'clave789' });
+  const changed = await ack(socket, 'auth:email', { email: 'nuevo@example.com', currentPassword: 'clave78901' });
   assert.deepEqual(changed, { ok: true, email: 'nuevo@example.com' });
 
-  const login = await ack(await connect(), 'auth:login', { email: 'nuevo@example.com', password: 'clave789' });
+  const login = await ack(await connect(), 'auth:login', { email: 'nuevo@example.com', password: 'clave78901' });
   assert.equal(login.ok, true);
   assert.equal(login.user.email, 'nuevo@example.com');
 
-  const password = await ack(socket, 'auth:password', { currentPassword: 'clave789', newPassword: 'clave-mas-segura-10' });
+  const password = await ack(socket, 'auth:password', { currentPassword: 'clave78901', newPassword: 'clave-mas-segura-10' });
   assert.equal(password.ok, true);
-  assert.equal((await ack(await connect(), 'auth:login', { email: 'nuevo@example.com', password: 'clave789' })).ok, false);
+  assert.equal((await ack(await connect(), 'auth:login', { email: 'nuevo@example.com', password: 'clave78901' })).ok, false);
   assert.equal((await ack(await connect(), 'auth:login', { email: 'nuevo@example.com', password: 'clave-mas-segura-10' })).ok, true);
 });
 
@@ -154,15 +154,16 @@ test('persiste perfil, tema y preferencias del usuario en el servidor', async ()
   assert.equal(profile.user.name, 'Brenda González');
   const settings = await ack(member, 'settings:update', { theme: 'dark', confirmDelete: false, compactNotes: true, notifications: false });
   assert.deepEqual(settings.settings, { theme: 'dark', confirmDelete: false, compactNotes: true, notifications: false });
-  const login = await ack(member, 'auth:login', { email: 'brenda@example.com', password: 'clave456' });
+  const login = await ack(member, 'auth:login', { email: 'brenda@example.com', password: 'clave45678' });
   assert.equal(login.user.settings.theme, 'dark');
 });
 
 test('crea un código de sala reutilizable y agrega cada membresía al unirse', async () => {
   const admin = clients[0];
   const member = clients[1];
-  const created = await ack(admin, 'wall:create', { name: 'Sprint web', description: 'Ideas del equipo' });
+  const created = await ack(admin, 'wall:create', { name: 'Sprint web', description: 'Ideas del equipo', color: 'azul' });
   assert.equal(created.wall.role, 'propietario');
+  assert.equal(created.wall.color, 'azul');
   const wallId = created.wall.id;
   const invited = await ack(admin, 'wall:invite', { wallId, role: 'lector' });
   assert.equal(invited.invitation.status, 'pendiente');
@@ -175,7 +176,7 @@ test('crea un código de sala reutilizable y agrega cada membresía al unirse', 
   assert.equal(accepted.status, 'aceptada');
   assert.equal((await ack(member, 'invitation:answer', { secret: invited.code, answer: 'aceptar' })).ok, false);
   const secondMember = await connect();
-  await ack(secondMember, 'auth:register', { name: 'Carla Invitada', email: 'carla@example.com', password: 'clave789', passwordConfirmation: 'clave789' });
+  await ack(secondMember, 'auth:register', { name: 'Carla Invitada', email: 'carla@example.com', password: 'clave78901', passwordConfirmation: 'clave78901' });
   assert.equal((await ack(secondMember, 'invitation:answer', { secret: invited.code.toLowerCase() })).status, 'aceptada');
   assert.equal((await ack(secondMember, 'wall:select', { id: wallId })).wall.role, 'lector');
   assert.equal((await ack(member, 'invitation:preview', { secret: 'NOEXISTE' })).error, 'Sala no encontrada.');
@@ -186,7 +187,17 @@ test('crea un código de sala reutilizable y agrega cada membresía al unirse', 
   assert.equal((await ack(admin, 'wall:member:update', { wallId, userId: memberId, role: 'editor' })).ok, true);
   assert.equal((await ack(member, 'wall:select', { id: wallId })).wall.role, 'editor');
   assert.equal((await ack(member, 'note:create', { texto: 'Ahora sí', color: 'verde' })).ok, true);
-  assert.equal((await ack(admin, 'wall:update', { id: wallId, name: 'Sprint actualizado', description: '' })).wall.name, 'Sprint actualizado');
+  const updatedWall = await ack(admin, 'wall:update', { id: wallId, name: 'Sprint actualizado', description: '', color: 'rosa' });
+  assert.equal(updatedWall.wall.name, 'Sprint actualizado');
+  assert.equal(updatedWall.wall.color, 'rosa');
+
+  const disposable = await ack(admin, 'wall:create', { name: 'Muro temporal', description: '', color: 'verde' });
+  const disposableInvite = await ack(admin, 'wall:invite', { wallId: disposable.wall.id, role: 'editor' });
+  await ack(member, 'invitation:answer', { secret: disposableInvite.code, answer: 'aceptar' });
+  const wallDeletedForMember = once(member, 'wall:deleted');
+  assert.equal((await ack(admin, 'wall:delete', { id: disposable.wall.id })).ok, true);
+  assert.equal(await wallDeletedForMember, disposable.wall.id);
+  assert.equal((await ack(member, 'walls:list')).walls.some((wall) => wall.id === disposable.wall.id), false);
 });
 
 test('mantiene reportes privados y permite que el superadmin responda al mismo autor', async () => {
@@ -200,7 +211,7 @@ test('mantiene reportes privados y permite que el superadmin responda al mismo a
   assert.equal((await ack(admin, 'admin:report:respond', { id: created.report.id, status: 'resuelto', decision: 'Se corrigió la carga.' })).ok, true);
   const answered = await ack(member, 'reports:list'); assert.equal(answered.reports[0].decision, 'Se corrigió la carga.');
   const outsider = await connect();
-  await ack(outsider, 'auth:register', { name: 'Persona externa', email: 'externa@example.com', password: 'clave999', passwordConfirmation: 'clave999' });
+  await ack(outsider, 'auth:register', { name: 'Persona externa', email: 'externa@example.com', password: 'clave99901', passwordConfirmation: 'clave99901' });
   assert.equal((await ack(outsider, 'reports:list')).reports.length, 0);
 });
 
