@@ -572,7 +572,10 @@
     const socket = window.MuroBoard?.getSocket();
     socket.emit('admin:user:discipline', { userId: user.id, ...result }, (response) => {
       if (!response?.ok) return toast(response?.error || 'No se pudo aplicar la medida.', 'error');
-      const finish = () => { toast('La medida se aplicó correctamente.', 'success'); renderAdminDashboard(); };
+      const finish = () => {
+        toast(response.notificationWarning || 'La medida se aplicó y se notificó por correo.', response.notificationWarning ? 'error' : 'success');
+        renderAdminDashboard();
+      };
       if (!result.reportId) return finish();
       socket.emit('admin:report:respond', { id: result.reportId, status: 'resuelto', decision: result.message }, () => finish());
     });

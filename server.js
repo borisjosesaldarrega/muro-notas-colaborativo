@@ -49,6 +49,17 @@ function validEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '';
 }
 
+async function sendModerationEmail(accessToken, payload) {
+  const baseUrl = String(process.env.MAILER_URL || 'https://muro-ideasquesemueven.netlify.app').replace(/\/$/, '');
+  const response = await fetch(`${baseUrl}/hooks/moderation`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: globalThis.AbortSignal.timeout(6_000)
+  });
+  if (!response.ok) throw new Error('moderation_email_failed');
+}
+
 function publicUser(user) {
   if (!user) return null;
   return {
@@ -343,7 +354,7 @@ function createMuroServer(options = {}) {
           return acknowledge({ ok: true, ...establishSession(socket, session.user, session.token) });
         } catch (error) {
           const suspended = /banned|suspend/i.test(String(error?.message));
-          return fail(acknowledge, suspended ? 'Tu cuenta está suspendida. Revisa el mensaje de moderación.' : 'Correo o contraseña incorrectos.');
+          return fail(acknowledge, suspended ? 'Tu cuenta está suspendida. Revisa el correo enviado por moderación.' : 'Correo o contraseña incorrectos.');
         }
       }
       const user = users.find((item) => item.email === email && item.password === String(payload.password ?? ''));
@@ -364,7 +375,7 @@ function createMuroServer(options = {}) {
           return acknowledge({ ok: true, token, user: publicUser(session.user) });
         } catch (error) {
           const suspended = /banned|suspend/i.test(String(error?.message));
-          return fail(acknowledge, suspended ? 'Tu cuenta está suspendida. Vuelve cuando termine la penalización.' : 'Tu sesión expiró. Inicia sesión nuevamente.');
+          return fail(acknowledge, suspended ? 'Tu cuenta está suspendida. Revisa el correo enviado por moderación.' : 'Tu sesión expiró. Inicia sesión nuevamente.');
         }
       }
       const user = users.find((item) => item.id === sessions.get(token));
@@ -898,7 +909,15 @@ function createMuroServer(options = {}) {
       if (!target || !action || message.length < 3) return fail(acknowledge, 'Selecciona una medida y escribe el mensaje para el usuario.');
       if (target.id === admin.id || target.role === 'superadmin') return fail(acknowledge, 'No se puede sancionar la cuenta superadministradora.');
       try {
+        let notificationWarning = '';
         if (storage.schemaReady) await store.disciplineUser({ userId, reportId: cleanText(payload.reportId, 100) || null, action, message, adminId: admin.id });
+        if (storage.schemaReady) {
+          try {
+            await sendModerationEmail(socket.data.accessToken, { email: target.email, name: target.name, action, message });
+          } catch {
+            notificationWarning = 'La medida se aplicó, pero no se pudo enviar el correo de notificación.';
+          }
+        }
         if (action === 'eliminar') {
           const index = users.findIndex((item) => item.id === userId);
           if (index >= 0) users.splice(index, 1);
@@ -915,7 +934,7 @@ function createMuroServer(options = {}) {
         } else {
           for (const peer of io.sockets.sockets.values()) if (peer.data.userId === userId) peer.emit('account:moderated', { action, message });
         }
-        acknowledge({ ok: true }); emitAdminSnapshot();
+        acknowledge({ ok: true, notificationWarning }); emitAdminSnapshot();
       } catch { return fail(acknowledge, 'No se pudo aplicar la medida a la cuenta.'); }
     });
 

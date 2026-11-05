@@ -553,6 +553,8 @@ window.MuroBoard = (function () {
   }
 
   $('#newNoteButton')?.addEventListener('click', openNewNoteDialog);
+  $('#closeNoteModal')?.addEventListener('click', () => $('#noteDialog')?.close());
+  $('#cancelNoteModal')?.addEventListener('click', () => $('#noteDialog')?.close());
   board?.addEventListener('dblclick', (event) => {
     if (event.target.closest('.note, button, textarea')) return;
     openNewNoteDialog();

@@ -1739,6 +1739,10 @@ html[data-theme="dark"] .admin-table td { border-color: #443b5c; color: #eeeaf9;
 dialog { color: var(--ink); }
 dialog form { width: 100%; overflow-x: hidden; }
 .account-settings-dialog { overflow-x: hidden; }
+#noteDialog { max-width: calc(100vw - 28px); overflow: hidden; }
+#noteDialog form { min-width: 0; }
+#noteDialog textarea { display: block; max-width: 100%; resize: vertical; }
+#noteDialog .dialog-actions { flex-wrap: wrap; }
 .account-action-dialog { width: min(520px, calc(100% - 28px)); }
 .settings-action-row {
   display: grid;
