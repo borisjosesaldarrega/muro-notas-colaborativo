@@ -185,6 +185,18 @@ test('mantiene el scroll de configuración dentro del contenido del modal', () =
   assert.match(css, /scrollbar-color:\s*rgba\(107, 88, 220, \.52\) transparent/);
 });
 
+test('recupera el código activo y permite cambiar o revocar permisos de miembros', () => {
+  const html = readFileSync(join(root, 'Frontend/index.html'), 'utf8');
+  const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
+  assert.match(html, /id="inviteCodeStatus"/);
+  assert.match(board, /emitWithTimeout\('invitations:list'/);
+  assert.match(board, /active\?\.code/);
+  assert.match(board, /class="member-role-select"/);
+  assert.match(board, /wall:member:update/);
+  assert.match(board, /wall:member:remove/);
+  assert.match(board, /socket\.on\('members:changed'/);
+});
+
 test('permite reportar miembros y notifica las medidas por correo sin revelar al reportante', () => {
   const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
   const app = readFileSync(join(root, 'Frontend/js/app.js'), 'utf8');

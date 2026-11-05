@@ -132,9 +132,11 @@ async function main() {
           rol_objetivo: 'lector',
           token_hash_nuevo: digest(token),
           codigo_hash_nuevo: digest(code),
+          codigo_visible_nuevo: code,
           vence_en_nuevo: new Date(Date.now() + 3_600_000).toISOString()
         });
         if (invitationError || !invitation?.id) throw invitationError || new Error('No se creó la invitación.');
+        const { data: listedInvitations, error: listInvitationsError } = await ownerClient.rpc('muro_listar_invitaciones');
         const { error: directMemberError } = await ownerClient.from('muro_sala_miembros').insert({ sala_id: wallId, usuario_id: outsider.id, rol: 'lector' });
         const { data: preview, error: previewError } = await outsiderClient.rpc('muro_inspeccionar_invitacion', { secreto_hash: digest(code) });
         const { data: accepted, error: acceptError } = await outsiderClient.rpc('muro_responder_invitacion', { secreto_hash: digest(code), respuesta: 'aceptar' });
@@ -142,12 +144,28 @@ async function main() {
         const { data: guestAccepted, error: guestAcceptError } = await guestClient.rpc('muro_responder_invitacion', { secreto_hash: digest(code), respuesta: 'aceptar' });
         const { data: membership, error: membershipError } = await outsiderClient.from('muro_sala_miembros').select('rol').eq('sala_id', wallId).eq('usuario_id', outsider.id).single();
         const { data: guestMembership, error: guestMembershipError } = await guestClient.from('muro_sala_miembros').select('rol').eq('sala_id', wallId).eq('usuario_id', guest.id).single();
-        result.invitations = Boolean(directMemberError) && !previewError && preview?.sala_id === wallId && !acceptError && accepted?.estado === 'aceptada' && Boolean(reuseError) && !guestAcceptError && guestAccepted?.estado === 'aceptada' && !membershipError && membership?.rol === 'lector' && !guestMembershipError && guestMembership?.rol === 'lector' ? 'passed' : 'failed';
+        const { error: directRoleUpdateError } = await ownerClient.from('muro_sala_miembros').update({ rol: 'editor' }).eq('sala_id', wallId).eq('usuario_id', outsider.id);
+        const { error: roleUpdateError } = await ownerClient.rpc('muro_cambiar_permiso_miembro', { sala_objetivo: wallId, usuario_objetivo: outsider.id, rol_nuevo: 'editor' });
+        const { data: updatedMembership, error: updatedMembershipError } = await outsiderClient.from('muro_sala_miembros').select('rol').eq('sala_id', wallId).eq('usuario_id', outsider.id).single();
+        const invitationChecksPassed = !listInvitationsError
+          && listedInvitations?.some((item) => item.id === invitation.id && item.codigo === code)
+          && Boolean(directMemberError)
+          && Boolean(directRoleUpdateError)
+          && !previewError && preview?.sala_id === wallId
+          && !acceptError && accepted?.estado === 'aceptada'
+          && Boolean(reuseError)
+          && !guestAcceptError && guestAccepted?.estado === 'aceptada'
+          && !membershipError && membership?.rol === 'lector'
+          && !guestMembershipError && guestMembership?.rol === 'lector'
+          && !roleUpdateError && !updatedMembershipError && updatedMembership?.rol === 'editor';
 
         const { data: report, error: reportError } = await outsiderClient.rpc('muro_crear_reporte', { motivo_nuevo: 'fallo_aplicacion', detalle_nuevo: 'Verificación temporal del circuito completo.', sala_objetivo: wallId, nota_objetivo: null });
         if (reportError || !report?.id) throw reportError || new Error('No se creó el reporte.');
         const { data: userReport, error: userReportError } = await outsiderClient.rpc('muro_reportar_usuario', { usuario_objetivo: guest.id, sala_objetivo: wallId, motivo_nuevo: 'spam', detalle_nuevo: 'Verificación temporal de un reporte asociado a una cuenta.' });
         if (userReportError || !userReport?.id) throw userReportError || new Error('No se creó el reporte de usuario.');
+        const { error: revokeError } = await ownerClient.rpc('muro_revocar_miembro', { sala_objetivo: wallId, usuario_objetivo: guest.id });
+        const { data: revokedMembership, error: revokedMembershipError } = await ownerClient.from('muro_sala_miembros').select('usuario_id').eq('sala_id', wallId).eq('usuario_id', guest.id);
+        result.invitations = invitationChecksPassed && !revokeError && !revokedMembershipError && revokedMembership?.length === 0 ? 'passed' : 'failed';
         const { error: promoteError } = await services.adminClient.from('muro_usuarios').update({ rol: 'superadmin' }).eq('id', owner.id);
         if (promoteError) throw promoteError;
         const { data: adminReports, error: adminReportsError } = await ownerClient.rpc('muro_reportes_administracion');
