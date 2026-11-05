@@ -35,6 +35,10 @@ test('expone configuración de cuenta, temas e invitación con lenguaje claro', 
   assert.match(html, /data-admin-tab="historial"/);
   assert.match(html, /data-admin-tab="guia"/);
   assert.match(board, /Propietario\/a/);
+  const css = readFileSync(join(root, 'Frontend/css/styles.css'), 'utf8');
+  assert.match(css, /\.account-settings-dialog::\-webkit-scrollbar-thumb/);
+  assert.match(css, /scrollbar-color:\s*#8f7cf8\s+#eeeaff/);
+  assert.match(css, /html\[data-theme="dark"\] \.account-settings-dialog/);
 });
 
 test('sincroniza el correo confirmado de Auth con el perfil público', () => {
