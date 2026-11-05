@@ -15,6 +15,25 @@ const SUPERADMIN_EMAIL = 'saldavargasboris@gmail.com';
 const THEMES = new Set(['light', 'dark', 'system']);
 const MAX_COORDINATE = 4000;
 const GENERAL_WALL_ID = '00000000-0000-0000-0000-000000000001';
+const REPORT_REASONS = new Set(['fallo_aplicacion', 'contenido_ofensivo', 'spam', 'enlace_inseguro', 'acoso', 'otro']);
+const DISCIPLINE_ACTIONS = new Set(['advertir', 'suspender_24h', 'suspender_7d', 'reactivar', 'eliminar']);
+const INVITATION_TTL = 24 * 60 * 60 * 1000;
+const INVITATION_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+function sha256(value) {
+  return crypto.createHash('sha256').update(String(value)).digest('hex');
+}
+
+function invitationSecrets() {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const code = Array.from({ length: 8 }, () => INVITATION_ALPHABET[crypto.randomInt(0, INVITATION_ALPHABET.length)]).join('');
+  return { token, code, tokenHash: sha256(token), codeHash: sha256(code), expiresAt: Date.now() + INVITATION_TTL };
+}
+
+function normalizeInvitationSecret(value) {
+  const secret = cleanText(value, 200);
+  return /^[a-z0-9]{8}$/i.test(secret) ? secret.toUpperCase() : secret;
+}
 
 function cleanText(value, max = 280) {
   return String(value ?? '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, max);
@@ -64,6 +83,8 @@ function createMuroServer(options = {}) {
   const storage = { mode: 'memory', publicConnection: false, adminConnection: false, schemaReady: false, reason: store ? 'initializing' : 'not_configured' };
   const users = [];
   const sessions = new Map();
+  const invitations = [];
+  const reports = [];
   const walls = [{
     id: 'general',
     name: 'Muro de ideas',
@@ -96,6 +117,21 @@ function createMuroServer(options = {}) {
   })();
 
   app.disable('x-powered-by');
+  app.use((req, res, next) => {
+    res.set({
+      'Content-Security-Policy': "default-src 'self'; base-uri 'self'; connect-src 'self' https://zdyljsfnnbqcrqaivwqa.supabase.co wss://zdyljsfnnbqcrqaivwqa.supabase.co; font-src 'self' https://fonts.gstatic.com data:; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; upgrade-insecure-requests",
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Resource-Policy': 'same-origin',
+      'Permissions-Policy': 'camera=(), geolocation=(), microphone=(), payment=(), usb=()',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY'
+    });
+    if (req.secure || req.get('x-forwarded-proto') === 'https') {
+      res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
   const supabaseBrowserBundle = path.join(path.dirname(require.resolve('@supabase/supabase-js')), 'umd', 'supabase.js');
   app.get('/vendor/supabase.js', (_req, res) => res.sendFile(supabaseBrowserBundle));
   app.get('/api/supabase/config', (_req, res) => {
@@ -106,18 +142,24 @@ function createMuroServer(options = {}) {
   app.use(express.static(path.join(__dirname, '..', 'Frontend')));
   app.get('/api/health', async (_req, res) => {
     await ready;
+    let database = storage.schemaReady ? 'ready' : 'unavailable';
+    if (storage.schemaReady) {
+      try { await store.ping(); } catch { database = 'unreachable'; }
+    }
     res.json({
-      ok: true,
+      ok: database !== 'unreachable',
       notes: walls.reduce((sum, wall) => sum + wall.notes.length, 0),
       walls: walls.length,
       users: io.engine.clientsCount,
-      storage: { ...storage }
+      storage: { ...storage, database }
     });
   });
 
   const fail = (acknowledge, error) => acknowledge({ ok: false, error });
   const findUser = (socket) => users.find((user) => user.id === socket.data.userId);
   const findWall = (id) => walls.find((wall) => wall.id === cleanText(id, 100));
+  // El rol global administra la plataforma, pero no concede acceso implícito al
+  // contenido privado de los muros. La membresía siempre se comprueba por muro.
   const wallRole = (wall, user) => wall?.members[user?.id];
   const canEdit = (wall, user) => ['propietario', 'editor'].includes(wallRole(wall, user));
   const canOwn = (wall, user) => wallRole(wall, user) === 'propietario';
@@ -146,6 +188,17 @@ function createMuroServer(options = {}) {
     updatedAt: wall.updatedAt
   });
   const wallMembers = (wall) => Object.entries(wall.members).map(([id, role]) => ({ ...publicUser(users.find((user) => user.id === id)), roleInWall: role })).filter((item) => item.id);
+  const invitationView = (invitation, user) => ({
+    id: invitation.id, wallId: invitation.wallId, wallName: findWall(invitation.wallId)?.name || 'Muro',
+    email: invitation.email, role: invitation.role, status: invitation.status,
+    owner: invitation.invitedBy === user.id, expiresAt: invitation.expiresAt, createdAt: invitation.createdAt
+  });
+  const reportView = (report, admin = false) => ({
+    id: report.id, reason: report.reason, detail: report.detail, status: report.status,
+    decision: report.decision || '', createdAt: report.createdAt, reviewedAt: report.reviewedAt || null,
+    answeredAt: report.answeredAt || null,
+    ...(admin ? { reporterId: report.reporterId, reporterName: users.find((item) => item.id === report.reporterId)?.name || 'Usuario', reportedUserId: report.reportedUserId || null, reportedUserName: users.find((item) => item.id === report.reportedUserId)?.name || 'Usuario no disponible', reportedUserEmail: users.find((item) => item.id === report.reportedUserId)?.email || '' } : {})
+  });
 
   function establishSession(socket, user, suppliedToken = '') {
     const token = suppliedToken || crypto.randomUUID();
@@ -229,8 +282,9 @@ function createMuroServer(options = {}) {
           const index = users.findIndex((item) => item.id === session.user.id);
           if (index >= 0) users[index] = session.user; else users.push(session.user);
           return acknowledge({ ok: true, ...establishSession(socket, session.user, session.token) });
-        } catch {
-          return fail(acknowledge, 'Correo o contraseña incorrectos.');
+        } catch (error) {
+          const suspended = /banned|suspend/i.test(String(error?.message));
+          return fail(acknowledge, suspended ? 'Tu cuenta está suspendida. Revisa el mensaje de moderación.' : 'Correo o contraseña incorrectos.');
         }
       }
       const user = users.find((item) => item.email === email && item.password === String(payload.password ?? ''));
@@ -249,8 +303,9 @@ function createMuroServer(options = {}) {
           socket.data.accessToken = token;
           sessions.set(token, session.user.id);
           return acknowledge({ ok: true, token, user: publicUser(session.user) });
-        } catch {
-          return fail(acknowledge, 'La sesión de Supabase expiró.');
+        } catch (error) {
+          const suspended = /banned|suspend/i.test(String(error?.message));
+          return fail(acknowledge, suspended ? 'Tu cuenta está suspendida. Vuelve cuando termine la penalización.' : 'La sesión de Supabase expiró.');
         }
       }
       const user = users.find((item) => item.id === sessions.get(token));
@@ -288,6 +343,24 @@ function createMuroServer(options = {}) {
       if (user.password !== String(payload.currentPassword ?? '')) return fail(acknowledge, 'La contraseña actual es incorrecta.');
       user.password = next;
       acknowledge({ ok: true });
+    });
+
+    socket.on('auth:email', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge);
+      if (!user) return;
+      const email = validEmail(payload.email);
+      if (!email) return fail(acknowledge, 'Escribe un correo válido.');
+      if (email === user.email) return acknowledge({ ok: true, email });
+      if (users.some((item) => item.id !== user.id && item.email === email)) return fail(acknowledge, 'Ese correo ya está registrado.');
+      if (storage.schemaReady) {
+        try { await store.changeEmail(user, String(payload.currentPassword ?? ''), email); }
+        catch { return fail(acknowledge, 'No se pudo cambiar el correo. Revisa tu contraseña y vuelve a intentarlo.'); }
+      } else {
+        if (user.password !== String(payload.currentPassword ?? '')) return fail(acknowledge, 'La contraseña actual es incorrecta.');
+      }
+      user.email = email;
+      acknowledge({ ok: true, email });
+      emitAdminSnapshot();
     });
 
     socket.on('profile:update', async (payload = {}, acknowledge = () => {}) => {
@@ -364,10 +437,8 @@ function createMuroServer(options = {}) {
       };
       if (storage.schemaReady) {
         try {
-          await store.createWall(wall, socket.data.accessToken);
-          await store.createMember(wall.id, user.id, 'propietario', socket.data.accessToken);
+          wall.id = await store.createWall(wall, socket.data.accessToken);
         } catch {
-          try { await store.deleteWall(wall.id, socket.data.accessToken); } catch {}
           return fail(acknowledge, 'No se pudo guardar el muro en Supabase.');
         }
       }
@@ -422,18 +493,90 @@ function createMuroServer(options = {}) {
       const wall = findWall(payload.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'El muro no existe.');
       if (!canOwn(wall, user)) return fail(acknowledge, 'Solo la persona propietaria puede invitar miembros.');
-      const target = users.find((item) => item.email === validEmail(payload.email));
-      if (!target) return fail(acknowledge, 'No existe una cuenta registrada con ese correo.');
       const role = MEMBER_ROLES.has(payload.role) && payload.role !== 'propietario' ? payload.role : 'editor';
+      invitations.filter((item) => item.wallId === wall.id && item.status === 'pendiente').forEach((item) => { item.status = 'cancelada'; });
+      const secrets = invitationSecrets();
+      const invitation = { id: crypto.randomUUID(), wallId: wall.id, email: null, role, invitedBy: user.id, status: 'pendiente', createdAt: Date.now(), ...secrets };
       if (storage.schemaReady) {
         try {
-          if (wall.members[target.id]) await store.updateMember(wall.id, target.id, role, socket.data.accessToken);
-          else await store.createMember(wall.id, target.id, role, socket.data.accessToken);
-        } catch { return fail(acknowledge, 'No se pudo guardar la invitación en Supabase.'); }
+          const saved = await store.createInvitation(invitation, socket.data.accessToken);
+          invitation.id = saved.id;
+        } catch { return fail(acknowledge, 'No se pudo crear la invitación.'); }
       }
-      wall.members[target.id] = role;
-      wall.updatedAt = Date.now();
-      acknowledge({ ok: true, members: wallMembers(wall) });
+      invitations.push(invitation);
+      const link = `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}`;
+      acknowledge({ ok: true, invitation: invitationView(invitation, user), code: secrets.code, link, members: wallMembers(wall) });
+    });
+
+    socket.on('invitations:list', async (_payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      if (storage.schemaReady) {
+        try {
+          const rows = await store.listInvitations(socket.data.accessToken);
+          return acknowledge({ ok: true, invitations: rows.map((row) => ({ id: row.id, wallId: row.sala_id, wallName: row.sala_nombre, email: row.correo, role: row.rol, status: row.estado, owner: row.es_propietario, expiresAt: Date.parse(row.vence_en), createdAt: Date.parse(row.creado_en) })) });
+        } catch { return fail(acknowledge, 'No se pudieron cargar las invitaciones.'); }
+      }
+      invitations.forEach((item) => { if (item.status === 'pendiente' && item.expiresAt <= Date.now()) item.status = 'vencida'; });
+      acknowledge({ ok: true, invitations: invitations.filter((item) => item.invitedBy === user.id).map((item) => invitationView(item, user)) });
+    });
+
+    socket.on('invitation:answer', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      const secret = normalizeInvitationSecret(payload.secret); const answer = 'aceptar';
+      if (!secret) return fail(acknowledge, 'Escribe el código o abre el enlace de invitación.');
+      const secretHash = sha256(secret);
+      if (storage.schemaReady) {
+        try {
+          const result = await store.answerInvitation(secretHash, answer, socket.data.accessToken);
+          replaceState(await store.loadState());
+          return acknowledge({ ok: true, wallId: result.sala_id, wallName: result.sala_nombre, invitedBy: result.invitado_por_nombre, status: result.estado });
+        } catch { return fail(acknowledge, 'Sala no encontrada.'); }
+      }
+      const invitation = invitations.find((item) => item.tokenHash === secretHash || item.codeHash === secretHash);
+      if (!invitation || invitation.status !== 'pendiente' || invitation.expiresAt <= Date.now()) return fail(acknowledge, 'Sala no encontrada.');
+      const wall = findWall(invitation.wallId); if (!wall || wall.members[user.id]) return fail(acknowledge, 'Sala no encontrada.');
+      wall.members[user.id] = invitation.role;
+      acknowledge({ ok: true, wallId: invitation.wallId, wallName: wall.name, invitedBy: users.find((item) => item.id === invitation.invitedBy)?.name || 'Propietario', status: 'aceptada' });
+    });
+
+    socket.on('invitation:preview', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      const secret = normalizeInvitationSecret(payload.secret);
+      if (!secret) return fail(acknowledge, 'Escribe el código de invitación.');
+      const secretHash = sha256(secret);
+      if (storage.schemaReady) {
+        try {
+          const result = await store.previewInvitation(secretHash, socket.data.accessToken);
+          return acknowledge({ ok: true, invitation: { wallId: result.sala_id, wallName: result.sala_nombre, invitedBy: result.invitado_por_nombre, role: result.rol, expiresAt: Date.parse(result.vence_en) } });
+        } catch { return fail(acknowledge, 'Sala no encontrada.'); }
+      }
+      const invitation = invitations.find((item) => item.tokenHash === secretHash || item.codeHash === secretHash);
+      if (!invitation || invitation.status !== 'pendiente' || invitation.expiresAt <= Date.now()) return fail(acknowledge, 'Sala no encontrada.');
+      acknowledge({ ok: true, invitation: { wallId: invitation.wallId, wallName: findWall(invitation.wallId)?.name || 'Muro', invitedBy: users.find((item) => item.id === invitation.invitedBy)?.name || 'Propietario', role: invitation.role, expiresAt: invitation.expiresAt } });
+    });
+
+    socket.on('invitation:cancel', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      if (storage.schemaReady) {
+        try { await store.cancelInvitation(payload.id, socket.data.accessToken); return acknowledge({ ok: true }); }
+        catch { return fail(acknowledge, 'La invitación no se puede cancelar.'); }
+      }
+      const invitation = invitations.find((item) => item.id === payload.id && item.invitedBy === user.id && item.status === 'pendiente');
+      if (!invitation) return fail(acknowledge, 'La invitación no se puede cancelar.'); invitation.status = 'cancelada'; acknowledge({ ok: true });
+    });
+
+    socket.on('invitation:resend', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      const secrets = invitationSecrets();
+      if (storage.schemaReady) {
+        try {
+          const saved = await store.resendInvitation({ id: payload.id, ...secrets }, socket.data.accessToken);
+          return acknowledge({ ok: true, invitation: saved, code: secrets.code, link: `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}` });
+        } catch { return fail(acknowledge, 'La invitación no se puede reenviar.'); }
+      }
+      const invitation = invitations.find((item) => item.id === payload.id && item.invitedBy === user.id && !['aceptada', 'cancelada'].includes(item.status));
+      if (!invitation) return fail(acknowledge, 'La invitación no se puede reenviar.'); Object.assign(invitation, secrets, { status: 'pendiente' });
+      acknowledge({ ok: true, invitation: invitationView(invitation, user), code: secrets.code, link: `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}` });
     });
 
     socket.on('wall:member:update', async (payload = {}, acknowledge = () => {}) => {
@@ -527,6 +670,15 @@ function createMuroServer(options = {}) {
       acknowledge({ ok: true });
     });
 
+    socket.on('note:preview-move', (payload = {}) => {
+      const user = findUser(socket);
+      const wall = findWall(socket.data.wallId);
+      if (!user || !wall || !canEdit(wall, user)) return;
+      const note = wall.notes.find((item) => item.id === cleanText(payload.id, 100));
+      if (!note) return;
+      socket.to(`wall:${wall.id}`).volatile.emit('note:preview-moved', { wallId: wall.id, id: note.id, x: safeCoordinate(payload.x, note.x), y: safeCoordinate(payload.y, note.y) });
+    });
+
     socket.on('note:delete', async (payload = {}, acknowledge = () => {}) => {
       const user = requireUser(socket, acknowledge);
       const wall = findWall(socket.data.wallId);
@@ -543,11 +695,78 @@ function createMuroServer(options = {}) {
       acknowledge({ ok: true });
     });
 
+    socket.on('report:create', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      const reason = REPORT_REASONS.has(payload.reason) ? payload.reason : ''; const detail = cleanText(payload.detail, 1000);
+      const wall = payload.wallId ? findWall(payload.wallId) : null;
+      if (!reason || detail.length < 10) return fail(acknowledge, 'Describe el problema con al menos 10 caracteres.');
+      if (payload.wallId && (!wall || !wallRole(wall, user))) return fail(acknowledge, 'No puedes reportar contenido de un muro al que no perteneces.');
+      const report = { id: crypto.randomUUID(), reporterId: user.id, wallId: wall?.id || null, noteId: cleanText(payload.noteId, 100) || null, reason, detail, status: 'pendiente', decision: '', createdAt: Date.now() };
+      if (storage.schemaReady) {
+        try { const saved = await store.createReport(report, socket.data.accessToken); report.id = saved.id; report.createdAt = Date.parse(saved.creado_en); }
+        catch { return fail(acknowledge, 'No se pudo registrar el reporte.'); }
+      }
+      reports.push(report);
+      for (const peer of io.sockets.sockets.values()) if (findUser(peer)?.role === 'superadmin') peer.emit('report:received');
+      acknowledge({ ok: true, report: reportView(report) }); emitAdminSnapshot();
+    });
+
+    socket.on('report:user:create', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      const wall = findWall(payload.wallId || socket.data.wallId); const reportedUserId = cleanText(payload.userId, 100);
+      const reason = REPORT_REASONS.has(payload.reason) && payload.reason !== 'fallo_aplicacion' ? payload.reason : ''; const detail = cleanText(payload.detail, 1000);
+      if (!wall || !wallRole(wall, user) || !wall.members[reportedUserId]) return fail(acknowledge, 'Solo puedes reportar a una persona que comparte este muro.');
+      if (reportedUserId === user.id) return fail(acknowledge, 'No puedes reportar tu propia cuenta.');
+      if (!reason || detail.length < 10) return fail(acknowledge, 'Describe lo ocurrido con al menos 10 caracteres.');
+      const report = { id: crypto.randomUUID(), reporterId: user.id, reportedUserId, wallId: wall.id, noteId: null, reason, detail, status: 'pendiente', decision: '', createdAt: Date.now() };
+      if (storage.schemaReady) { try { const saved = await store.reportUser(report, socket.data.accessToken); report.id = saved.id; report.createdAt = Date.parse(saved.creado_en); } catch { return fail(acknowledge, 'No se pudo registrar el reporte de usuario.'); } }
+      reports.push(report); for (const peer of io.sockets.sockets.values()) if (findUser(peer)?.role === 'superadmin') peer.emit('report:received');
+      acknowledge({ ok: true, report: reportView(report) }); emitAdminSnapshot();
+    });
+
+    socket.on('reports:list', async (_payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge); if (!user) return;
+      if (storage.schemaReady) {
+        try { const rows = await store.listOwnReports(socket.data.accessToken); return acknowledge({ ok: true, reports: rows.map((row) => ({ id: row.id, reason: row.motivo, detail: row.detalle, status: row.estado, decision: row.decision, createdAt: Date.parse(row.creado_en), reviewedAt: row.revisado_en ? Date.parse(row.revisado_en) : null, answeredAt: row.respondido_en ? Date.parse(row.respondido_en) : null })) }); }
+        catch { return fail(acknowledge, 'No se pudieron cargar tus reportes.'); }
+      }
+      acknowledge({ ok: true, reports: reports.filter((item) => item.reporterId === user.id).map((item) => reportView(item)) });
+    });
+
+    socket.on('admin:reports:list', async (_payload = {}, acknowledge = () => {}) => {
+      const admin = requireAdmin(socket, acknowledge); if (!admin) return;
+      if (storage.schemaReady) {
+        try { const rows = await store.listAdminReports(socket.data.accessToken); return acknowledge({ ok: true, reports: rows.map((row) => ({ id: row.id, reporterId: row.reportante_id, reporterName: row.reportante_nombre, reportedUserId: row.reportado_id, reportedUserName: row.reportado_nombre, reportedUserEmail: row.reportado_correo, reason: row.motivo, detail: row.detalle, status: row.estado, decision: row.decision, createdAt: Date.parse(row.creado_en), reviewedAt: row.revisado_en ? Date.parse(row.revisado_en) : null, answeredAt: row.respondido_en ? Date.parse(row.respondido_en) : null })) }); }
+        catch { return fail(acknowledge, 'No se pudieron cargar los reportes.'); }
+      }
+      acknowledge({ ok: true, reports: reports.map((item) => reportView(item, true)) });
+    });
+
+    socket.on('admin:report:take', async (payload = {}, acknowledge = () => {}) => {
+      const admin = requireAdmin(socket, acknowledge); if (!admin) return;
+      if (storage.schemaReady) { try { await store.takeReport(payload.id, socket.data.accessToken); return acknowledge({ ok: true }); } catch { return fail(acknowledge, 'El reporte ya no está disponible.'); } }
+      const report = reports.find((item) => item.id === payload.id && item.status === 'pendiente'); if (!report) return fail(acknowledge, 'El reporte ya no está disponible.');
+      Object.assign(report, { status: 'en_revision', reviewerId: admin.id, reviewedAt: Date.now() }); acknowledge({ ok: true });
+    });
+
+    socket.on('admin:report:respond', async (payload = {}, acknowledge = () => {}) => {
+      const admin = requireAdmin(socket, acknowledge); if (!admin) return;
+      const status = ['resuelto', 'rechazado'].includes(payload.status) ? payload.status : ''; const decision = cleanText(payload.decision, 1000);
+      if (!status || decision.length < 3) return fail(acknowledge, 'Escribe una respuesta válida.');
+      if (storage.schemaReady) {
+        try { const reporterId = await store.answerReport(payload.id, status, decision, socket.data.accessToken); for (const peer of io.sockets.sockets.values()) if (findUser(peer)?.id === reporterId) peer.emit('report:answered'); acknowledge({ ok: true }); emitAdminSnapshot(); return; }
+        catch { return fail(acknowledge, 'No se pudo responder el reporte.'); }
+      }
+      const report = reports.find((item) => item.id === payload.id && ['pendiente', 'en_revision'].includes(item.status)); if (!report) return fail(acknowledge, 'El reporte ya no está disponible.');
+      Object.assign(report, { status, decision, reviewerId: admin.id, reviewedAt: report.reviewedAt || Date.now(), answeredAt: Date.now() });
+      for (const peer of io.sockets.sockets.values()) if (findUser(peer)?.id === report.reporterId) peer.emit('report:answered');
+      acknowledge({ ok: true }); emitAdminSnapshot();
+    });
+
     socket.on('admin:clear', async (payload = {}, acknowledge = () => {}) => {
       const user = requireAdmin(socket, acknowledge);
       const wall = findWall(payload.wallId || socket.data.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'El muro no existe.');
-      if (!wallRole(wall, user)) return fail(acknowledge, 'No tienes acceso a este muro.');
       const removed = wall.notes.length;
       if (storage.schemaReady) {
         try { await store.clearNotes(wall.id); } catch { return fail(acknowledge, 'No se pudieron eliminar las notas en Supabase.'); }
@@ -557,17 +776,27 @@ function createMuroServer(options = {}) {
       acknowledge({ ok: true, removed });
     });
 
-    socket.on('admin:snapshot', (_payload = {}, acknowledge = () => {}) => {
+    socket.on('admin:snapshot', async (_payload = {}, acknowledge = () => {}) => {
       const user = requireAdmin(socket, acknowledge);
       if (!user) return;
-      acknowledge({
-        ok: true,
-        users: users.map(publicUser),
-        walls: walls
-          .filter((wall) => wallRole(wall, user))
-          .map((wall) => ({ ...wallSummary(wall, user), members: wallMembers(wall) })),
-        connected: io.engine.clientsCount
-      });
+      if (storage.schemaReady) {
+        try { const [summaryResult, adminUsers] = await Promise.all([store.userClient(socket.data.accessToken).rpc('muro_resumen_administrativo'), store.listAdminUsers()]); if (summaryResult.error) return fail(acknowledge, 'No se pudo cargar el resumen administrativo.'); acknowledge({ ok: true, users: adminUsers, totals: summaryResult.data, connected: io.engine.clientsCount }); }
+        catch { return fail(acknowledge, 'No se pudo cargar el directorio de usuarios.'); }
+      } else acknowledge({ ok: true, users: users.map(publicUser), walls: walls.map((wall) => ({ ...wallSummary(wall, user), members: wallMembers(wall) })), totals: { usuarios: users.length, salas: walls.length, notas: walls.reduce((sum, wall) => sum + wall.notes.length, 0), reportes_pendientes: reports.filter((item) => ['pendiente', 'en_revision'].includes(item.status)).length }, connected: io.engine.clientsCount });
+    });
+
+    socket.on('admin:user:discipline', async (payload = {}, acknowledge = () => {}) => {
+      const admin = requireAdmin(socket, acknowledge); if (!admin) return;
+      const userId = cleanText(payload.userId, 100); const action = DISCIPLINE_ACTIONS.has(payload.action) ? payload.action : ''; const message = cleanText(payload.message, 1000); const target = users.find((item) => item.id === userId);
+      if (!target || !action || message.length < 3) return fail(acknowledge, 'Selecciona una medida y escribe el mensaje para el usuario.');
+      if (target.id === admin.id || target.role === 'superadmin') return fail(acknowledge, 'No se puede sancionar la cuenta superadministradora.');
+      try {
+        if (storage.schemaReady) await store.disciplineUser({ userId, reportId: cleanText(payload.reportId, 100) || null, action, message, adminId: admin.id });
+        if (action === 'eliminar') { const index = users.findIndex((item) => item.id === userId); if (index >= 0) users.splice(index, 1); walls.forEach((wall) => delete wall.members[userId]); }
+        if (['suspender_24h', 'suspender_7d', 'eliminar'].includes(action)) { for (const [token, id] of sessions) if (id === userId) sessions.delete(token); for (const peer of io.sockets.sockets.values()) if (peer.data.userId === userId) { peer.emit('account:moderated', { action, message }); peer.disconnect(true); } }
+        else for (const peer of io.sockets.sockets.values()) if (peer.data.userId === userId) peer.emit('account:moderated', { action, message });
+        acknowledge({ ok: true }); emitAdminSnapshot();
+      } catch { return fail(acknowledge, 'No se pudo aplicar la medida a la cuenta.'); }
     });
 
     socket.on('admin:user:role', async (payload = {}, acknowledge = () => {}) => {
@@ -589,7 +818,7 @@ function createMuroServer(options = {}) {
     socket.on('disconnect', () => io.emit('users:count', io.engine.clientsCount));
   });
 
-  return { app, httpServer, io, users, sessions, walls, ready, storage };
+  return { app, httpServer, io, users, sessions, walls, invitations, reports, ready, storage };
 }
 
 if (require.main === module) {
@@ -598,4 +827,4 @@ if (require.main === module) {
   httpServer.listen(port, () => console.log(`Muro disponible en http://localhost:${port}`));
 }
 
-module.exports = { COLORS, cleanText, createMuroServer, safeCoordinate, validEmail };
+module.exports = { COLORS, cleanText, createMuroServer, invitationSecrets, safeCoordinate, sha256, validEmail };

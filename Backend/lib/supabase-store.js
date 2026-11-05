@@ -100,13 +100,23 @@ class SupabaseStore {
     return { users, walls };
   }
 
+  async ping() {
+    const { error } = await this.admin.from('muro_usuarios').select('id', { head: true, count: 'exact' });
+    throwIf(error, 'health_ping');
+    return true;
+  }
+
   async getUser(id) {
-    const [profileResult, settingsResult] = await Promise.all([
+    const [profileResult, settingsResult, authResult] = await Promise.all([
       this.admin.from('muro_usuarios').select('id,nombre,correo,rol,avatar,creado_en').eq('id', id).single(),
-      this.admin.from('muro_configuraciones_usuario').select('tema,confirmar_eliminacion,notas_compactas,notificaciones').eq('usuario_id', id).single()
+      this.admin.from('muro_configuraciones_usuario').select('tema,confirmar_eliminacion,notas_compactas,notificaciones').eq('usuario_id', id).single(),
+      this.admin.auth.admin.getUserById(id)
     ]);
     throwIf(profileResult.error, 'profile');
     throwIf(settingsResult.error, 'settings');
+    throwIf(authResult.error, 'auth_user');
+    const bannedUntil = authResult.data?.user?.banned_until;
+    if (bannedUntil && Date.parse(bannedUntil) > Date.now()) throw new Error('account_suspended');
     const profile = profileResult.data;
     const settings = settingsResult.data;
     return {
@@ -167,6 +177,15 @@ class SupabaseStore {
     throwIf(error, 'password_update');
   }
 
+  async changeEmail(user, currentPassword, newEmail) {
+    const { error: loginError } = await this.public.auth.signInWithPassword({ email: user.email, password: currentPassword });
+    throwIf(loginError, 'current_password');
+    const { error } = await this.admin.auth.admin.updateUserById(user.id, { email: newEmail, email_confirm: true });
+    throwIf(error, 'email_update');
+    const { error: profileError } = await this.admin.from('muro_usuarios').update({ correo: newEmail, actualizado_en: new Date().toISOString() }).eq('id', user.id);
+    throwIf(profileError, 'profile_email_update');
+  }
+
   async deleteUser(id) {
     const { error } = await this.admin.auth.admin.deleteUser(id);
     throwIf(error, 'user_delete');
@@ -199,8 +218,12 @@ class SupabaseStore {
   }
 
   async createWall(wall, accessToken) {
-    const { error } = await this.userClient(accessToken).from('muro_salas').insert(this.wallRow(wall));
+    const { data, error } = await this.userClient(accessToken).rpc('muro_crear_sala', {
+      nombre_nuevo: wall.name,
+      descripcion_nueva: wall.description
+    });
     throwIf(error, 'wall_create');
+    return data;
   }
 
   async updateWall(wall, accessToken) {
@@ -229,6 +252,122 @@ class SupabaseStore {
   async deleteMember(wallId, userId, accessToken) {
     const { error } = await this.userClient(accessToken).from('muro_sala_miembros').delete().eq('sala_id', wallId).eq('usuario_id', userId);
     throwIf(error, 'member_delete');
+  }
+
+  async createInvitation(invitation, accessToken) {
+    const { data, error } = await this.userClient(accessToken).rpc('muro_crear_invitacion_codigo', {
+      sala_objetivo: invitation.wallId, rol_objetivo: invitation.role,
+      token_hash_nuevo: invitation.tokenHash, codigo_hash_nuevo: invitation.codeHash,
+      vence_en_nuevo: new Date(invitation.expiresAt).toISOString()
+    });
+    throwIf(error, 'invitation_create'); return data;
+  }
+
+  async listInvitations(accessToken) {
+    const { data, error } = await this.userClient(accessToken).rpc('muro_listar_invitaciones');
+    throwIf(error, 'invitations_list'); return data || [];
+  }
+
+  async answerInvitation(secretHash, answer, accessToken) {
+    const { data, error } = await this.userClient(accessToken).rpc('muro_responder_invitacion', { secreto_hash: secretHash, respuesta: answer });
+    throwIf(error, 'invitation_answer'); return data;
+  }
+
+  async previewInvitation(secretHash, accessToken) {
+    const { data, error } = await this.userClient(accessToken).rpc('muro_inspeccionar_invitacion', { secreto_hash: secretHash });
+    throwIf(error, 'invitation_preview'); return data;
+  }
+
+  async cancelInvitation(id, accessToken) {
+    const { error } = await this.userClient(accessToken).rpc('muro_cancelar_invitacion', { invitacion_objetivo: id });
+    throwIf(error, 'invitation_cancel');
+  }
+
+  async resendInvitation(invitation, accessToken) {
+    const { data, error } = await this.userClient(accessToken).rpc('muro_reenviar_invitacion', {
+      invitacion_objetivo: invitation.id, token_hash_nuevo: invitation.tokenHash,
+      codigo_hash_nuevo: invitation.codeHash, vence_en_nuevo: new Date(invitation.expiresAt).toISOString()
+    });
+    throwIf(error, 'invitation_resend'); return data;
+  }
+
+  async createReport(report, accessToken) {
+    const { data, error } = await this.userClient(accessToken).rpc('muro_crear_reporte', {
+      motivo_nuevo: report.reason, detalle_nuevo: report.detail,
+      sala_objetivo: report.wallId || null, nota_objetivo: report.noteId || null
+    });
+    throwIf(error, 'report_create'); return data;
+  }
+
+  async listOwnReports(accessToken) {
+    const { data, error } = await this.userClient(accessToken).rpc('muro_mis_reportes');
+    throwIf(error, 'reports_list'); return data || [];
+  }
+
+  async listAdminReports(accessToken) {
+    const { data, error } = await this.userClient(accessToken).rpc('muro_reportes_administracion');
+    throwIf(error, 'admin_reports_list'); return data || [];
+  }
+
+  async reportUser(report, accessToken) {
+    const { data, error } = await this.userClient(accessToken).rpc('muro_reportar_usuario', {
+      usuario_objetivo: report.reportedUserId,
+      sala_objetivo: report.wallId,
+      motivo_nuevo: report.reason,
+      detalle_nuevo: report.detail
+    });
+    throwIf(error, 'user_report_create'); return data;
+  }
+
+  async listAdminUsers() {
+    const [profilesResult, authResult, sanctionsResult] = await Promise.all([
+      this.admin.from('muro_usuarios').select('id,nombre,correo,rol,avatar,creado_en'),
+      this.admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+      this.admin.from('muro_sanciones').select('usuario_id,tipo,mensaje,suspension_hasta,creado_en').order('creado_en', { ascending: false })
+    ]);
+    throwIf(profilesResult.error, 'admin_users');
+    throwIf(authResult.error, 'admin_auth_users');
+    throwIf(sanctionsResult.error, 'admin_sanctions');
+    const authUsers = new Map((authResult.data?.users || []).map((user) => [user.id, user]));
+    const sanctions = sanctionsResult.data || [];
+    return (profilesResult.data || []).map((profile) => {
+      const authUser = authUsers.get(profile.id);
+      const userSanctions = sanctions.filter((item) => item.usuario_id === profile.id);
+      const bannedUntil = authUser?.banned_until || null;
+      return {
+        id: profile.id,
+        name: profile.nombre,
+        email: profile.correo,
+        role: profile.rol,
+        avatar: profile.avatar || '',
+        createdAt: Date.parse(profile.creado_en),
+        status: bannedUntil && Date.parse(bannedUntil) > Date.now() ? 'suspendido' : 'activo',
+        bannedUntil: bannedUntil ? Date.parse(bannedUntil) : null,
+        sanctions: userSanctions.map((item) => ({ type: item.tipo, message: item.mensaje, suspendedUntil: item.suspension_hasta ? Date.parse(item.suspension_hasta) : null, createdAt: Date.parse(item.creado_en) }))
+      };
+    });
+  }
+
+  async disciplineUser({ userId, reportId, action, message, adminId }) {
+    const duration = action === 'suspender_24h' ? '24h' : action === 'suspender_7d' ? '168h' : null;
+    const type = action === 'advertir' ? 'advertencia' : duration ? 'suspension' : action === 'reactivar' ? 'reactivacion' : 'eliminacion';
+    const suspendedUntil = duration ? new Date(Date.now() + (action === 'suspender_24h' ? 24 : 168) * 60 * 60 * 1000).toISOString() : null;
+    if (duration) { const { error } = await this.admin.auth.admin.updateUserById(userId, { ban_duration: duration }); throwIf(error, 'user_suspend'); }
+    else if (action === 'reactivar') { const { error } = await this.admin.auth.admin.updateUserById(userId, { ban_duration: 'none' }); throwIf(error, 'user_reactivate'); }
+    const { error: sanctionError } = await this.admin.from('muro_sanciones').insert({ usuario_id: userId, reporte_id: reportId || null, tipo: type, mensaje: message, suspension_hasta: suspendedUntil, creado_por: adminId });
+    throwIf(sanctionError, 'sanction_create');
+    if (action === 'eliminar') { const { error } = await this.admin.auth.admin.deleteUser(userId); throwIf(error, 'user_delete'); }
+    return { type, suspendedUntil: suspendedUntil ? Date.parse(suspendedUntil) : null };
+  }
+
+  async takeReport(id, accessToken) {
+    const { error } = await this.userClient(accessToken).rpc('muro_tomar_reporte', { reporte_objetivo: id });
+    throwIf(error, 'report_take');
+  }
+
+  async answerReport(id, status, answer, accessToken) {
+    const { data, error } = await this.userClient(accessToken).rpc('muro_responder_reporte', { reporte_objetivo: id, estado_nuevo: status, respuesta_nueva: answer });
+    throwIf(error, 'report_answer'); return data;
   }
 
   noteRow(wallId, note) {

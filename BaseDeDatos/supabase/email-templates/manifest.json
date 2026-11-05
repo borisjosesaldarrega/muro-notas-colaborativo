@@ -1,0 +1,41 @@
+{
+  "confirmation": {
+    "subject": "Confirma tu cuenta en Muro Colaborativo"
+  },
+  "invite": {
+    "subject": "Te invitaron a Muro Colaborativo"
+  },
+  "magic_link": {
+    "subject": "Tu acceso seguro a Muro Colaborativo"
+  },
+  "recovery": {
+    "subject": "Restablece tu contraseña de Muro Colaborativo"
+  },
+  "email_change": {
+    "subject": "Confirma tu nuevo correo en Muro Colaborativo"
+  },
+  "reauthentication": {
+    "subject": "{{ .Token }} es tu código de verificación"
+  },
+  "password_changed_notification": {
+    "subject": "Tu contraseña fue actualizada"
+  },
+  "email_changed_notification": {
+    "subject": "El correo de tu cuenta fue actualizado"
+  },
+  "phone_changed_notification": {
+    "subject": "El teléfono de tu cuenta fue actualizado"
+  },
+  "identity_linked_notification": {
+    "subject": "Se vinculó un nuevo método de inicio de sesión"
+  },
+  "identity_unlinked_notification": {
+    "subject": "Se eliminó un método de inicio de sesión"
+  },
+  "mfa_factor_enrolled_notification": {
+    "subject": "Se añadió un método de verificación"
+  },
+  "mfa_factor_unenrolled_notification": {
+    "subject": "Se eliminó un método de verificación"
+  }
+}

@@ -37,9 +37,13 @@ after(async () => {
 });
 
 test('sirve la aplicación y un estado de salud', async () => {
-  const page = await fetch(baseUrl).then((response) => response.text());
+  const pageResponse = await fetch(baseUrl);
+  const page = await pageResponse.text();
   const health = await fetch(`${baseUrl}/api/health`).then((response) => response.json());
   assert.match(page, /Muro/);
+  assert.equal(pageResponse.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(pageResponse.headers.get('x-frame-options'), 'DENY');
+  assert.match(pageResponse.headers.get('content-security-policy'), /frame-ancestors 'none'/);
   assert.equal(health.ok, true);
   assert.equal(health.notes, 1);
   assert.equal(health.walls, 1);
@@ -63,6 +67,27 @@ test('registra, restaura y valida cuentas y roles en el servidor', async () => {
   const restore = await ack(restored, 'auth:restore', { token: first.token });
   assert.equal(restore.ok, true);
   assert.equal(restore.user.id, first.user.id);
+});
+
+test('actualiza el correo solo después de verificar la contraseña actual', async () => {
+  const socket = await connect();
+  const registered = await ack(socket, 'auth:register', {
+    name: 'Cuenta Configuración',
+    email: 'configuracion@example.com',
+    password: 'clave789',
+    passwordConfirmation: 'clave789'
+  });
+  assert.equal(registered.ok, true);
+
+  const rejected = await ack(socket, 'auth:email', { email: 'nuevo@example.com', currentPassword: 'incorrecta' });
+  assert.equal(rejected.ok, false);
+
+  const changed = await ack(socket, 'auth:email', { email: 'nuevo@example.com', currentPassword: 'clave789' });
+  assert.deepEqual(changed, { ok: true, email: 'nuevo@example.com' });
+
+  const login = await ack(await connect(), 'auth:login', { email: 'nuevo@example.com', password: 'clave789' });
+  assert.equal(login.ok, true);
+  assert.equal(login.user.email, 'nuevo@example.com');
 });
 
 test('sincroniza el ciclo de vida de notas entre clientes', async () => {
@@ -89,6 +114,12 @@ test('sincroniza el ciclo de vida de notas entre clientes', async () => {
   assert.equal(moved.x, 0);
   assert.equal(moved.y, 4000);
 
+  const previewEvent = once(member, 'note:preview-moved');
+  admin.emit('note:preview-move', { id: created.note.id, x: 640, y: 420 });
+  const preview = await previewEvent;
+  assert.equal(preview.x, 640);
+  assert.equal(preview.y, 420);
+
   const deletedEvent = once(member, 'note:deleted');
   assert.equal((await ack(admin, 'note:delete', { id: created.note.id })).ok, true);
   assert.equal((await deletedEvent).id, created.note.id);
@@ -104,14 +135,23 @@ test('persiste perfil, tema y preferencias del usuario en el servidor', async ()
   assert.equal(login.user.settings.theme, 'dark');
 });
 
-test('crea muros, invita miembros y aplica permisos de lectura', async () => {
+test('crea un código de sala reutilizable y agrega cada membresía al unirse', async () => {
   const admin = clients[0];
   const member = clients[1];
   const created = await ack(admin, 'wall:create', { name: 'Sprint web', description: 'Ideas del equipo' });
   assert.equal(created.wall.role, 'propietario');
   const wallId = created.wall.id;
-  const invited = await ack(admin, 'wall:invite', { wallId, email: 'brenda@example.com', role: 'lector' });
-  assert.equal(invited.members.find((item) => item.email === 'brenda@example.com').roleInWall, 'lector');
+  const invited = await ack(admin, 'wall:invite', { wallId, role: 'lector' });
+  assert.equal(invited.invitation.status, 'pendiente');
+  assert.match(invited.code, /^[A-Z0-9]{8}$/);
+  assert.equal((await ack(member, 'wall:select', { id: wallId })).ok, false);
+  const accepted = await ack(member, 'invitation:answer', { secret: invited.code, answer: 'aceptar' });
+  assert.equal(accepted.status, 'aceptada');
+  assert.equal((await ack(member, 'invitation:answer', { secret: invited.code, answer: 'aceptar' })).ok, false);
+  const secondMember = await connect();
+  await ack(secondMember, 'auth:register', { name: 'Carla Invitada', email: 'carla@example.com', password: 'clave789', passwordConfirmation: 'clave789' });
+  assert.equal((await ack(secondMember, 'invitation:answer', { secret: invited.code.toLowerCase() })).status, 'aceptada');
+  assert.equal((await ack(secondMember, 'wall:select', { id: wallId })).wall.role, 'lector');
   assert.equal((await ack(member, 'wall:select', { id: wallId })).wall.role, 'lector');
   assert.equal((await ack(member, 'note:create', { texto: 'No permitido', color: 'verde' })).ok, false);
 
@@ -120,6 +160,34 @@ test('crea muros, invita miembros y aplica permisos de lectura', async () => {
   assert.equal((await ack(member, 'wall:select', { id: wallId })).wall.role, 'editor');
   assert.equal((await ack(member, 'note:create', { texto: 'Ahora sí', color: 'verde' })).ok, true);
   assert.equal((await ack(admin, 'wall:update', { id: wallId, name: 'Sprint actualizado', description: '' })).wall.name, 'Sprint actualizado');
+});
+
+test('mantiene reportes privados y permite que el superadmin responda al mismo autor', async () => {
+  const admin = clients[0]; const member = clients[1];
+  const created = await ack(member, 'report:create', { reason: 'fallo_aplicacion', detail: 'La pantalla no carga correctamente.' });
+  assert.equal(created.report.status, 'pendiente');
+  assert.equal(server.reports[0].reporterId, server.users.find((user) => user.email === 'brenda@example.com').id);
+  const own = await ack(member, 'reports:list'); assert.equal(own.reports.length, 1);
+  const adminList = await ack(admin, 'admin:reports:list'); assert.equal(adminList.reports.length, 1); assert.equal(adminList.reports[0].wallName, undefined);
+  assert.equal((await ack(admin, 'admin:report:take', { id: created.report.id })).ok, true);
+  assert.equal((await ack(admin, 'admin:report:respond', { id: created.report.id, status: 'resuelto', decision: 'Se corrigió la carga.' })).ok, true);
+  const answered = await ack(member, 'reports:list'); assert.equal(answered.reports[0].decision, 'Se corrigió la carga.');
+  const outsider = await connect();
+  await ack(outsider, 'auth:register', { name: 'Persona externa', email: 'externa@example.com', password: 'clave999', passwordConfirmation: 'clave999' });
+  assert.equal((await ack(outsider, 'reports:list')).reports.length, 0);
+});
+
+test('reporta a una cuenta compartida y reserva las sanciones al superadmin', async () => {
+  const admin = clients[0]; const member = clients[1];
+  const wall = server.walls.find((item) => item.name === 'Sprint actualizado');
+  const adminId = server.users.find((user) => user.email === 'saldavargasboris@gmail.com').id;
+  const memberId = server.users.find((user) => user.email === 'brenda@example.com').id;
+  const report = await ack(member, 'report:user:create', { wallId: wall.id, userId: adminId, reason: 'acoso', detail: 'Mensajes insistentes dentro del grupo compartido.' });
+  assert.equal(report.ok, true);
+  const listed = await ack(admin, 'admin:reports:list');
+  assert.equal(listed.reports.find((item) => item.id === report.report.id).reportedUserId, adminId);
+  assert.equal((await ack(member, 'admin:user:discipline', { userId: adminId, action: 'advertir', message: 'No permitido.' })).ok, false);
+  assert.equal((await ack(admin, 'admin:user:discipline', { userId: memberId, action: 'advertir', message: 'Evita repetir esta conducta.' })).ok, true);
 });
 
 test('rechaza roles simulados en el navegador y autoriza solo al superadmin real', async () => {
@@ -132,7 +200,7 @@ test('rechaza roles simulados en el navegador y autoriza solo al superadmin real
 
   const snapshot = await ack(admin, 'admin:snapshot');
   assert.equal(snapshot.ok, true);
-  assert.equal(snapshot.users.length, 2);
+  assert.ok(snapshot.users.length >= 2);
   assert.equal(snapshot.walls.length, 2);
   const memberId = snapshot.users.find((user) => user.email === 'brenda@example.com').id;
   const ownerId = snapshot.users.find((user) => user.email === 'saldavargasboris@gmail.com').id;
@@ -143,17 +211,22 @@ test('rechaza roles simulados en el navegador y autoriza solo al superadmin real
   assert.equal(cleared.removed, 1);
 });
 
-test('el superadmin no puede ver ni modificar muros privados ajenos', async () => {
+test('bloquea un IDOR aunque el atacante tenga rol global de superadmin', async () => {
   const admin = clients[0];
   const member = clients[1];
-  const privateWall = await ack(member, 'wall:create', { name: 'Privado de Brenda', description: 'Solo para sus integrantes' });
+  const privateWall = await ack(member, 'wall:create', { name: 'Privado de Brenda', description: 'Solo invitadas' });
   assert.equal(privateWall.ok, true);
 
-  const listed = await ack(admin, 'walls:list');
-  assert.equal(listed.walls.some((wall) => wall.id === privateWall.wall.id), false);
-  assert.equal((await ack(admin, 'wall:select', { id: privateWall.wall.id })).ok, false);
-  assert.equal((await ack(admin, 'admin:clear', { wallId: privateWall.wall.id })).ok, false);
+  const guessedId = privateWall.wall.id;
+  const readAttempt = await ack(admin, 'wall:select', { id: guessedId });
+  const updateAttempt = await ack(admin, 'wall:update', { id: guessedId, name: 'Tomado', description: '' });
+  const deleteAttempt = await ack(admin, 'wall:delete', { id: guessedId });
 
-  const snapshot = await ack(admin, 'admin:snapshot');
-  assert.equal(snapshot.walls.some((wall) => wall.id === privateWall.wall.id), false);
+  assert.equal(readAttempt.ok, false);
+  assert.match(readAttempt.error, /No tienes acceso/);
+  assert.equal(updateAttempt.ok, false);
+  assert.match(updateAttempt.error, /propietaria/);
+  assert.equal(deleteAttempt.ok, false);
+  assert.match(deleteAttempt.error, /propietaria/);
+  assert.equal(server.walls.find((wall) => wall.id === guessedId).name, 'Privado de Brenda');
 });

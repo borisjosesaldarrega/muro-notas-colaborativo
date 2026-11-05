@@ -1,0 +1,26 @@
+name: Publicar cambios del Frontend en Render
+
+on:
+  push:
+    branches:
+      - agent/completar-muro-colaborativo
+    paths:
+      - 'Frontend/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Solicitar despliegue a Render
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$RENDER_DEPLOY_HOOK_URL"
+          curl --fail --show-error --silent --request POST "$RENDER_DEPLOY_HOOK_URL"

@@ -1,66 +1,45 @@
 # Backend del Muro Colaborativo
 
-Este backend reemplaza la demostración que guardaba todo en memoria. Mantiene un modo local para pruebas, pero cuando las variables de Supabase están configuradas utiliza Auth, políticas RLS y las tablas del proyecto.
+Este backend reemplaza la demostración que guardaba todo en memoria. Mantiene un modo local para pruebas, pero cuando las variables de Supabase están configuradas utiliza Auth, políticas RLS y las tablas del proyecto. Boris completó esta área después de integrar el trabajo visual de Pierina para que la misma implementación exista en la raíz y en `Backend/`.
 
 ## Funciones implementadas
 
 - Registro, inicio, restauración y cierre de sesión.
-- Recuperación y cambio de contraseña.
-- Perfil y preferencias del usuario.
+- Recuperación y cambio de contraseña con verificación de la clave actual.
+- Perfil, cambio seguro de correo y preferencias de apariencia del usuario.
 - Creación, edición, selección y eliminación de muros.
 - Gestión de integrantes y permisos: propietario, editor y lector.
-- Creación, edición, movimiento y eliminación de notas en tiempo real.
-- Panel y operaciones protegidas para el superadministrador.
+- Creación, edición, movimiento fluido y eliminación de notas en tiempo real sobre un lienzo común para PC y móvil.
+- Panel protegido de ayuda y moderación: usuarios, reportes y medidas sobre cuentas.
 - Privacidad de muros: ser superadministrador no concede acceso automático a muros ajenos.
 - Persistencia en Supabase con modo en memoria para pruebas locales.
+- Creación atómica de sala y membresía propietaria mediante la RPC `muro_crear_sala`.
+- Un código activo por sala, alfanumérico, con hash SHA-256 y vencimiento; varias cuentas pueden usarlo para unirse.
+- Alta de miembros únicamente después de usar un código válido de 8 caracteres; no se solicita correo del invitado.
+- Reportes privados asociados a la cuenta reportada, recepción del superadmin, historial y medidas de advertencia, suspensión, reactivación o eliminación.
 
 ## Ejecutar
 
 ```bash
-npm install
+npm ci
 npm start
+npm run check
 ```
 
 El servidor utiliza el frontend ubicado en `../Frontend`.
 
 Para activar Supabase, copia `.env.example` como `.env` y completa las variables en tu entorno local. Nunca subas el archivo `.env` ni claves privadas.
 
-## Pendiente para Steven: invitaciones y reportes
+## Cierre de invitaciones y reportes
 
-Responsable propuesto: **Steven León — @stevenleonb2**
+La persona propietaria genera el código desde la interfaz y decide el rol. Quien quiera unirse escribe el código en la pestaña **Unirse**; la vista previa muestra el muro y quién generó la invitación. Un código inexistente, vencido o ya utilizado responde `Sala no encontrada` y no crea membresías.
 
-### 1. Validación de invitaciones
+Responsable de implementación y corrección: **Boris Salda Vargas**.
 
-El evento `wall:invite` actualmente agrega directamente a una cuenta registrada. Falta convertirlo en un flujo de invitación verificable:
+La entrega anterior había dejado estos dos módulos como pendientes. Boris terminó el contrato del backend y su interfaz: la persona propietaria genera el código, Supabase conserva únicamente el hash y cada cuenta que lo utiliza recibe su propia membresía. Al generar uno nuevo se cancela el anterior; también se controlan vencimiento, duplicados y permisos.
 
-1. Definir si la invitación se aceptará mediante enlace, código o ambos.
-2. Generar un token o código aleatorio, de un solo uso y con fecha de expiración.
-3. Guardar solamente el hash del token o código.
-4. Crear los eventos para enviar, consultar, aceptar, rechazar, reenviar y cancelar invitaciones.
-5. Agregar al usuario a `muro_sala_miembros` únicamente después de validar la invitación.
-6. Impedir que un lector invite personas o modifique permisos.
-7. Rechazar invitaciones vencidas, usadas, canceladas o dirigidas a otro usuario.
-8. Evitar invitaciones duplicadas para la misma sala y el mismo correo.
-9. Añadir pruebas automáticas del flujo correcto y de los casos de error.
-10. Documentar los eventos y las respuestas que consumirá el frontend.
+En reportes, el autor sale siempre de la sesión y la cuenta denunciada debe compartir el mismo muro. Cada persona ve únicamente sus solicitudes; el superadmin recibe, toma y responde sin obtener por ello acceso al contenido de muros privados. Desde el directorio puede revisar el historial y aplicar una medida proporcionada. Las pruebas cubren el recorrido correcto y los intentos no autorizados.
 
-La integración con correo puede conectarse después; la validación del backend no debe depender de que el correo ya esté configurado.
+La propuesta visual de Pierina se conectó a estos eventos y Boris corrigió los problemas de presentación, modales, notas, responsividad y movimiento compartido. La misma versión se publica desde la raíz y queda reflejada en `Backend/`, `Frontend/` y `BaseDeDatos/` para la revisión por áreas.
 
-### 2. Flujo de reportes y respuestas
-
-Las migraciones ya contemplan la tabla de reportes, pero falta terminar su API y su comunicación en tiempo real:
-
-1. Permitir que un usuario autenticado cree un reporte con categoría, motivo y descripción validados.
-2. Guardar cada reporte en Supabase con estado `pendiente`, autor y fecha.
-3. Enviar el nuevo reporte en tiempo real únicamente a las cuentas superadministradoras.
-4. Permitir que solo un superadministrador consulte, tome, revise y responda reportes.
-5. Guardar quién revisó el reporte, la respuesta, la decisión y la fecha de revisión.
-6. Manejar estados definidos: `pendiente`, `en_revision`, `resuelto` y `rechazado`.
-7. Enviar la respuesta en tiempo real únicamente al usuario que creó el reporte.
-8. Permitir que cada usuario consulte solo sus propios reportes y respuestas.
-9. Evitar que el identificador enviado por el navegador suplante al autor; el autor debe salir de la sesión autenticada.
-10. No mostrar el contenido de muros privados al superadministrador por el solo hecho de recibir un reporte.
-11. Validar longitudes, estados y transiciones para impedir respuestas vacías o cambios inválidos.
-12. Añadir pruebas de creación, recepción, autorización, respuesta y privacidad.
-
-Se considera terminado cuando las pruebas demuestren el recorrido completo: usuario crea el reporte, superadministrador lo recibe y responde, y el mismo usuario recibe la respuesta.
+La configuración de cuenta conserva la sesión al recargar, permite elegir tema del sistema, claro u oscuro, y verifica la contraseña actual antes de cambiar correo o clave. Cuando Supabase confirma el nuevo correo, el trigger versionado mantiene el perfil público sincronizado.

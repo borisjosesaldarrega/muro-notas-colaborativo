@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#6d4aff">
   <title>Muro Colaborativo</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <!-- VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO / RECUPERACIÓN) -->
-  <main id="authView" class="auth-shell">
+  <!-- VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO / VERIFICACIÓN / CONFIRMACIÓN / RECUPERACIÓN) -->
+  <main id="authView" class="auth-shell hidden">
     <section class="auth-brand">
       <div class="brand-mark" title="Muro Colaborativo">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg>
@@ -28,31 +29,85 @@
     </section>
 
     <section class="auth-panel">
-      <form id="loginForm" class="auth-card">
-        <div class="mobile-logo">
-          <span class="brand-mark">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg>
-          </span> Muro
-        </div>
+      <!-- 1. LOGIN -->
+      <form id="loginForm" class="auth-card" novalidate>
+        <div class="mobile-logo"><span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span> Muro</div>
         <p class="eyebrow">Bienvenido de nuevo</p>
         <h2>Inicia sesión</h2>
         <p class="muted">Entra y continúa construyendo grandes ideas.</p>
-        <label>Correo electrónico<input id="loginEmail" type="email" placeholder="nombre@correo.com" required></label>
-        <label>Contraseña<input id="loginPassword" type="password" minlength="4" placeholder="••••••••" required></label>
+        <label>Correo electrónico
+          <input id="loginEmail" type="email" placeholder="nombre@correo.com" required autocomplete="email">
+          <span id="loginEmailError" class="field-error"></span>
+        </label>
+        <label>Contraseña
+          <input id="loginPassword" type="password" minlength="4" placeholder="••••••••" required autocomplete="current-password">
+          <span id="loginPasswordError" class="field-error"></span>
+        </label>
         <button class="link-button" type="button" data-view="recover">¿Olvidaste tu contraseña?</button>
         <button class="primary-button" type="submit">Ingresar al muro</button>
         <p class="switch-text">¿No tienes cuenta? <button type="button" data-view="register">Regístrate</button></p>
       </form>
 
-      <form id="registerForm" class="auth-card hidden">
-        <p class="eyebrow">Crea tu espacio</p><h2>Regístrate</h2>
-        <label>Nombre<input id="registerName" maxlength="40" required></label>
-        <label>Correo electrónico<input id="registerEmail" type="email" required></label>
-        <label>Contraseña<input id="registerPassword" type="password" minlength="4" required></label>
-        <button class="primary-button" type="submit">Crear cuenta</button>
+      <!-- 2. REGISTRO (PASO 1) -->
+      <form id="registerForm" class="auth-card hidden" novalidate>
+        <p class="eyebrow">Paso 1 de 3 · Registro</p>
+        <h2>Crea tu cuenta</h2>
+        <p class="muted">Tu cuenta se registra de forma segura en el backend.</p>
+        <label>Nombre y Apellido
+          <input id="registerName" maxlength="40" placeholder="Ej: Pierina Medranda" required autocomplete="name">
+          <span id="registerNameError" class="field-error"></span>
+        </label>
+        <label>Correo electrónico
+          <input id="registerEmail" type="email" placeholder="nombre@correo.com" required autocomplete="email">
+          <span id="registerEmailError" class="field-error"></span>
+        </label>
+        <label>Contraseña
+          <input id="registerPassword" type="password" minlength="4" maxlength="128" placeholder="Mínimo 4 caracteres" required autocomplete="new-password">
+          <span id="registerPasswordError" class="field-error"></span>
+        </label>
+        <label>Confirmar Contraseña
+          <input id="registerConfirmPassword" type="password" minlength="4" maxlength="128" placeholder="Repite tu contraseña" required autocomplete="new-password">
+          <span id="registerConfirmError" class="field-error"></span>
+        </label>
+        <button class="primary-button" type="submit">Continuar a Verificación</button>
         <p class="switch-text">¿Ya tienes cuenta? <button type="button" data-view="login">Inicia sesión</button></p>
       </form>
 
+      <!-- 3. VERIFICAR CÓDIGO (PASO 2) -->
+      <form id="verifyForm" class="auth-card hidden">
+        <p class="eyebrow">Paso 2 de 3 · Verificación</p>
+        <h2>Revisa tu correo</h2>
+        <p class="muted">Ingresa el código de 6 dígitos que enviamos a <strong id="verifyEmailTarget" style="color:var(--ink);">tu correo</strong>.</p>
+
+        <div class="code-inputs-group">
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required autofocus>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
+        </div>
+
+        <div class="resend-block">
+          <span id="countdownText" class="muted">Reenviar código en <b id="countdownTimer">00:45</b></span>
+          <button id="resendCodeBtn" type="button" class="link-button" style="display:none; float:none;">Reenviar nuevo código</button>
+        </div>
+
+        <button class="primary-button" type="submit">Verificar código</button>
+        <p class="switch-text"><button type="button" data-view="register">← Volver al registro</button></p>
+      </form>
+
+      <!-- 4. CONFIRMACIÓN EXITOSA (PASO 3) -->
+      <form id="confirmForm" class="auth-card hidden text-center">
+        <div class="confirm-circle">✓</div>
+        <p class="eyebrow">Paso 3 de 3 · Cuenta Activada</p>
+        <h2>¡Todo listo!</h2>
+        <p class="muted">Tu cuenta ha sido verificada correctamente. Ya puedes ingresar y comenzar a colaborar en los muros.</p>
+        <button id="enterAfterConfirmBtn" class="primary-button" type="button">Ingresar al Muro</button>
+        <p class="switch-text"><button type="button" data-view="login">Volver al inicio de sesión</button></p>
+      </form>
+
+      <!-- 5. RECUPERAR CONTRASEÑA -->
       <form id="recoverForm" class="auth-card hidden">
         <p class="eyebrow">Recupera tu acceso</p><h2>Restablecer contraseña</h2>
         <p class="muted">Ingresa tu correo para recibir un enlace de recuperación.</p>
@@ -66,17 +121,10 @@
   <!-- VISTA 2: DASHBOARD DE MIS MUROS / SALAS (CARA DE USUARIO) -->
   <main id="wallsView" class="walls-shell hidden">
     <header class="topbar">
-      <a class="app-brand" href="#">
-        <span class="brand-mark">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg>
-        </span>
-        <span>Muro</span>
-      </a>
+      <a class="app-brand" href="#"><span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span><span>Muro</span></a>
       <div class="board-name"><small>Espacio de trabajo</small><strong>Mis Muros y Salas</strong></div>
       <div class="top-actions">
-        <button id="joinWallBtn" class="btn-join-code">🔑 Unirse a una Sala</button>
         <button id="createWallBtn" class="primary-button compact">＋ Crear Muro</button>
-        <button id="wallsAdminButton" class="icon-button hidden" title="Panel Superadministrador">⚙</button>
         <button id="wallsProfileBtn" class="avatar" title="Perfil">P</button>
       </div>
     </header>
@@ -85,6 +133,11 @@
         <h2>Selecciona un Muro Colaborativo</h2>
         <p class="muted">Entra a una sala para colaborar en tiempo real o crea un nuevo muro para tu proyecto.</p>
       </div>
+      <form id="acceptInvitationForm" class="invitation-accept-bar">
+        <div><strong>¿Recibiste una invitación?</strong><small>Usa el código de 8 letras y números o abre el enlace compartido.</small><small id="acceptInvitationPreview" class="muted"></small></div>
+        <input id="acceptInvitationCode" maxlength="128" autocomplete="off" placeholder="Ej. A7K9M2QX" required>
+        <button class="btn-join-code" type="submit"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 7a5 5 0 1 0-3.8 4.85L12 13.65V16h2v2h2v2h3v-3.35l-5.2-5.2A5 5 0 0 0 14 7Zm-7 2a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>Unirse</button>
+      </form>
       <div id="wallsGrid" class="walls-grid">
         <!-- Tarjetas dinámicas de salas -->
       </div>
@@ -93,33 +146,240 @@
 
   <!-- VISTA 3: LIENZO Y TABLERO DEL MURO ACTIVO (CARA DE USUARIO) -->
   <main id="appView" class="app-shell hidden">
-    <header class="topbar">
-      <button id="backToWallsButton" class="secondary-button compact" title="Volver a la lista de salas">← Mis Muros</button>
-      <div class="board-name">
-        <small>Muro activo</small>
-        <strong id="currentWallTitle">Muro de ideas</strong>
-      </div>
-      <div class="top-actions">
-        <button id="inviteButton" class="btn-invite-room" title="Invitar y compartir enlace">👥 Invitar al Muro</button>
-        <button id="deleteWallBtn" class="danger-button compact hidden" title="Eliminar este muro">🗑️ Eliminar Sala</button>
-        <span class="presence"><i></i><b id="onlineCount">1</b> en esta sala</span>
-        <!-- Botón superadmin oculto por defecto para usuarios normales -->
-        <button id="adminButton" class="icon-button hidden" title="Panel Superadministrador">⚙</button>
+    <header class="topbar board-topbar">
+      <button id="backToWallsButton" class="board-brand" title="Volver a Mis Muros" aria-label="Volver a Mis Muros">
+        <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span>
+        <span class="board-brand-copy"><strong>Muro</strong><small>Ideas que se mueven juntas</small></span>
+      </button>
+      <span class="presence board-presence"><i></i><span id="connectionStatus">Conectado</span> · <b id="onlineCount">1</b> <span class="presence-label">personas</span></span>
+      <div class="top-actions board-actions">
+        <button id="inviteButton" class="board-action share-action" title="Invitar personas mediante código">Invitar</button>
+        <button id="deleteWallBtn" class="board-action delete-action hidden" title="Eliminar este muro" aria-label="Eliminar este muro">Eliminar</button>
+        <button id="newNoteButton" class="board-action new-note-action">＋ Nueva nota</button>
         <button id="profileButton" class="avatar" title="Perfil">P</button>
       </div>
     </header>
-    <section class="toolbar">
-      <button id="newNoteButton" class="primary-button compact">＋ Nueva nota</button>
-      <div class="color-filter" aria-label="Filtrar por color">
-        <button class="swatch active" data-filter="all" title="Todos"></button>
+    <section class="toolbar board-toolbar">
+      <div class="board-heading">
+        <h1 id="currentWallTitle">Muro de ideas</h1>
+        <p>Arrastra las notas, escribe y construyamos algo genial.</p>
+      </div>
+      <div class="board-tools">
+        <div class="color-filter" aria-label="Filtrar por color">
+        <button class="swatch all-colors active" data-filter="all" title="Todos los colores"><span>Todos los colores</span></button>
         <button class="swatch yellow" data-filter="amarillo"></button>
         <button class="swatch pink" data-filter="rosa"></button>
         <button class="swatch blue" data-filter="azul"></button>
         <button class="swatch green" data-filter="verde"></button>
+        </div>
+        <div class="board-zoom" aria-label="Zoom del muro">
+          <button type="button" data-board-zoom="out" title="Alejar">−</button>
+          <span id="boardZoomLabel">100%</span>
+          <button type="button" data-board-zoom="in" title="Acercar">＋</button>
+          <button class="fit-board" type="button" data-board-zoom="fit" title="Ver todo">Ver todo</button>
+        </div>
       </div>
-      <span id="connectionStatus" class="status">Sincronizado</span>
     </section>
-    <section id="board" class="board" aria-label="Muro colaborativo"></section>
+    <section id="board" class="board" aria-label="Muro colaborativo">
+      <div id="boardStage" class="board-stage"><div id="boardSurface" class="board-surface"></div></div>
+      <p class="board-help">Doble clic en el tablero para crear una nota · Arrastra para mover</p>
+    </section>
+  </main>
+
+  <!-- VISTA 4: CENTRO PRIVADO DE AYUDA Y MODERACIÓN -->
+  <main id="adminView" class="admin-shell hidden">
+    <div class="admin-layout">
+      <!-- SIDEBAR LATERAL DE ADMINISTRACIÓN -->
+      <aside class="admin-sidebar">
+        <div class="admin-sidebar-header">
+          <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span>
+          <div>
+            <strong>Soporte Muro</strong>
+            <small class="admin-badge">AYUDA</small>
+          </div>
+        </div>
+
+        <nav class="admin-nav">
+          <button class="admin-nav-item active" data-admin-tab="resumen">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3v-9.5Z"/></svg> Resumen
+          </button>
+          <button class="admin-nav-item" data-admin-tab="usuarios">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8 13c-4.4 0-7 2.2-7 5v2h14v-2c0-2.8-2.6-5-7-5Zm8-.8c-.7 0-1.4.1-2 .2 2 1.2 3 3.1 3 5.6v2h6v-2c0-3.2-2.7-5.8-7-5.8Z"/></svg> Usuarios
+          </button>
+          <button class="admin-nav-item" data-admin-tab="reportes">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2h2v2h11l-2 4 2 4H7v10H5V2Zm2 4v4h7.8l-1-2 1-2H7Z"/></svg> Reportes
+            <span id="adminPendingBadge" class="nav-count-badge">0</span>
+          </button>
+        </nav>
+
+        <div class="admin-sidebar-tip">
+          <svg class="tip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.7 8 11 4.6-1.3 8-5.9 8-11V5l-8-3Zm0 3 5 1.9V11c0 3.5-2.1 6.8-5 8-2.9-1.2-5-4.5-5-8V6.9L12 5Zm-1 3v5h2V8h-2Zm0 7v2h2v-2h-2Z"/></svg>
+          <div><strong>Privacidad activa</strong><small>No se muestran notas ni muros privados.</small></div>
+        </div>
+
+        <div class="admin-sidebar-footer">
+          <div class="admin-user-info">
+            <div class="avatar" id="adminAvatar">AD</div>
+            <div>
+              <strong id="adminUserName">Superadministrador</strong>
+              <small class="muted" style="color:#b2acc9;">Ayuda y moderación</small>
+            </div>
+          </div>
+          <button id="adminExitBtn" class="secondary-button compact admin-exit"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5-7 7 7 7 1.4-1.4L6.8 13H21v-2H6.8l4.6-4.6L10 5Z"/></svg>Volver al muro</button>
+        </div>
+      </aside>
+
+      <!-- CONTENIDO PRINCIPAL DEL DASHBOARD ESPECTADOR -->
+      <section class="admin-main">
+        <header class="admin-topbar">
+          <div>
+            <h1 id="adminTabTitle">Centro de ayuda</h1>
+            <p class="muted" style="margin:4px 0 0; font-size:0.9rem;">Revisa reportes y ayuda a mantener una comunidad segura.</p>
+          </div>
+          <div class="spectator-indicator">
+            <span class="live-dot"></span>
+            <span>Soporte activo</span>
+          </div>
+        </header>
+
+        <!-- PESTAÑA 1: RESUMEN GENERAL -->
+        <div id="adminTabResumen" class="admin-tab-content">
+          <div class="admin-spectator-alert">
+            <svg class="alert-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-1 5h2v2h-2V7Zm0 4h2v6h-2v-6Z"/></svg>
+            <div>
+              <strong>Privacidad primero:</strong> este panel trabaja con cuentas y reportes. No abre muros ni muestra notas privadas de los equipos.
+            </div>
+          </div>
+
+          <!-- 4 Métricas Clave (Pág 20 del PDF) -->
+          <div class="admin-metrics-grid">
+            <article class="metric-card">
+              <span class="metric-icon purple"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8 13c-4.4 0-7 2.2-7 5v2h14v-2c0-2.8-2.6-5-7-5Zm8-.8c-.7 0-1.4.1-2 .2 2 1.2 3 3.1 3 5.6v2h6v-2c0-3.2-2.7-5.8-7-5.8Z"/></svg></span>
+              <div>
+                <small>Usuarios Registrados</small>
+                <strong id="metricUsersCount">1</strong>
+              </div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon yellow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5V3Zm9 2v3h3l-3-3ZM8 12h8v-2H8v2Zm0 4h8v-2H8v2Z"/></svg></span>
+              <div>
+                <small>Reportes Pendientes</small>
+                <strong id="metricReportsCount">0</strong>
+              </div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12v5h-2V5H7v14h8v-3h2v5H5V3Zm11 6 5 3-5 3v-2H9v-2h7V9Z"/></svg></span>
+              <div>
+                <small>Casos Resueltos</small>
+                <strong id="metricResolvedCount">0</strong>
+              </div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon red"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2h2v2h11l-2 4 2 4H7v10H5V2Zm2 4v4h7.8l-1-2 1-2H7Z"/></svg></span>
+              <div>
+                <small>Cuentas Suspendidas</small>
+                <strong id="metricSuspendedCount">0</strong>
+              </div>
+            </article>
+          </div>
+
+          <!-- Actividad Semanal de Notas & Moderación Pendiente -->
+          <div class="admin-grid-two">
+            <div class="admin-card">
+              <div class="admin-card-head"><h3>Cómo moderar</h3><small class="muted">Proceso claro y proporcional</small></div>
+              <ol class="support-steps">
+                <li>Lee el reporte y revisa a quién señala.</li>
+                <li>Consulta los reportes y sanciones de esa cuenta.</li>
+                <li>Advierte, suspende o elimina solo cuando corresponda.</li>
+              </ol>
+            </div>
+
+            <div class="admin-card">
+              <div class="admin-card-head">
+                <h3>Moderación Pendiente</h3>
+                <small class="muted">Reportes de usuarios</small>
+              </div>
+              <div id="adminRecentReports" class="admin-reports-list">
+                <!-- Cargado dinámicamente -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla de Usuarios Recientes -->
+          <div class="admin-card" style="margin-top:24px;">
+            <div class="admin-card-head">
+              <h3>Usuarios que requieren atención</h3>
+              <small class="muted">Historial de reportes y medidas</small>
+            </div>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Usuario</th>
+                    <th>Correo Electrónico</th>
+                    <th>Reportes recibidos</th>
+                    <th>Estado</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="adminRecentUsersTable">
+                  <!-- Cargado dinámicamente -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- PESTAÑA 4: USUARIOS -->
+        <div id="adminTabUsuarios" class="admin-tab-content hidden">
+          <div class="admin-card-head">
+            <h3>Directorio de Cuentas</h3>
+            <input id="adminUserSearch" type="search" placeholder="Buscar por nombre o correo..." style="max-width:320px; padding:10px 14px; border-radius:12px; border:1px solid var(--line);">
+          </div>
+          <div class="admin-table-wrap" style="margin-top:16px;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Correo Electrónico</th>
+                  <th>Reportes recibidos</th>
+                  <th>Última medida</th>
+                  <th>Estado</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody id="adminAllUsersTable">
+                <!-- Cargado dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PESTAÑA 5: REPORTES -->
+        <div id="adminTabReportes" class="admin-tab-content hidden">
+          <div class="admin-card-head">
+            <h3>Reportes de usuarios</h3>
+            <small class="muted">La persona reportada se revisa antes de aplicar una medida</small>
+          </div>
+          <div class="admin-table-wrap" style="margin-top:16px;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Reportó</th>
+                  <th>Usuario reportado</th>
+                  <th>Motivo y detalle</th>
+                  <th>Fecha</th>
+                  <th>Estado y acción</th>
+                </tr>
+              </thead>
+              <tbody id="adminAllReportsTable">
+                <!-- Cargado dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
 
   <!-- MODAL: CREAR NOTA -->
@@ -130,6 +390,7 @@
         <button class="close-button" value="cancel" type="button">&times;</button>
       </div>
       <label>Contenido<textarea id="noteText" maxlength="280" rows="5" placeholder="Escribe tu idea…" required></textarea></label>
+      <div id="characterCount" style="text-align:right; font-size:0.78rem; color:var(--muted); margin-top:4px; font-weight:600;">0 / 280</div>
       <fieldset>
         <legend>Color</legend>
         <div class="color-options">
@@ -143,24 +404,6 @@
       <div class="dialog-actions">
         <button value="cancel" class="secondary-button" type="button">Cancelar</button>
         <button id="saveNote" type="submit" class="primary-button">Publicar nota</button>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- MODAL: UNIRSE A SALA CON CÓDIGO -->
-  <dialog id="joinWallDialog">
-    <form id="joinWallForm">
-      <div class="dialog-head">
-        <div><p class="eyebrow">Acceso Rápido</p><h3>Unirse a una Sala</h3></div>
-        <button class="close-button" id="closeJoinWallModal" type="button">&times;</button>
-      </div>
-      <p class="muted">Ingresa el código o ID de la sala para acceder y colaborar:</p>
-      <label>Código o ID de la Sala
-        <input id="joinWallCodeInput" placeholder="Ej: general o ID del muro" required maxlength="100">
-      </label>
-      <div class="dialog-actions">
-        <button id="cancelJoinWallModal" type="button" class="secondary-button">Cancelar</button>
-        <button id="submitJoinWallBtn" type="submit" class="primary-button">Entrar a la Sala</button>
       </div>
     </form>
   </dialog>
@@ -185,62 +428,73 @@
   <dialog id="inviteDialog">
     <form id="inviteForm">
       <div class="dialog-head">
-        <div><p class="eyebrow">Colaboración</p><h3>Invitar a la Sala</h3></div>
+        <div><p class="eyebrow">Colaboración</p><h3>Invitar al muro</h3></div>
         <button class="close-button" id="closeInviteModal" type="button">&times;</button>
       </div>
 
-      <!-- Código de la Sala para compartir -->
-      <div style="background: #f5f3fa; padding: 14px 16px; border-radius: 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <small style="font-size: 0.72rem; font-weight: 800; color: var(--primary); letter-spacing: 0.1em; display: block; text-transform: uppercase;">Código de esta Sala</small>
-          <strong id="wallCodeText" style="font-family: monospace; font-size: 1.15rem; color: var(--ink);">general</strong>
-        </div>
-        <button id="copyWallCodeBtn" type="button" class="secondary-button compact">📋 Copiar Código</button>
-      </div>
-      
-      <!-- Bloque 1: Enlace directo a la sala (estilo Figma / Google Docs) -->
-      <div style="background: #f5f3fa; padding: 14px 16px; border-radius: 14px; margin-bottom: 18px;">
-        <label style="margin-top:0; font-weight:700; font-size:0.85rem; color: var(--ink);">🔗 Enlace directo a esta sala</label>
-        <div style="display:flex; gap:10px; margin-top:8px;">
-          <input id="shareLinkInput" type="text" readonly style="background:#fff; font-size:0.85rem; padding:10px;" />
-          <button id="copyShareLinkBtn" type="button" class="secondary-button compact" style="white-space:nowrap; padding:10px 14px;">📋 Copiar</button>
+      <!-- El código se genera en el servidor y se puede compartir por cualquier medio. -->
+      <div class="invite-code-card">
+        <label style="margin-top:0; font-weight:700; font-size:0.88rem; color: var(--ink);">Código de invitación</label>
+        <p class="invite-code-help">Genera un código y compártelo con todas las personas que quieras invitar.</p>
+        <div class="invite-code-row">
+          <input id="inviteCodeOutput" type="text" readonly aria-label="Código de invitación" placeholder="Genera un código" />
+          <input id="shareLinkInput" class="hidden" type="text" readonly />
+          <button id="copyShareLinkBtn" type="button" class="secondary-button compact" disabled><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V3h13v13h-4v5H3V7h5Zm2 0h7v7h2V5h-9v2Zm5 2H5v10h10V9Z"/></svg>Copiar código</button>
         </div>
       </div>
 
-      <!-- Bloque 2: Invitar por correo -->
-      <p class="muted" style="margin-bottom:10px; font-weight:600; font-size: 0.9rem;">O invita a un colaborador por correo electrónico:</p>
-      <label>Correo electrónico<input id="inviteEmailInput" type="email" placeholder="compañero@correo.com"></label>
-      <label>Rol de permisos
-        <select id="inviteRoleSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);">
-          <option value="editor">Editor (Puede crear, mover y editar notas)</option>
-          <option value="lector">Lector (Solo puede ver el muro)</option>
-        </select>
-      </label>
+      <!-- Bloque 2: permisos del código -->
+      <div id="inviteEmailSection">
+        <p class="muted" style="margin-bottom:10px; font-weight:600;">Quien use el código recibirá este permiso:</p>
+        <div id="inviteOwnerOnlyNotice" class="hidden" style="margin-bottom:12px; padding:10px 14px; background:#fffbeb; border:1px solid #fef3c7; border-radius:10px; font-size:0.83rem; color:#92400e;">
+          Solo la persona propietaria de esta sala puede invitar o cambiar permisos de miembros.
+        </div>
+        <label>Rol de permisos
+          <select id="inviteRoleSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);">
+            <option value="editor">Editor (Puede crear, mover y editar notas)</option>
+            <option value="lector">Lector (Solo puede ver el muro)</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- Bloque 3: Miembros actuales de la sala con sus roles del backend -->
+      <div id="wallMembersContainer" class="invite-members-list">
+        <div class="invite-members-title">
+          <span><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8 13c-4.4 0-7 2.2-7 5v2h14v-2c0-2.8-2.6-5-7-5Zm8-.8c-.7 0-1.4.1-2 .2 2 1.2 3 3.1 3 5.6v2h6v-2c0-3.2-2.7-5.8-7-5.8Z"/></svg>Miembros con acceso a este muro</span>
+          <small id="wallMembersCount" class="muted">1 miembro</small>
+        </div>
+        <div id="wallMembersList" style="max-height: 180px; overflow-y: auto;">
+          <!-- Lista dinámica de miembros reales del backend -->
+        </div>
+      </div>
+
       <div class="dialog-actions">
         <button id="cancelInviteModal" type="button" class="secondary-button">Cerrar</button>
-        <button id="sendInviteBtn" type="submit" class="primary-button">Enviar Invitación</button>
+        <button id="sendInviteBtn" type="submit" class="primary-button">Generar código</button>
       </div>
     </form>
   </dialog>
 
-  <!-- MODAL: REPORTAR CONTENIDO / ERROR EN LA APLICACIÓN -->
+  <!-- MODAL: REPORTAR USUARIO -->
   <dialog id="reportDialog">
     <form id="reportForm">
       <div class="dialog-head">
-        <div><p class="eyebrow">Soporte y Mejora</p><h3>Reportar sobre la Aplicación</h3></div>
+        <div><p class="eyebrow">Cuidado de la comunidad</p><h3>Reportar usuario</h3></div>
         <button class="close-button" id="closeReportModal" type="button">&times;</button>
       </div>
-      <p class="muted">Ayúdanos a mejorar reportando fallas, errores o sugerencias técnicas de la aplicación.</p>
-      <label>Tipo de problema en la aplicación
+      <p class="muted">Como en un grupo de mensajería, reporta la cuenta y explica qué ocurrió. El equipo de soporte revisará el caso.</p>
+      <div class="reported-user-card"><span class="cute-ball">✦</span><div><small>Vas a reportar a</small><strong id="reportedUserName">Usuario</strong></div></div>
+      <input id="reportedUserId" type="hidden">
+      <label>Motivo del reporte
         <select id="reportReasonSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);" required>
-          <option value="Error de sincronización">Error de sincronización o conexión</option>
-          <option value="Falla al cargar sala o notas">Falla al cargar la sala o las notas</option>
-          <option value="Problema visual o de diseño">Problema visual o de diseño en pantalla</option>
-          <option value="Error al invitar o unirse">Error al invitar o unirse a una sala</option>
-          <option value="Sugerencia de mejora">Sugerencia de mejora para la app</option>
+          <option value="contenido_ofensivo">Contenido ofensivo o inapropiado</option>
+          <option value="spam">Spam o mensajes repetidos</option>
+          <option value="enlace_inseguro">Enlace no seguro</option>
+          <option value="acoso">Acoso o comportamiento intimidante</option>
+          <option value="otro">Otro motivo</option>
         </select>
       </label>
-      <label>Detalle del problema<input id="reportDetailInput" placeholder="Describe brevemente qué sucedió..." maxlength="200" required></label>
+      <label>¿Qué ocurrió?<textarea id="reportDetailInput" placeholder="Describe el comportamiento para que soporte pueda revisarlo..." maxlength="1000" rows="4" required></textarea></label>
       <div class="dialog-actions">
         <button id="cancelReportModal" type="button" class="secondary-button">Cancelar</button>
         <button id="sendReportBtn" type="submit" class="danger-button" style="margin-top:0;">Enviar Reporte</button>
@@ -248,60 +502,93 @@
     </form>
   </dialog>
 
+  <dialog id="actionDialog" class="action-dialog">
+    <form method="dialog">
+      <div id="actionDialogIcon" class="action-dialog-icon">✨</div>
+      <h3 id="actionDialogTitle">Confirmar acción</h3>
+      <p id="actionDialogMessage" class="muted"></p>
+      <div class="dialog-actions"><button id="actionDialogCancel" type="button" class="secondary-button">Cancelar</button><button id="actionDialogAccept" type="button" class="primary-button">Confirmar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="moderationDialog">
+    <form id="moderationForm">
+      <div class="dialog-head"><div><p class="eyebrow">Ayuda y moderación</p><h3>Revisar cuenta</h3></div></div>
+      <div class="reported-user-card"><span class="cute-ball">✦</span><div><strong id="moderationUserName">Usuario</strong><small id="moderationUserEmail"></small></div></div>
+      <p id="moderationReportSummary" class="moderation-summary"></p>
+      <input id="moderationReportId" type="hidden">
+      <label>Medida
+        <select id="moderationAction" required>
+          <option value="advertir">Enviar advertencia</option>
+          <option value="suspender_24h">Suspender por 24 horas</option>
+          <option value="suspender_7d">Suspender por 7 días</option>
+          <option value="reactivar">Reactivar cuenta</option>
+          <option value="eliminar">Eliminar cuenta</option>
+        </select>
+      </label>
+      <label>Mensaje para el usuario<textarea id="moderationMessage" rows="4" maxlength="1000" placeholder="Explica la decisión y cómo puede corregir la situación." required></textarea></label>
+      <div class="dialog-actions"><button id="moderationCancel" type="button" class="secondary-button">Cancelar</button><button type="submit" class="primary-button">Aplicar medida</button></div>
+    </form>
+  </dialog>
+
   <!-- PANEL LATERAL DE PERFIL -->
   <aside id="sidePanel" class="side-panel" aria-hidden="true">
-    <button id="closePanel" class="close-button">&times;</button>
+    <button id="closePanel" class="close-button" aria-label="Cerrar panel">&times;</button>
     <div id="profilePanel">
-      <p class="eyebrow">Tu cuenta</p>
-      <h2 id="profileName">Usuario</h2>
-      <p id="profileEmail" class="muted"></p>
-      <button id="logoutButton" class="danger-button">Cerrar sesión</button>
-    </div>
-    <!-- Módulo de Superadmin: modo visual (salas y reportes de la app) -->
-    <div id="adminPanel" class="hidden">
-      <p class="eyebrow">Superadministrador (Modo Visual)</p>
-      <h2>Supervisión del Sistema</h2>
-      <p class="muted" style="font-size:0.86rem; margin-top:-4px;">Monitoreo de salas activas y reportes técnicos de la aplicación (solo lectura).</p>
-      <div class="stats">
-        <article><strong id="notesStat">0</strong><span>Notas en Sala</span></article>
-        <article><strong id="wallsStat">0</strong><span>Salas Creadas</span></article>
+      <div class="profile-hero">
+        <div id="profileAvatarLarge" class="profile-avatar-large">U</div>
+        <div><p class="eyebrow">Tu cuenta</p><h2 id="profileName">Usuario</h2><p id="profileEmail" class="muted"></p></div>
+      </div>
+      <div id="profileRoleBadge" class="profile-role-tag usuario">Rol: Usuario</div>
+
+      <button id="openAccountSettingsBtn" class="profile-menu-button" type="button">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.8 7.8 0 0 0 0-2l2-1.6-2-3.4-2.5 1a8 8 0 0 0-1.7-1L14.8 3h-4l-.4 3a8 8 0 0 0-1.7 1L6.2 6l-2 3.4 2 1.6a7.8 7.8 0 0 0 0 2l-2 1.6 2 3.4 2.5-1a8 8 0 0 0 1.7 1l.4 3h4l.4-3a8 8 0 0 0 1.7-1l2.5 1 2-3.4-2-1.6ZM12.8 19h-1.6l-.3-2.4-.7-.3a6 6 0 0 1-1.1-.7l-.6-.5-2.1.8-.8-1.4 1.8-1.5-.1-.8a5.8 5.8 0 0 1 0-1.3l.1-.8-1.8-1.5.8-1.4 2.1.8.6-.5a6 6 0 0 1 1.1-.7l.7-.3.3-2.4h1.6l.3 2.4.7.3a6 6 0 0 1 1.1.7l.6.5 2.1-.8.8 1.4-1.8 1.5.1.8a5.8 5.8 0 0 1 0 1.3l-.1.8 1.8 1.5-.8 1.4-2.1-.8-.6.5a6 6 0 0 1-1.1.7l-.7.3-.3 2.4ZM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
+        <span><strong>Configuración</strong><small>Perfil, acceso y apariencia</small></span>
+        <svg class="menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z"/></svg>
+      </button>
+
+      <!-- Ventanita exclusiva que aparece solo para Superadministrador -->
+      <div id="profileAdminAccess" class="profile-admin-access hidden">
+        <div class="profile-admin-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4C6.5 4 2.2 8.6 1 12c1.2 3.4 5.5 8 11 8s9.8-4.6 11-8c-1.2-3.4-5.5-8-11-8Zm0 14c-4 0-7.4-3.1-8.8-6C4.6 9.1 8 6 12 6s7.4 3.1 8.8 6c-1.4 2.9-4.8 6-8.8 6Zm0-9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg><strong>Centro de ayuda</strong></div>
+        <p class="muted" style="font-size:0.82rem; margin:0 0 14px 0; line-height:1.4;">Revisa reportes y aplica medidas a cuentas sin entrar en muros ni leer notas privadas.</p>
+        <button id="openAdminFromProfileBtn" class="primary-button compact" style="width:100%;">Abrir Centro de Ayuda</button>
       </div>
 
-      <!-- Lista visual de salas del sistema -->
-      <div class="admin-visual-box">
-        <h3>Salas en el Sistema</h3>
-        <div id="adminWallsList" class="admin-visual-list">
-          <!-- Cargado con información real del backend -->
-        </div>
-      </div>
-
-      <!-- Lista de reportes de la aplicación -->
-      <div class="admin-visual-box">
-        <h3>Reportes de la Aplicación</h3>
-        <div id="adminReportsList" class="admin-visual-list">
-          <!-- Reportes de fallas técnicas -->
-        </div>
-      </div>
+      <button id="logoutButton" class="profile-logout" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9v2H7v14h7v2H5V3Zm11 5 5 4-5 4v-3H9v-2h7V8Z"/></svg>Cerrar sesión</button>
     </div>
   </aside>
 
-  <!-- MODAL DE CONFIRMACIÓN ESTILIZADO -->
-  <dialog id="confirmDialog">
-    <div class="confirm-box">
-      <div id="confirmIcon" class="confirm-icon">🗑️</div>
-      <h3 id="confirmTitle" class="confirm-title">¿Eliminar elemento?</h3>
-      <p id="confirmMessage" class="confirm-message">Esta acción no se puede deshacer.</p>
-      <div class="confirm-actions">
-        <button id="cancelConfirmBtn" type="button" class="secondary-button">Cancelar</button>
-        <button id="acceptConfirmBtn" type="button" class="danger-button" style="margin-top:0;">Eliminar</button>
+  <dialog id="accountSettingsDialog" class="account-settings-dialog">
+    <form id="accountSettingsForm">
+      <div class="dialog-head"><div><p class="eyebrow">Tu espacio personal</p><h3>Configuración de cuenta</h3></div><button id="closeAccountSettings" class="close-button" type="button" aria-label="Cerrar">&times;</button></div>
+      <div class="settings-section">
+        <div class="settings-section-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 6v2h18v-2c0-3.5-4-6-9-6Z"/></svg><div><strong>Perfil</strong><small>Cómo te ven las demás personas</small></div></div>
+        <label>Nombre visible<input id="settingsName" maxlength="40" required></label>
+        <label>Correo electrónico<input id="settingsEmail" type="email" autocomplete="email" required><small class="field-hint">Si cambias el correo, Supabase puede pedirte confirmarlo.</small></label>
       </div>
-    </div>
+      <div class="settings-section">
+        <div class="settings-section-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 9h-1V7a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v9h14v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V7Zm3 9.7V18h-2v-1.3a2 2 0 1 1 2 0Z"/></svg><div><strong>Seguridad</strong><small>Solo completa estos campos si cambiarás correo o contraseña</small></div></div>
+        <label>Contraseña actual<input id="settingsCurrentPassword" type="password" autocomplete="current-password"></label>
+        <div class="settings-password-grid"><label>Nueva contraseña<input id="settingsNewPassword" type="password" minlength="4" autocomplete="new-password"></label><label>Repetir contraseña<input id="settingsConfirmPassword" type="password" minlength="4" autocomplete="new-password"></label></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.5A7 7 0 0 1 12 3Zm-6 9a7 7 0 0 1 3.8-6.2A9 9 0 0 0 18.2 17 7 7 0 0 1 6 12Z"/></svg><div><strong>Apariencia</strong><small>Elige una jerarquía cómoda para tus ojos</small></div></div>
+        <div class="theme-picker" role="radiogroup" aria-label="Tema de color">
+          <label><input type="radio" name="theme" value="system"><span><b class="theme-preview system-preview"></b><strong>Sistema</strong><small>Sigue tu dispositivo</small></span></label>
+          <label><input type="radio" name="theme" value="light"><span><b class="theme-preview light-preview"></b><strong>Claro</strong><small>Suave y luminoso</small></span></label>
+          <label><input type="radio" name="theme" value="dark"><span><b class="theme-preview dark-preview"></b><strong>Oscuro</strong><small>Contraste descansado</small></span></label>
+        </div>
+      </div>
+      <div class="settings-section settings-toggles"><label><input id="settingsConfirmDelete" type="checkbox">Confirmar antes de eliminar</label><label><input id="settingsNotifications" type="checkbox">Mostrar notificaciones</label><label><input id="settingsCompactNotes" type="checkbox">Usar notas compactas</label></div>
+      <div class="dialog-actions"><button id="cancelAccountSettings" type="button" class="secondary-button">Cancelar</button><button type="submit" class="primary-button">Guardar cambios</button></div>
+    </form>
   </dialog>
 
   <div id="toast" class="toast" role="status"></div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/js/board.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
