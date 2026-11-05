@@ -453,7 +453,7 @@
     // Obtener la instantánea con datos REALES de la base de datos del Backend
     socket.emit('admin:snapshot', {}, (res) => {
       if (!res || !res.ok) {
-        return toast(res?.error || 'No se pudo obtener la información de soporte.');
+        return toast(res?.error || 'No se pudo cargar la información de soporte.');
       }
 
       cachedAdminUsers = res.users || [];
@@ -483,7 +483,7 @@
 
     reportsContainer.innerHTML = '';
     if (!reports.length) {
-      reportsContainer.innerHTML = `<div class="muted" style="text-align:center; padding:24px;">Sin reportes pendientes en el sistema.</div>`;
+      reportsContainer.innerHTML = `<div class="muted" style="text-align:center; padding:24px;">No hay reportes pendientes.</div>`;
       return;
     }
 
@@ -519,7 +519,7 @@
     const socket = window.MuroBoard?.getSocket();
     socket.emit('admin:user:discipline', { userId: user.id, ...result }, (response) => {
       if (!response?.ok) return toast(response?.error || 'No se pudo aplicar la medida.', 'error');
-      const finish = () => { toast('Medida aplicada y registrada.', 'success'); renderAdminDashboard(); };
+      const finish = () => { toast('La medida se aplicó correctamente.', 'success'); renderAdminDashboard(); };
       if (!result.reportId) return finish();
       socket.emit('admin:report:respond', { id: result.reportId, status: 'resuelto', decision: result.message }, () => finish());
     });
@@ -615,7 +615,7 @@
 
     allReportsTable.innerHTML = '';
     if (!reports.length) {
-      allReportsTable.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center; padding:30px;">No se han recibido reportes de contenido.</td></tr>`;
+      allReportsTable.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center; padding:30px;">Todavía no se han recibido reportes.</td></tr>`;
       return;
     }
 
