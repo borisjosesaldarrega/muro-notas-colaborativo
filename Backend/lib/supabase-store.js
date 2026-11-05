@@ -41,7 +41,7 @@ class SupabaseStore {
       this.admin.from('muro_configuraciones_usuario').select('usuario_id,tema,confirmar_eliminacion,notas_compactas,notificaciones'),
       this.admin.from('muro_salas').select('id,nombre,descripcion,color,propietario_id,creado_en,actualizado_en'),
       this.admin.from('muro_sala_miembros').select('sala_id,usuario_id,rol'),
-      this.admin.from('muro_notas').select('id,sala_id,titulo,contenido,color,posicion_x,posicion_y,autor_id,nombre_autor,creado_en,actualizado_en')
+      this.admin.from('muro_notas').select('id,sala_id,titulo,contenido,color,posicion_x,posicion_y,autor_id,nombre_autor,editado_por_id,nombre_editor,creado_en,actualizado_en')
     ]);
     throwIf(profilesResult.error, 'profiles');
     throwIf(settingsResult.error, 'user_settings');
@@ -84,6 +84,8 @@ class SupabaseStore {
         y: Number(row.posicion_y),
         autor: row.nombre_autor,
         authorId: row.autor_id,
+        editor: row.nombre_editor || '',
+        editorId: row.editado_por_id || null,
         updatedAt: Date.parse(row.actualizado_en)
       });
     }
@@ -417,10 +419,14 @@ class SupabaseStore {
   }
 
   async updateNote(wallId, note, accessToken) {
-    const row = this.noteRow(wallId, note);
-    delete row.id;
-    delete row.sala_id;
-    delete row.autor_id;
+    const row = {
+      titulo: note.titulo || note.texto.slice(0, 80),
+      contenido: note.texto,
+      color: note.color,
+      posicion_x: note.x,
+      posicion_y: note.y,
+      actualizado_en: new Date(note.updatedAt).toISOString()
+    };
     const { error } = await this.userClient(accessToken).from('muro_notas').update(row).eq('id', note.id).eq('sala_id', wallId);
     throwIf(error, 'note_save');
   }

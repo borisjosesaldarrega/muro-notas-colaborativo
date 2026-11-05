@@ -113,7 +113,7 @@ window.MuroBoard = (function () {
         </div>
         <textarea maxlength="280" aria-label="Contenido de la nota" placeholder="Escribe tu idea..."></textarea>
         <div class="note-footer">
-          <span class="author-tag"></span>
+          <span class="note-credits"><span class="author-tag"></span><small class="editor-tag"></small></span>
           <small class="time-tag"></small>
         </div>
       `;
@@ -185,7 +185,14 @@ window.MuroBoard = (function () {
     resizeNoteToContent(element, textarea, note.texto);
 
     const authorTag = element.querySelector('.author-tag');
-    if (authorTag) authorTag.textContent = note.autor || 'Invitado';
+    if (authorTag) authorTag.textContent = `Creada por ${note.autor || 'Invitado'}`;
+
+    const editorTag = element.querySelector('.editor-tag');
+    if (editorTag) {
+      const editedByAnotherPerson = note.editor && note.editorId && note.editorId !== note.authorId;
+      editorTag.textContent = editedByAnotherPerson ? `Editada por ${note.editor}` : '';
+      editorTag.hidden = !editedByAnotherPerson;
+    }
 
     const timeTag = element.querySelector('.time-tag');
     if (timeTag) timeTag.textContent = timeAgo(note.updatedAt);
@@ -831,6 +838,7 @@ window.MuroBoard = (function () {
 
   // Botón Volver a Mis Muros (Salir de la sala)
   $('#backToWallsButton')?.addEventListener('click', () => {
+    socket?.emit('wall:leave', {}, () => {});
     $('#appView')?.classList.add('hidden');
     $('#wallsView')?.classList.remove('hidden');
     window.location.hash = '';
