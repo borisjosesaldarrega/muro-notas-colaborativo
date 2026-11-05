@@ -13,6 +13,26 @@
   const $$ = (selector) => document.querySelectorAll(selector);
 
   const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+  const TOKEN_KEY = 'muroToken';
+  const SESSION_KEY = 'muroSession';
+  const THEME_KEY = 'muroTheme';
+
+  function applyTheme(choice = 'system') {
+    const safeChoice = ['system', 'light', 'dark'].includes(choice) ? choice : 'system';
+    const resolved = safeChoice === 'system'
+      ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : safeChoice;
+    document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.themeChoice = safeChoice;
+    localStorage.setItem(THEME_KEY, safeChoice);
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = resolved === 'dark' ? '#211a37' : '#6658f5';
+  }
+
+  applyTheme(localStorage.getItem(THEME_KEY) || 'system');
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if ((localStorage.getItem(THEME_KEY) || 'system') === 'system') applyTheme('system');
+  });
 
   function toast(message, tone = 'info') {
     if (window.MuroUI) return window.MuroUI.toast(message, tone);
@@ -101,8 +121,11 @@
 
   function enterApp(user, token = '') {
     currentUser = user;
-    sessionStorage.setItem('muroSession', JSON.stringify(user));
-    if (token) sessionStorage.setItem('muroToken', token);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    applyTheme(user.settings?.theme || localStorage.getItem(THEME_KEY) || 'system');
 
     $('#authView')?.classList.add('hidden');
     $('#appView')?.classList.add('hidden');
@@ -114,6 +137,7 @@
     if ($('#profileEmail')) $('#profileEmail').textContent = user.email;
     if ($('#profileButton')) $('#profileButton').textContent = initials(user.name);
     if ($('#wallsProfileBtn')) $('#wallsProfileBtn').textContent = initials(user.name);
+    if ($('#profileAvatarLarge')) $('#profileAvatarLarge').textContent = initials(user.name);
 
     // Identificación de rol en el perfil (sin alterar la interfaz normal de usuario)
     const isSuperadmin = user && user.role === 'superadmin';
@@ -448,6 +472,16 @@
 
   async function moderateAccount(user, report = null) {
     const reports = reportsForUser(user.id);
+    if (user.role === 'superadmin') {
+      await window.MuroUI.confirmAction({
+        title: 'Cuenta protegida',
+        message: `${user.name} tiene rol de superadministración. Puedes consultar sus ${reports.length} reporte(s), pero las sanciones están bloqueadas para proteger la cuenta responsable del sistema.`,
+        confirmText: 'Entendido',
+        tone: 'primary',
+        showCancel: false
+      });
+      return;
+    }
     const result = await window.MuroUI.moderateUser({
       user,
       reportId: report?.id || '',
@@ -471,8 +505,7 @@
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'primary-button compact moderation-button';
-    button.textContent = 'Revisar';
-    button.disabled = user.role === 'superadmin';
+    button.textContent = user.role === 'superadmin' ? 'Ver detalles' : 'Revisar';
     button.addEventListener('click', () => moderateAccount(user, report));
     return button;
   }
@@ -610,6 +643,98 @@
   $('#profileButton')?.addEventListener('click', () => openPanel('profile'));
   $('#wallsProfileBtn')?.addEventListener('click', () => openPanel('profile'));
 
+  function emitAsync(socket, event, payload) {
+    return new Promise((resolve) => socket.emit(event, payload, resolve));
+  }
+
+  function openAccountSettings() {
+    if (!currentUser) return;
+    $('#sidePanel')?.classList.remove('open');
+    $('#settingsName').value = currentUser.name || '';
+    $('#settingsEmail').value = currentUser.email || '';
+    $('#settingsCurrentPassword').value = '';
+    $('#settingsNewPassword').value = '';
+    $('#settingsConfirmPassword').value = '';
+    const settings = currentUser.settings || {};
+    const theme = settings.theme || localStorage.getItem(THEME_KEY) || 'system';
+    const themeInput = document.querySelector(`input[name="theme"][value="${theme}"]`);
+    if (themeInput) themeInput.checked = true;
+    $('#settingsConfirmDelete').checked = settings.confirmDelete !== false;
+    $('#settingsNotifications').checked = settings.notifications !== false;
+    $('#settingsCompactNotes').checked = Boolean(settings.compactNotes);
+    $('#accountSettingsDialog')?.showModal();
+  }
+
+  $('#openAccountSettingsBtn')?.addEventListener('click', openAccountSettings);
+  $('#closeAccountSettings')?.addEventListener('click', () => $('#accountSettingsDialog')?.close());
+  $('#cancelAccountSettings')?.addEventListener('click', () => $('#accountSettingsDialog')?.close());
+
+  $('#accountSettingsForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!currentUser) return;
+    const socket = window.MuroBoard?.getSocket();
+    if (!socket) return toast('No hay conexión con el servidor.', 'error');
+
+    const name = $('#settingsName').value.trim();
+    const email = $('#settingsEmail').value.trim().toLowerCase();
+    const currentPassword = $('#settingsCurrentPassword').value;
+    const newPassword = $('#settingsNewPassword').value;
+    const confirmPassword = $('#settingsConfirmPassword').value;
+    const selectedTheme = document.querySelector('input[name="theme"]:checked')?.value || 'system';
+
+    if (!name) return toast('Escribe el nombre que quieres mostrar.', 'error');
+    if (validateEmail(email)) return toast(validateEmail(email), 'error');
+    if ((email !== currentUser.email || newPassword) && !currentPassword) return toast('Escribe tu contraseña actual para cambiar el acceso.', 'error');
+    if (newPassword && newPassword !== confirmPassword) return toast('Las contraseñas nuevas no coinciden.', 'error');
+    if (newPassword && validatePassword(newPassword)) return toast(validatePassword(newPassword), 'error');
+
+    const submit = event.submitter;
+    if (submit) submit.disabled = true;
+    try {
+      const profileResult = await emitAsync(socket, 'profile:update', { name, avatar: currentUser.avatar || '' });
+      if (!profileResult?.ok) throw new Error(profileResult?.error || 'No se pudo guardar el perfil.');
+
+      const settingsResult = await emitAsync(socket, 'settings:update', {
+        theme: selectedTheme,
+        confirmDelete: $('#settingsConfirmDelete').checked,
+        compactNotes: $('#settingsCompactNotes').checked,
+        notifications: $('#settingsNotifications').checked
+      });
+      if (!settingsResult?.ok) throw new Error(settingsResult?.error || 'No se pudieron guardar las preferencias.');
+
+      let emailResult = null;
+      if (email !== currentUser.email) {
+        emailResult = await emitAsync(socket, 'auth:email', { email, currentPassword });
+        if (!emailResult?.ok) throw new Error(emailResult?.error || 'No se pudo cambiar el correo.');
+      }
+
+      if (newPassword) {
+        const passwordResult = await emitAsync(socket, 'auth:password', { currentPassword, newPassword });
+        if (!passwordResult?.ok) throw new Error(passwordResult?.error || 'No se pudo cambiar la contraseña.');
+      }
+
+      currentUser = {
+        ...currentUser,
+        ...profileResult.user,
+        email: emailResult?.email || currentUser.email,
+        settings: settingsResult.settings
+      };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+      applyTheme(selectedTheme);
+      $('#profileName').textContent = currentUser.name;
+      $('#profileEmail').textContent = currentUser.email;
+      $('#profileButton').textContent = initials(currentUser.name);
+      $('#wallsProfileBtn').textContent = initials(currentUser.name);
+      $('#profileAvatarLarge').textContent = initials(currentUser.name);
+      $('#accountSettingsDialog')?.close();
+      toast(emailResult?.pending ? 'Cambios guardados. Revisa tu correo para confirmar la nueva dirección.' : 'Configuración guardada.', 'success');
+    } catch (error) {
+      toast(error.message || 'No se pudieron guardar los cambios.', 'error');
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  });
+
   // Acceso exclusivo al centro de ayuda desde el perfil
   $('#openAdminFromProfileBtn')?.addEventListener('click', () => openAdminDashboard(currentUser));
 
@@ -617,10 +742,12 @@
   $('#logoutButton')?.addEventListener('click', () => {
     const socket = window.MuroBoard?.getSocket();
     if (socket) {
-      socket.emit('auth:logout', {});
+      socket.emit('auth:logout', { token: localStorage.getItem(TOKEN_KEY) || '' });
     }
-    sessionStorage.removeItem('muroSession');
-    sessionStorage.removeItem('muroToken');
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
     currentUser = null;
     $('#sidePanel')?.classList.remove('open');
     showAuth('login');
@@ -641,16 +768,18 @@
      INICIALIZACIÓN
      ========================================== */
 
-  const savedToken = sessionStorage.getItem('muroToken') || '';
+  const savedToken = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
   const sessionSocket = window.MuroBoard?.getSocket();
-  if (savedToken && sessionSocket) {
+  if (sessionSocket) {
     sessionSocket.emit('auth:restore', { token: savedToken }, (res) => {
       if (res?.ok) enterApp(res.user, res.token);
       else {
-        sessionStorage.removeItem('muroSession');
-        sessionStorage.removeItem('muroToken');
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(SESSION_KEY);
+        sessionStorage.removeItem(TOKEN_KEY);
         showAuth('login');
-        toast(res?.error || 'La sesión expiró.');
+        if (savedToken) toast(res?.error || 'La sesión expiró.');
       }
     });
   } else showAuth('login');

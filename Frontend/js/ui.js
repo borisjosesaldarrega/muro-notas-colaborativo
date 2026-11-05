@@ -11,15 +11,18 @@
     toast.timer = setTimeout(() => item.classList.remove('show'), 3200);
   }
 
-  function confirmAction({ title, message, confirmText = 'Confirmar', tone = 'primary', icon = '✨' }) {
+  function confirmAction({ title, message, confirmText = 'Confirmar', tone = 'primary', showCancel = true }) {
     return new Promise((resolve) => {
       const dialog = $('#actionDialog');
       if (!dialog) return resolve(false);
-      $('#actionDialogIcon').textContent = icon;
+      $('#actionDialogIcon').innerHTML = tone === 'danger'
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22L12 2Zm0 5.8L19.5 19h-15L12 7.8ZM11 11v4h2v-4h-2Zm0 5.5v2h2v-2h-2Z"/></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-1 5h2v2h-2V7Zm0 4h2v6h-2v-6Z"/></svg>';
       $('#actionDialogTitle').textContent = title;
       $('#actionDialogMessage').textContent = message;
       const accept = $('#actionDialogAccept');
       const cancel = $('#actionDialogCancel');
+      cancel.classList.toggle('hidden', !showCancel);
       accept.textContent = confirmText;
       accept.className = tone === 'danger' ? 'danger-button action-confirm' : 'primary-button action-confirm';
       const close = (value) => { dialog.close(); resolve(value); };

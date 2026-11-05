@@ -7,6 +7,7 @@ window.MuroBoard = (function () {
   const socket = typeof io !== 'undefined' ? io() : null;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => document.querySelectorAll(selector);
+  const escapeHTML = (value = '') => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
 
   const board = $('#board');
   const boardStage = $('#boardStage');
@@ -256,18 +257,18 @@ window.MuroBoard = (function () {
     state.walls.forEach((wall) => {
       const card = document.createElement('article');
       card.className = 'wall-card';
-      const roleText = wall.role ? (wall.role === 'propietario' ? 'Propietaria' : 'Colaboradora') : 'Público';
+      const roleText = wall.role ? (wall.role === 'propietario' ? 'Propietario/a' : 'Colaborador/a') : 'Público';
 
       card.innerHTML = `
         <div class="wall-card-head">
           <span class="wall-card-badge">${roleText}</span>
         </div>
         <div>
-          <h3>${wall.name || 'Muro sin título'}</h3>
-          <p>${wall.description || 'Sin descripción'}</p>
+          <h3>${escapeHTML(wall.name || 'Muro sin título')}</h3>
+          <p>${escapeHTML(wall.description || 'Sin descripción')}</p>
         </div>
         <div class="wall-card-footer">
-          <span class="wall-card-meta">📝 ${wall.notesCount ?? 0} notas</span>
+          <span class="wall-card-meta"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5V3Zm9 2v3h3l-3-3ZM8 12h8v-2H8v2Zm0 4h8v-2H8v2Z"/></svg>${wall.notesCount ?? 0} notas</span>
           <button class="primary-button compact enter-wall-btn">Entrar al Muro →</button>
         </div>
       `;
@@ -285,6 +286,9 @@ window.MuroBoard = (function () {
       socket.emit('walls:list', {}, (res) => {
         if (res && res.ok && Array.isArray(res.walls)) {
           renderWallsList(res.walls);
+          const requestedId = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('wall');
+          const requestedWall = requestedId && res.walls.find((wall) => wall.id === requestedId);
+          if (requestedWall && $('#appView')?.classList.contains('hidden')) selectWall(requestedWall.id, requestedWall.name, requestedWall.role);
         }
       });
     } else {
@@ -344,13 +348,6 @@ window.MuroBoard = (function () {
     socket.on('connect', () => {
       const status = $('#connectionStatus');
       if (status) status.textContent = 'Conectado';
-      const token = sessionStorage.getItem('muroToken');
-      if (token) socket.emit('auth:restore', { token }, (res) => {
-        if (!res?.ok) {
-          sessionStorage.removeItem('muroSession');
-          sessionStorage.removeItem('muroToken');
-        }
-      });
     });
 
     socket.on('disconnect', () => {
@@ -564,17 +561,18 @@ window.MuroBoard = (function () {
       item.className = 'member-item';
       const role = m.roleInWall || 'editor';
       const isTargetOwner = role === 'propietario';
+      const roleLabel = isTargetOwner ? 'Propietario/a' : role === 'lector' ? 'Lector/a' : 'Editor/a';
 
       item.innerHTML = `
         <div class="member-item-info">
-          <div class="member-item-avatar">${(m.name || 'U').slice(0, 2).toUpperCase()}</div>
+          <div class="member-item-avatar">${escapeHTML((m.name || 'U').slice(0, 2).toUpperCase())}</div>
           <div>
-            <strong>${m.name || 'Usuario'}</strong>
-            <small class="muted" style="display:block;">${m.email || ''}</small>
+            <strong>${escapeHTML(m.name || 'Usuario')}</strong>
+            <small class="muted" style="display:block;">${escapeHTML(m.email || '')}</small>
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
-          <span class="member-role-tag ${role}">${role}</span>
+          <span class="member-role-tag ${role}">${roleLabel}</span>
           ${m.id !== state.user?.id ? `<button type="button" class="report-member-btn" title="Reportar usuario">Reportar</button>` : ''}
           ${isCurrentUserOwner && !isTargetOwner ? `<button type="button" class="remove-member-btn" data-user-id="${m.id}" title="Quitar miembro">&times;</button>` : ''}
         </div>
@@ -619,6 +617,7 @@ window.MuroBoard = (function () {
     const shareInput = $('#shareLinkInput');
     if (shareInput) shareInput.value = '';
     if ($('#inviteCodeOutput')) $('#inviteCodeOutput').value = '';
+    if ($('#copyShareLinkBtn')) $('#copyShareLinkBtn').disabled = true;
 
     // Regla estricta del backend: Solo la persona propietaria puede invitar miembros
     const isOwner = state.currentWall?.role === 'propietario';
@@ -640,7 +639,7 @@ window.MuroBoard = (function () {
     const codeOutput = $('#inviteCodeOutput');
     if (codeOutput?.value) {
       navigator.clipboard.writeText(codeOutput.value).then(() => {
-        toast('📋 Código copiado al portapapeles.');
+        toast('Código copiado al portapapeles.');
       }).catch(() => {
         codeOutput.select();
         toast('Código seleccionado para copiar.');
@@ -663,6 +662,7 @@ window.MuroBoard = (function () {
           const shareInput = $('#shareLinkInput'); const codeOutput = $('#inviteCodeOutput');
           if (shareInput) shareInput.value = res.link || shareInput.value;
           if (codeOutput) codeOutput.value = res.code || '';
+          if ($('#copyShareLinkBtn')) $('#copyShareLinkBtn').disabled = !res.code;
           toast(`Código ${res.code} creado. Compártelo con quien quieras invitar.`);
         } else {
           toast(res?.error || 'No se pudo enviar la invitación.');

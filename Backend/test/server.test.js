@@ -69,6 +69,27 @@ test('registra, restaura y valida cuentas y roles en el servidor', async () => {
   assert.equal(restore.user.id, first.user.id);
 });
 
+test('actualiza el correo solo después de verificar la contraseña actual', async () => {
+  const socket = await connect();
+  const registered = await ack(socket, 'auth:register', {
+    name: 'Cuenta Configuración',
+    email: 'configuracion@example.com',
+    password: 'clave789',
+    passwordConfirmation: 'clave789'
+  });
+  assert.equal(registered.ok, true);
+
+  const rejected = await ack(socket, 'auth:email', { email: 'nuevo@example.com', currentPassword: 'incorrecta' });
+  assert.equal(rejected.ok, false);
+
+  const changed = await ack(socket, 'auth:email', { email: 'nuevo@example.com', currentPassword: 'clave789' });
+  assert.deepEqual(changed, { ok: true, email: 'nuevo@example.com' });
+
+  const login = await ack(await connect(), 'auth:login', { email: 'nuevo@example.com', password: 'clave789' });
+  assert.equal(login.ok, true);
+  assert.equal(login.user.email, 'nuevo@example.com');
+});
+
 test('sincroniza el ciclo de vida de notas entre clientes', async () => {
   const admin = clients[0];
   const member = clients[1];

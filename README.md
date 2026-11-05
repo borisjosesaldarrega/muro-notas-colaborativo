@@ -5,6 +5,7 @@ Aplicación de notas adhesivas con el lenguaje visual original de Muro DZ y una 
 ## Funciones
 
 - Registro, inicio y restauración de sesión mediante Supabase Auth cuando el esquema está disponible.
+- Sesión persistente al recargar, configuración de perfil y apariencia (sistema, claro u oscuro), y cambio de correo o contraseña con verificación de la clave actual.
 - Recuperación y cambio de contraseña.
 - Rol `superadmin` reservado a la cuenta propietaria y validado siempre en el backend.
 - Muros independientes con permisos `propietario`, `editor` y `lector`.
@@ -61,7 +62,7 @@ Render asignará la URL al completar el primer despliegue. Abre esa URL para pro
 
 ## Preparar Supabase
 
-Las migraciones versionadas están en `supabase/migrations/`. Crean y actualizan las tablas `muro_usuarios`, `muro_configuraciones_usuario`, `muro_salas`, `muro_sala_miembros`, `muro_notas`, `muro_invitaciones`, `muro_reportes` y `muro_sanciones`, junto con índices, funciones y políticas RLS. La migración `20261027000508_corregir_a10_creacion_atomica_muro.sql` añade la RPC transaccional de muros. `20261027002032_completar_invitaciones_y_reportes.sql` termina los flujos que habían quedado incompletos, `20261027002607_bloquear_altas_directas_de_miembros.sql` cierra el atajo que permitía crear membresías sin aceptar una invitación y `20261105040901_reportes_por_usuario_y_sanciones.sql` relaciona cada denuncia con la cuenta reportada y conserva el historial de moderación. El prefijo `muro_` evita colisiones con otros esquemas.
+Las migraciones versionadas están en `supabase/migrations/`. Crean y actualizan las tablas `muro_usuarios`, `muro_configuraciones_usuario`, `muro_salas`, `muro_sala_miembros`, `muro_notas`, `muro_invitaciones`, `muro_reportes` y `muro_sanciones`, junto con índices, funciones y políticas RLS. La migración `20261027000508_corregir_a10_creacion_atomica_muro.sql` añade la RPC transaccional de muros. `20261027002032_completar_invitaciones_y_reportes.sql` termina los flujos que habían quedado incompletos, `20261027002607_bloquear_altas_directas_de_miembros.sql` cierra el atajo que permitía crear membresías sin aceptar una invitación, `20261105040901_reportes_por_usuario_y_sanciones.sql` relaciona cada denuncia con la cuenta reportada y conserva el historial de moderación, y `20261105045727_sincronizar_cambio_correo_usuario.sql` mantiene el correo público alineado con Auth después de confirmarlo. El prefijo `muro_` evita colisiones con otros esquemas.
 
 ```bash
 npx supabase login
@@ -103,7 +104,7 @@ npm run verify:supabase -- --auth
 
 ## Aporte de esta entrega
 
-Responsable de la corrección y cierre del backend: **Boris Salda Vargas**. Boris completó las invitaciones verificables, la atención de reportes, el historial de sanciones, el lienzo adaptable y la sincronización fluida; también cerró las altas directas de miembros, aplicó las migraciones y añadió las pruebas. La propuesta visual de Pierina se integró y se corrigieron problemas de presentación, modales, tamaños de notas y adaptación móvil tanto en la aplicación principal como en la carpeta `Backend/`.
+Responsable de la corrección y cierre del backend: **Boris Salda Vargas**. Boris completó las invitaciones verificables, la atención de reportes, el historial de sanciones, el lienzo adaptable y la sincronización fluida; también cerró las altas directas de miembros, aplicó las migraciones y añadió las pruebas. En la interfaz corrigió la persistencia de sesión, la configuración de cuenta, los temas, el modal de invitación, la revisión de usuarios y la presentación cartoon basada en Figma. La propuesta visual de Pierina se integró y se ajustaron los problemas de presentación, modales, tamaños de notas y adaptación móvil tanto en la aplicación principal como en la carpeta `Backend/`.
 
 ## Respaldo en memoria
 

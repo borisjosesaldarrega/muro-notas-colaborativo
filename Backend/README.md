@@ -5,8 +5,8 @@ Este backend reemplaza la demostración que guardaba todo en memoria. Mantiene u
 ## Funciones implementadas
 
 - Registro, inicio, restauración y cierre de sesión.
-- Recuperación y cambio de contraseña.
-- Perfil y preferencias del usuario.
+- Recuperación y cambio de contraseña con verificación de la clave actual.
+- Perfil, cambio seguro de correo y preferencias de apariencia del usuario.
 - Creación, edición, selección y eliminación de muros.
 - Gestión de integrantes y permisos: propietario, editor y lector.
 - Creación, edición, movimiento fluido y eliminación de notas en tiempo real sobre un lienzo común para PC y móvil.
@@ -41,3 +41,5 @@ La entrega anterior había dejado estos dos módulos como pendientes. Boris term
 En reportes, el autor sale siempre de la sesión y la cuenta denunciada debe compartir el mismo muro. Cada persona ve únicamente sus solicitudes; el superadmin recibe, toma y responde sin obtener por ello acceso al contenido de muros privados. Desde el directorio puede revisar el historial y aplicar una medida proporcionada. Las pruebas cubren el recorrido correcto y los intentos no autorizados.
 
 La propuesta visual de Pierina se conectó a estos eventos y Boris corrigió los problemas de presentación, modales, notas, responsividad y movimiento compartido. La misma versión se publica desde la raíz y queda reflejada en `Backend/`, `Frontend/` y `BaseDeDatos/` para la revisión por áreas.
+
+La configuración de cuenta conserva la sesión al recargar, permite elegir tema del sistema, claro u oscuro, y verifica la contraseña actual antes de cambiar correo o clave. Cuando Supabase confirma el nuevo correo, el trigger versionado mantiene el perfil público sincronizado.

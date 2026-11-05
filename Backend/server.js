@@ -345,6 +345,24 @@ function createMuroServer(options = {}) {
       acknowledge({ ok: true });
     });
 
+    socket.on('auth:email', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge);
+      if (!user) return;
+      const email = validEmail(payload.email);
+      if (!email) return fail(acknowledge, 'Escribe un correo válido.');
+      if (email === user.email) return acknowledge({ ok: true, email });
+      if (users.some((item) => item.id !== user.id && item.email === email)) return fail(acknowledge, 'Ese correo ya está registrado.');
+      if (storage.schemaReady) {
+        try { await store.changeEmail(user, String(payload.currentPassword ?? ''), email); }
+        catch { return fail(acknowledge, 'No se pudo cambiar el correo. Revisa tu contraseña y vuelve a intentarlo.'); }
+      } else {
+        if (user.password !== String(payload.currentPassword ?? '')) return fail(acknowledge, 'La contraseña actual es incorrecta.');
+      }
+      user.email = email;
+      acknowledge({ ok: true, email });
+      emitAdminSnapshot();
+    });
+
     socket.on('profile:update', async (payload = {}, acknowledge = () => {}) => {
       const user = requireUser(socket, acknowledge);
       if (!user) return;

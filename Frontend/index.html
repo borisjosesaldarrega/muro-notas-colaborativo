@@ -13,7 +13,7 @@
 </head>
 <body>
   <!-- VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO / VERIFICACIÓN / CONFIRMACIÓN / RECUPERACIÓN) -->
-  <main id="authView" class="auth-shell">
+  <main id="authView" class="auth-shell hidden">
     <section class="auth-brand">
       <div class="brand-mark" title="Muro Colaborativo">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg>
@@ -136,7 +136,7 @@
       <form id="acceptInvitationForm" class="invitation-accept-bar">
         <div><strong>¿Recibiste una invitación?</strong><small>Usa el código de 8 letras y números o abre el enlace compartido.</small><small id="acceptInvitationPreview" class="muted"></small></div>
         <input id="acceptInvitationCode" maxlength="128" autocomplete="off" placeholder="Ej. A7K9M2QX" required>
-        <button class="btn-join-code" type="submit">🔑 Unirse</button>
+        <button class="btn-join-code" type="submit"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 7a5 5 0 1 0-3.8 4.85L12 13.65V16h2v2h2v2h3v-3.35l-5.2-5.2A5 5 0 0 0 14 7Zm-7 2a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>Unirse</button>
       </form>
       <div id="wallsGrid" class="walls-grid">
         <!-- Tarjetas dinámicas de salas -->
@@ -153,7 +153,7 @@
       </button>
       <span class="presence board-presence"><i></i><span id="connectionStatus">Conectado</span> · <b id="onlineCount">1</b> <span class="presence-label">personas</span></span>
       <div class="top-actions board-actions">
-        <button id="inviteButton" class="board-action share-action" title="Compartir código de invitación">Compartir</button>
+        <button id="inviteButton" class="board-action share-action" title="Invitar personas mediante código">Invitar</button>
         <button id="deleteWallBtn" class="board-action delete-action hidden" title="Eliminar este muro" aria-label="Eliminar este muro">Eliminar</button>
         <button id="newNoteButton" class="board-action new-note-action">＋ Nueva nota</button>
         <button id="profileButton" class="avatar" title="Perfil">P</button>
@@ -195,22 +195,27 @@
           <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span>
           <div>
             <strong>Soporte Muro</strong>
-            <small class="admin-badge">💜 Ayuda</small>
+            <small class="admin-badge">AYUDA</small>
           </div>
         </div>
 
         <nav class="admin-nav">
           <button class="admin-nav-item active" data-admin-tab="resumen">
-            <span class="nav-icon">🏡</span> Resumen
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3v-9.5Z"/></svg> Resumen
           </button>
           <button class="admin-nav-item" data-admin-tab="usuarios">
-            <span class="nav-icon">👥</span> Usuarios
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8 13c-4.4 0-7 2.2-7 5v2h14v-2c0-2.8-2.6-5-7-5Zm8-.8c-.7 0-1.4.1-2 .2 2 1.2 3 3.1 3 5.6v2h6v-2c0-3.2-2.7-5.8-7-5.8Z"/></svg> Usuarios
           </button>
           <button class="admin-nav-item" data-admin-tab="reportes">
-            <span class="nav-icon">🚩</span> Reportes
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2h2v2h11l-2 4 2 4H7v10H5V2Zm2 4v4h7.8l-1-2 1-2H7Z"/></svg> Reportes
             <span id="adminPendingBadge" class="nav-count-badge">0</span>
           </button>
         </nav>
+
+        <div class="admin-sidebar-tip">
+          <svg class="tip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.7 8 11 4.6-1.3 8-5.9 8-11V5l-8-3Zm0 3 5 1.9V11c0 3.5-2.1 6.8-5 8-2.9-1.2-5-4.5-5-8V6.9L12 5Zm-1 3v5h2V8h-2Zm0 7v2h2v-2h-2Z"/></svg>
+          <div><strong>Privacidad activa</strong><small>No se muestran notas ni muros privados.</small></div>
+        </div>
 
         <div class="admin-sidebar-footer">
           <div class="admin-user-info">
@@ -220,7 +225,7 @@
               <small class="muted" style="color:#b2acc9;">Ayuda y moderación</small>
             </div>
           </div>
-          <button id="adminExitBtn" class="secondary-button compact" style="width:100%; margin-top:12px;">← Volver al Muro</button>
+          <button id="adminExitBtn" class="secondary-button compact admin-exit"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5-7 7 7 7 1.4-1.4L6.8 13H21v-2H6.8l4.6-4.6L10 5Z"/></svg>Volver al muro</button>
         </div>
       </aside>
 
@@ -240,7 +245,7 @@
         <!-- PESTAÑA 1: RESUMEN GENERAL -->
         <div id="adminTabResumen" class="admin-tab-content">
           <div class="admin-spectator-alert">
-            <span style="font-size:1.3rem;">ℹ️</span>
+            <svg class="alert-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-1 5h2v2h-2V7Zm0 4h2v6h-2v-6Z"/></svg>
             <div>
               <strong>Privacidad primero:</strong> este panel trabaja con cuentas y reportes. No abre muros ni muestra notas privadas de los equipos.
             </div>
@@ -249,28 +254,28 @@
           <!-- 4 Métricas Clave (Pág 20 del PDF) -->
           <div class="admin-metrics-grid">
             <article class="metric-card">
-              <span class="metric-icon purple">👥</span>
+              <span class="metric-icon purple"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8 13c-4.4 0-7 2.2-7 5v2h14v-2c0-2.8-2.6-5-7-5Zm8-.8c-.7 0-1.4.1-2 .2 2 1.2 3 3.1 3 5.6v2h6v-2c0-3.2-2.7-5.8-7-5.8Z"/></svg></span>
               <div>
                 <small>Usuarios Registrados</small>
                 <strong id="metricUsersCount">1</strong>
               </div>
             </article>
             <article class="metric-card">
-              <span class="metric-icon yellow">📝</span>
+              <span class="metric-icon yellow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5V3Zm9 2v3h3l-3-3ZM8 12h8v-2H8v2Zm0 4h8v-2H8v2Z"/></svg></span>
               <div>
                 <small>Reportes Pendientes</small>
                 <strong id="metricReportsCount">0</strong>
               </div>
             </article>
             <article class="metric-card">
-              <span class="metric-icon blue">🚪</span>
+              <span class="metric-icon blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12v5h-2V5H7v14h8v-3h2v5H5V3Zm11 6 5 3-5 3v-2H9v-2h7V9Z"/></svg></span>
               <div>
                 <small>Casos Resueltos</small>
                 <strong id="metricResolvedCount">0</strong>
               </div>
             </article>
             <article class="metric-card">
-              <span class="metric-icon red">🚩</span>
+              <span class="metric-icon red"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2h2v2h11l-2 4 2 4H7v10H5V2Zm2 4v4h7.8l-1-2 1-2H7Z"/></svg></span>
               <div>
                 <small>Cuentas Suspendidas</small>
                 <strong id="metricSuspendedCount">0</strong>
@@ -329,7 +334,7 @@
         <div id="adminTabUsuarios" class="admin-tab-content hidden">
           <div class="admin-card-head">
             <h3>Directorio de Cuentas</h3>
-            <input id="adminUserSearch" type="search" placeholder="🔍 Buscar por nombre o correo..." style="max-width:320px; padding:10px 14px; border-radius:12px; border:1px solid var(--line);">
+            <input id="adminUserSearch" type="search" placeholder="Buscar por nombre o correo..." style="max-width:320px; padding:10px 14px; border-radius:12px; border:1px solid var(--line);">
           </div>
           <div class="admin-table-wrap" style="margin-top:16px;">
             <table class="admin-table">
@@ -423,17 +428,18 @@
   <dialog id="inviteDialog">
     <form id="inviteForm">
       <div class="dialog-head">
-        <div><p class="eyebrow">Colaboración</p><h3>Compartir e Invitar</h3></div>
+        <div><p class="eyebrow">Colaboración</p><h3>Invitar al muro</h3></div>
         <button class="close-button" id="closeInviteModal" type="button">&times;</button>
       </div>
 
       <!-- El código se genera en el servidor y se puede compartir por cualquier medio. -->
-      <div style="background: #f5f3fa; padding: 16px; border-radius: 14px; margin-bottom: 20px;">
+      <div class="invite-code-card">
         <label style="margin-top:0; font-weight:700; font-size:0.88rem; color: var(--ink);">Código de invitación</label>
-        <div style="display:flex; gap:10px; margin-top:8px;">
-          <input id="inviteCodeOutput" type="text" readonly aria-label="Código de invitación" placeholder="Pulsa Generar código" style="background:#fff; font-size:1.1rem; font-weight:800; letter-spacing:.15em; padding:10px;" />
+        <p class="invite-code-help">Genera un código y compártelo con todas las personas que quieras invitar.</p>
+        <div class="invite-code-row">
+          <input id="inviteCodeOutput" type="text" readonly aria-label="Código de invitación" placeholder="Genera un código" />
           <input id="shareLinkInput" class="hidden" type="text" readonly />
-          <button id="copyShareLinkBtn" type="button" class="secondary-button compact" style="white-space:nowrap; padding:10px 14px;">📋 Copiar código</button>
+          <button id="copyShareLinkBtn" type="button" class="secondary-button compact" disabled><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V3h13v13h-4v5H3V7h5Zm2 0h7v7h2V5h-9v2Zm5 2H5v10h10V9Z"/></svg>Copiar código</button>
         </div>
       </div>
 
@@ -441,7 +447,7 @@
       <div id="inviteEmailSection">
         <p class="muted" style="margin-bottom:10px; font-weight:600;">Quien use el código recibirá este permiso:</p>
         <div id="inviteOwnerOnlyNotice" class="hidden" style="margin-bottom:12px; padding:10px 14px; background:#fffbeb; border:1px solid #fef3c7; border-radius:10px; font-size:0.83rem; color:#92400e;">
-          ⚠️ Solo la persona propietaria de esta sala puede invitar o cambiar permisos de miembros.
+          Solo la persona propietaria de esta sala puede invitar o cambiar permisos de miembros.
         </div>
         <label>Rol de permisos
           <select id="inviteRoleSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);">
@@ -454,7 +460,7 @@
       <!-- Bloque 3: Miembros actuales de la sala con sus roles del backend -->
       <div id="wallMembersContainer" class="invite-members-list">
         <div class="invite-members-title">
-          <span>👥 Miembros con acceso a esta sala</span>
+          <span><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8 13c-4.4 0-7 2.2-7 5v2h14v-2c0-2.8-2.6-5-7-5Zm8-.8c-.7 0-1.4.1-2 .2 2 1.2 3 3.1 3 5.6v2h6v-2c0-3.2-2.7-5.8-7-5.8Z"/></svg>Miembros con acceso a este muro</span>
           <small id="wallMembersCount" class="muted">1 miembro</small>
         </div>
         <div id="wallMembersList" style="max-height: 180px; overflow-y: auto;">
@@ -527,26 +533,56 @@
 
   <!-- PANEL LATERAL DE PERFIL -->
   <aside id="sidePanel" class="side-panel" aria-hidden="true">
-    <button id="closePanel" class="close-button">&times;</button>
+    <button id="closePanel" class="close-button" aria-label="Cerrar panel">&times;</button>
     <div id="profilePanel">
-      <p class="eyebrow">Tu cuenta</p>
-      <h2 id="profileName">Usuario</h2>
-      <p id="profileEmail" class="muted"></p>
-      <div id="profileRoleBadge" class="profile-role-tag usuario" style="margin-top:6px; display:inline-block;">Rol: Usuario</div>
+      <div class="profile-hero">
+        <div id="profileAvatarLarge" class="profile-avatar-large">U</div>
+        <div><p class="eyebrow">Tu cuenta</p><h2 id="profileName">Usuario</h2><p id="profileEmail" class="muted"></p></div>
+      </div>
+      <div id="profileRoleBadge" class="profile-role-tag usuario">Rol: Usuario</div>
+
+      <button id="openAccountSettingsBtn" class="profile-menu-button" type="button">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.8 7.8 0 0 0 0-2l2-1.6-2-3.4-2.5 1a8 8 0 0 0-1.7-1L14.8 3h-4l-.4 3a8 8 0 0 0-1.7 1L6.2 6l-2 3.4 2 1.6a7.8 7.8 0 0 0 0 2l-2 1.6 2 3.4 2.5-1a8 8 0 0 0 1.7 1l.4 3h4l.4-3a8 8 0 0 0 1.7-1l2.5 1 2-3.4-2-1.6ZM12.8 19h-1.6l-.3-2.4-.7-.3a6 6 0 0 1-1.1-.7l-.6-.5-2.1.8-.8-1.4 1.8-1.5-.1-.8a5.8 5.8 0 0 1 0-1.3l.1-.8-1.8-1.5.8-1.4 2.1.8.6-.5a6 6 0 0 1 1.1-.7l.7-.3.3-2.4h1.6l.3 2.4.7.3a6 6 0 0 1 1.1.7l.6.5 2.1-.8.8 1.4-1.8 1.5.1.8a5.8 5.8 0 0 1 0 1.3l-.1.8 1.8 1.5-.8 1.4-2.1-.8-.6.5a6 6 0 0 1-1.1.7l-.7.3-.3 2.4ZM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
+        <span><strong>Configuración</strong><small>Perfil, acceso y apariencia</small></span>
+        <svg class="menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z"/></svg>
+      </button>
 
       <!-- Ventanita exclusiva que aparece solo para Superadministrador -->
-      <div id="profileAdminAccess" class="hidden" style="margin:24px 0 16px; padding:16px; background: rgba(109, 74, 255, 0.08); border: 1px solid rgba(109, 74, 255, 0.22); border-radius: 14px; text-align: left;">
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-          <span style="font-size:1.2rem;">👁️</span>
-          <strong style="color:var(--brand); font-size:0.95rem;">Centro de ayuda</strong>
-        </div>
+      <div id="profileAdminAccess" class="profile-admin-access hidden">
+        <div class="profile-admin-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4C6.5 4 2.2 8.6 1 12c1.2 3.4 5.5 8 11 8s9.8-4.6 11-8c-1.2-3.4-5.5-8-11-8Zm0 14c-4 0-7.4-3.1-8.8-6C4.6 9.1 8 6 12 6s7.4 3.1 8.8 6c-1.4 2.9-4.8 6-8.8 6Zm0-9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg><strong>Centro de ayuda</strong></div>
         <p class="muted" style="font-size:0.82rem; margin:0 0 14px 0; line-height:1.4;">Revisa reportes y aplica medidas a cuentas sin entrar en muros ni leer notas privadas.</p>
-        <button id="openAdminFromProfileBtn" class="primary-button compact" style="width:100%;">💜 Abrir Centro de Ayuda</button>
+        <button id="openAdminFromProfileBtn" class="primary-button compact" style="width:100%;">Abrir Centro de Ayuda</button>
       </div>
 
-      <button id="logoutButton" class="danger-button" style="margin-top:20px;">Cerrar sesión</button>
+      <button id="logoutButton" class="profile-logout" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9v2H7v14h7v2H5V3Zm11 5 5 4-5 4v-3H9v-2h7V8Z"/></svg>Cerrar sesión</button>
     </div>
   </aside>
+
+  <dialog id="accountSettingsDialog" class="account-settings-dialog">
+    <form id="accountSettingsForm">
+      <div class="dialog-head"><div><p class="eyebrow">Tu espacio personal</p><h3>Configuración de cuenta</h3></div><button id="closeAccountSettings" class="close-button" type="button" aria-label="Cerrar">&times;</button></div>
+      <div class="settings-section">
+        <div class="settings-section-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 6v2h18v-2c0-3.5-4-6-9-6Z"/></svg><div><strong>Perfil</strong><small>Cómo te ven las demás personas</small></div></div>
+        <label>Nombre visible<input id="settingsName" maxlength="40" required></label>
+        <label>Correo electrónico<input id="settingsEmail" type="email" autocomplete="email" required><small class="field-hint">Si cambias el correo, Supabase puede pedirte confirmarlo.</small></label>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 9h-1V7a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v9h14v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V7Zm3 9.7V18h-2v-1.3a2 2 0 1 1 2 0Z"/></svg><div><strong>Seguridad</strong><small>Solo completa estos campos si cambiarás correo o contraseña</small></div></div>
+        <label>Contraseña actual<input id="settingsCurrentPassword" type="password" autocomplete="current-password"></label>
+        <div class="settings-password-grid"><label>Nueva contraseña<input id="settingsNewPassword" type="password" minlength="4" autocomplete="new-password"></label><label>Repetir contraseña<input id="settingsConfirmPassword" type="password" minlength="4" autocomplete="new-password"></label></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.5A7 7 0 0 1 12 3Zm-6 9a7 7 0 0 1 3.8-6.2A9 9 0 0 0 18.2 17 7 7 0 0 1 6 12Z"/></svg><div><strong>Apariencia</strong><small>Elige una jerarquía cómoda para tus ojos</small></div></div>
+        <div class="theme-picker" role="radiogroup" aria-label="Tema de color">
+          <label><input type="radio" name="theme" value="system"><span><b class="theme-preview system-preview"></b><strong>Sistema</strong><small>Sigue tu dispositivo</small></span></label>
+          <label><input type="radio" name="theme" value="light"><span><b class="theme-preview light-preview"></b><strong>Claro</strong><small>Suave y luminoso</small></span></label>
+          <label><input type="radio" name="theme" value="dark"><span><b class="theme-preview dark-preview"></b><strong>Oscuro</strong><small>Contraste descansado</small></span></label>
+        </div>
+      </div>
+      <div class="settings-section settings-toggles"><label><input id="settingsConfirmDelete" type="checkbox">Confirmar antes de eliminar</label><label><input id="settingsNotifications" type="checkbox">Mostrar notificaciones</label><label><input id="settingsCompactNotes" type="checkbox">Usar notas compactas</label></div>
+      <div class="dialog-actions"><button id="cancelAccountSettings" type="button" class="secondary-button">Cancelar</button><button type="submit" class="primary-button">Guardar cambios</button></div>
+    </form>
+  </dialog>
 
   <div id="toast" class="toast" role="status"></div>
 
