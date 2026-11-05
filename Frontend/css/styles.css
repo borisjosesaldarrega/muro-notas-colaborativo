@@ -1582,7 +1582,30 @@ button .ui-icon { margin-right: 7px; }
 .profile-logout { width: 100%; height: 46px; margin-top: 18px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 14px; color: #b6425c; background: #fff0f4; font-weight: 800; }
 .profile-logout.is-loading { opacity: .65; cursor: wait; }
 
-.account-settings-dialog { width: min(690px, calc(100% - 28px)); max-height: min(88vh, 820px); }
+.account-settings-dialog {
+  width: min(690px, calc(100% - 28px));
+  max-height: min(88vh, 820px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #8f7cf8 #eeeaff;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+.account-settings-dialog::-webkit-scrollbar { width: 12px; }
+.account-settings-dialog::-webkit-scrollbar-track {
+  margin-block: 14px;
+  background: #eeeaff;
+  border-radius: 999px;
+}
+.account-settings-dialog::-webkit-scrollbar-thumb {
+  min-height: 58px;
+  border: 3px solid #eeeaff;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #aa9cff, #7763ed);
+}
+.account-settings-dialog::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #9585ff, #6651df); }
+.account-settings-dialog::-webkit-scrollbar-button { width: 0; height: 0; display: none; }
 .account-settings-dialog form { padding: 28px; }
 .settings-section { margin-top: 17px; padding: 17px; border: 1px solid #ebe6f4; border-radius: 18px; background: #fcfbff; }
 .settings-section-title { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -1655,6 +1678,13 @@ html[data-theme="dark"] .wall-card-meta { color: #625b73; }
 html[data-theme="dark"] .wall-card-footer { border-color: rgba(73,62,98,.16); }
 html[data-theme="dark"] .theme-picker input:checked + span { border-color: #a998ff; background: #342a4d; box-shadow: 0 0 0 3px rgba(169,152,255,.24), inset 0 0 0 1px rgba(255,255,255,.08); }
 html[data-theme="dark"] .theme-picker input:checked + span::after { color: #211a37; background: #c8bbff; border-color: #342a4d; }
+html[data-theme="dark"] .account-settings-dialog { scrollbar-color: #a998ff #342a4d; }
+html[data-theme="dark"] .account-settings-dialog::-webkit-scrollbar-track { background: #342a4d; }
+html[data-theme="dark"] .account-settings-dialog::-webkit-scrollbar-thumb {
+  border-color: #342a4d;
+  background: linear-gradient(180deg, #b8aaff, #806bee);
+}
+html[data-theme="dark"] .account-settings-dialog::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #c8bdff, #927cff); }
 html[data-theme="dark"] .admin-table th,
 html[data-theme="dark"] .admin-table td { border-color: #443b5c; color: #eeeaf9; }
 
@@ -1664,6 +1694,7 @@ html[data-theme="dark"] .admin-table td { border-color: #443b5c; color: #eeeaf9;
   .theme-preview { grid-row: 1 / 3; margin: 0; }
   .invite-code-row { grid-template-columns: 1fr; }
   #copyShareLinkBtn { justify-content: center; }
+  .account-settings-dialog::-webkit-scrollbar { width: 9px; }
 }
 
 /* Ajustes finales de contraste y acciones de cuenta. */
