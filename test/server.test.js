@@ -150,8 +150,13 @@ test('sincroniza el ciclo de vida de notas entre clientes', async () => {
 
 test('persiste perfil, tema y preferencias del usuario en el servidor', async () => {
   const member = clients[1];
+  await ack(member, 'wall:select', { id: 'general' });
+  const note = await ack(member, 'note:create', { texto: 'Idea de Brenda', color: 'azul', x: 80, y: 90 });
+  const authorChanged = once(clients[0], 'note:updated');
   const profile = await ack(member, 'profile:update', { name: 'Brenda González', avatar: '' });
   assert.equal(profile.user.name, 'Brenda González');
+  assert.equal((await authorChanged).note.autor, 'Brenda González');
+  await ack(member, 'note:delete', { id: note.note.id });
   const settings = await ack(member, 'settings:update', { theme: 'dark', confirmDelete: false, compactNotes: true, notifications: false });
   assert.deepEqual(settings.settings, { theme: 'dark', confirmDelete: false, compactNotes: true, notifications: false });
   const login = await ack(member, 'auth:login', { email: 'brenda@example.com', password: 'clave45678' });

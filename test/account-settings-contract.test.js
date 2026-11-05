@@ -40,7 +40,7 @@ test('expone configuración de cuenta, temas e invitación con lenguaje claro', 
   assert.match(css, /scrollbar-color:\s*#8f7cf8\s+#eeeaff/);
   assert.match(css, /html\[data-theme="dark"\] \.account-settings-dialog/);
   assert.match(css, /\.admin-user-info \.avatar[\s\S]*place-items:\s*center/);
-  assert.match(html, /class="admin-user-role">Ayuda y moderación/);
+  assert.match(html, /class="admin-user-role">Moderador\/a/);
 });
 
 test('sincroniza el correo confirmado de Auth con el perfil público', () => {
@@ -89,7 +89,7 @@ test('el registro exige verificación real de ocho dígitos y permite reenviar e
   const adapter = readFileSync(join(root, 'public/netlify-socket.js'), 'utf8');
   const config = readFileSync(join(root, 'supabase/config.toml'), 'utf8');
   assert.equal((html.match(/class="code-digit"/g) || []).length, 8);
-  assert.match(app, /pendingRegistration = \{ name, email \}/);
+  assert.match(app, /pendingRegistration = \{ name, email, type: 'signup' \}/);
   assert.doesNotMatch(app, /pendingRegistration\.(password|passwordConfirmation|code)/);
   assert.match(app, /auth:resend-code/);
   assert.match(app, /auth:verify-code/);
@@ -103,4 +103,35 @@ test('el registro exige verificación real de ocho dígitos y permite reenviar e
   assert.match(adapter, /auth\.verifyOtp\(\{ email: payload\.email\.trim\(\)\.toLowerCase\(\), token: payload\.token\.trim\(\), type \}\)/);
   assert.match(config, /otp_length = 8/);
   assert.match(config, /max_frequency = "60s"/);
+});
+
+test('recupera la contraseña con un código de ocho dígitos dentro de la aplicación', () => {
+  const html = readFileSync(join(root, 'Frontend/index.html'), 'utf8');
+  const app = readFileSync(join(root, 'Frontend/js/app.js'), 'utf8');
+  const server = readFileSync(join(root, 'server.js'), 'utf8');
+  const store = readFileSync(join(root, 'lib/supabase-store.js'), 'utf8');
+  const adapter = readFileSync(join(root, 'public/netlify-socket.js'), 'utf8');
+  const template = readFileSync(join(root, 'supabase/email-templates/recovery.html'), 'utf8');
+  assert.match(html, /id="resetPasswordForm"/);
+  assert.match(html, /te enviaremos un código de 8 dígitos/i);
+  assert.match(app, /pendingRegistration = \{ email, type: 'recovery' \}/);
+  assert.match(app, /auth:recovery-password/);
+  assert.match(server, /socket\.on\('auth:recovery-password'/);
+  assert.match(server, /store\.verifyRecovery\(\{ email, token \}\)/);
+  assert.match(store, /verifyOtp\(\{ email, token, type: 'recovery' \}\)/);
+  assert.match(adapter, /case 'auth:recovery-password'/);
+  assert.match(template, /\{\{ \.Token \}\}/);
+  assert.doesNotMatch(template, /\{\{ \.ConfirmationURL \}\}/);
+});
+
+test('ajusta las notas al contenido y sincroniza el nombre visible de su autor', () => {
+  const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
+  const css = readFileSync(join(root, 'Frontend/css/styles.css'), 'utf8');
+  const migration = readFileSync(join(root, 'supabase/migrations/20261105200638_sincronizar_nombre_autor_notas.sql'), 'utf8');
+  assert.match(board, /function resizeNoteToContent/);
+  assert.match(board, /sizeClass === 'size-sm' \? 46/);
+  assert.match(css, /#appView \.note\.size-sm \{ width: 210px; min-height: 132px/);
+  assert.match(migration, /after update of nombre on public\.muro_usuarios/i);
+  assert.match(migration, /update public\.muro_notas/i);
+  assert.match(migration, /nota\.autor_id = usuario\.id/i);
 });

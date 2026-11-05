@@ -7,7 +7,7 @@ const expectedVariables = {
   confirmation: ['{{ .ConfirmationURL }}', '{{ .Token }}'],
   invite: ['{{ .ConfirmationURL }}'],
   magic_link: ['{{ .ConfirmationURL }}', '{{ .Token }}'],
-  recovery: ['{{ .ConfirmationURL }}', '{{ .Token }}'],
+  recovery: ['{{ .Token }}'],
   email_change: ['{{ .ConfirmationURL }}', '{{ .Token }}', '{{ .NewEmail }}'],
   reauthentication: ['{{ .Token }}'],
   password_changed_notification: ['{{ .Email }}'],
@@ -25,6 +25,7 @@ for (const [name, variables] of Object.entries(expectedVariables)) {
   for (const variable of variables) {
     if (!html.includes(variable)) throw new Error(`${name} no conserva ${variable}`);
   }
+  if (name === 'recovery' && html.includes('{{ .ConfirmationURL }}')) throw new Error('recovery no debe incluir enlaces; la recuperación usa un código dentro de la aplicación');
   if (!html.includes('<table role="presentation"') || !html.includes('style="')) throw new Error(`${name} no usa estructura de correo compatible`);
   if (/<script\b/i.test(html) || /supabase/i.test(html)) throw new Error(`${name} contiene contenido no permitido`);
 }

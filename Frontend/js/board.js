@@ -59,6 +59,14 @@ window.MuroBoard = (function () {
     return '';
   }
 
+  function resizeNoteToContent(element, textarea, text = '') {
+    const sizeClass = noteSizeClass(text);
+    const minimum = sizeClass === 'size-sm' ? 46 : sizeClass === 'size-lg' ? 96 : 68;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(260, Math.max(minimum, textarea.scrollHeight))}px`;
+    element.dataset.noteSize = sizeClass || 'medium';
+  }
+
   function updateNoteCount() {
     const countSpan = $('#notesStat');
     if (countSpan) countSpan.textContent = state.notes.size;
@@ -114,6 +122,12 @@ window.MuroBoard = (function () {
       setupDrag(element);
 
       const textarea = element.querySelector('textarea');
+      textarea.addEventListener('input', () => {
+        const current = state.notes.get(note.id);
+        const sizeClass = noteSizeClass(textarea.value);
+        element.className = `note ${colorClass(current?.color)}${sizeClass ? ` ${sizeClass}` : ''}${state.filter !== 'all' && state.filter !== current?.color ? ' filtered' : ''}`;
+        resizeNoteToContent(element, textarea, textarea.value);
+      });
       textarea.addEventListener('change', (event) => {
         const newText = event.target.value.trim();
         const current = state.notes.get(note.id);
@@ -168,8 +182,7 @@ window.MuroBoard = (function () {
     if (document.activeElement !== textarea) {
       textarea.value = note.texto || '';
     }
-    textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(260, Math.max(72, textarea.scrollHeight))}px`;
+    resizeNoteToContent(element, textarea, note.texto);
 
     const authorTag = element.querySelector('.author-tag');
     if (authorTag) authorTag.textContent = note.autor || 'Invitado';

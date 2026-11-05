@@ -9,7 +9,7 @@ Este directorio contiene el asunto y el HTML completo de todos los correos de Su
 | Confirm signup | Confirma tu cuenta en Muro Colaborativo | `confirmation.html` | `{{ .ConfirmationURL }}`, `{{ .Token }}` |
 | Invite user | Te invitaron a Muro Colaborativo | `invite.html` | `{{ .ConfirmationURL }}` |
 | Magic link | Tu acceso seguro a Muro Colaborativo | `magic_link.html` | `{{ .ConfirmationURL }}`, `{{ .Token }}` |
-| Reset password | Restablece tu contraseña de Muro Colaborativo | `recovery.html` | `{{ .ConfirmationURL }}`, `{{ .Token }}` |
+| Reset password | Restablece tu contraseña de Muro Colaborativo | `recovery.html` | `{{ .Token }}` (código de 8 dígitos dentro de la aplicación) |
 | Change email address | Confirma tu nuevo correo en Muro Colaborativo | `email_change.html` | `{{ .ConfirmationURL }}`, `{{ .Token }}`, `{{ .NewEmail }}` |
 | Reauthentication | `{{ .Token }} es tu código de verificación` | `reauthentication.html` | `{{ .Token }}` |
 
