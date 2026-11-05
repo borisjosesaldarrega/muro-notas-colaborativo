@@ -232,12 +232,33 @@ function createMuroServer(options = {}) {
     } : {})
   });
 
-  function establishSession(socket, user, suppliedToken = '') {
-    const token = suppliedToken || crypto.randomUUID();
+  /** @param {string | { token?: string, refreshToken?: string, expiresAt?: number } | null} suppliedSession */
+  function establishSession(socket, user, suppliedSession = null) {
+    const session = typeof suppliedSession === 'string' ? { token: suppliedSession } : (suppliedSession || {});
+    const token = session.token || crypto.randomUUID();
     sessions.set(token, user.id);
     socket.data.userId = user.id;
-    socket.data.accessToken = suppliedToken || '';
-    return { token, user: publicUser(user) };
+    socket.data.accessToken = session.token || '';
+    socket.data.refreshToken = session.refreshToken || '';
+    socket.data.expiresAt = Number(session.expiresAt || 0);
+    return { token, refreshToken: session.refreshToken || '', expiresAt: socket.data.expiresAt, user: publicUser(user) };
+  }
+
+  async function refreshSocketSession(socket) {
+    if (!storage.schemaReady || !socket.data.userId || !socket.data.refreshToken) return;
+    if (socket.data.expiresAt && socket.data.expiresAt > Date.now() + 60_000) return;
+    const previousToken = socket.data.accessToken;
+    const refreshed = await store.refreshSession(socket.data.refreshToken);
+    if (previousToken) sessions.delete(previousToken);
+    sessions.set(refreshed.token, refreshed.user.id);
+    socket.data.accessToken = refreshed.token;
+    socket.data.refreshToken = refreshed.refreshToken;
+    socket.data.expiresAt = refreshed.expiresAt;
+    socket.emit('auth:token-refreshed', {
+      token: refreshed.token,
+      refreshToken: refreshed.refreshToken,
+      expiresAt: refreshed.expiresAt
+    });
   }
 
   function connectedUserCount(wallId = null, excludedSocketId = '') {
@@ -277,7 +298,18 @@ function createMuroServer(options = {}) {
 
   io.on('connection', (socket) => {
     socket.use(async (_packet, next) => {
-      try { await ready; next(); } catch (error) { next(error); }
+      try {
+        await ready;
+        await refreshSocketSession(socket);
+        next();
+      } catch {
+        socket.data.userId = null;
+        socket.data.accessToken = '';
+        socket.data.refreshToken = '';
+        socket.data.expiresAt = 0;
+        socket.emit('auth:expired');
+        next();
+      }
     });
     socket.emit('auth:required');
 
@@ -337,7 +369,7 @@ function createMuroServer(options = {}) {
         }
         replaceState(await store.loadState());
         const user = users.find((item) => item.id === session.user.id) || session.user;
-        return acknowledge({ ok: true, ...establishSession(socket, user, session.token) });
+        return acknowledge({ ok: true, ...establishSession(socket, user, session) });
       } catch {
         return fail(acknowledge, 'El código es incorrecto, caducó o ya fue utilizado. Solicita uno nuevo.');
       }
@@ -367,7 +399,7 @@ function createMuroServer(options = {}) {
           const session = await store.login({ email, password: String(payload.password ?? '') });
           const index = users.findIndex((item) => item.id === session.user.id);
           if (index >= 0) users[index] = session.user; else users.push(session.user);
-          return acknowledge({ ok: true, ...establishSession(socket, session.user, session.token) });
+          return acknowledge({ ok: true, ...establishSession(socket, session.user, session) });
         } catch (error) {
           const suspended = /banned|suspend/i.test(String(error?.message));
           return fail(acknowledge, suspended ? 'Tu cuenta está suspendida. Revisa el correo enviado por moderación.' : 'Correo o contraseña incorrectos.');
@@ -382,13 +414,10 @@ function createMuroServer(options = {}) {
       const token = cleanText(payload.token, 4096);
       if (storage.schemaReady) {
         try {
-          const session = await store.restore(token);
+          const session = await store.restore(token, cleanText(payload.refreshToken, 4096));
           const index = users.findIndex((item) => item.id === session.user.id);
           if (index >= 0) users[index] = session.user; else users.push(session.user);
-          socket.data.userId = session.user.id;
-          socket.data.accessToken = token;
-          sessions.set(token, session.user.id);
-          return acknowledge({ ok: true, token, user: publicUser(session.user) });
+          return acknowledge({ ok: true, ...establishSession(socket, session.user, session) });
         } catch (error) {
           const suspended = /banned|suspend/i.test(String(error?.message));
           return fail(acknowledge, suspended ? 'Tu cuenta está suspendida. Revisa el correo enviado por moderación.' : 'Tu sesión expiró. Inicia sesión nuevamente.');
@@ -405,6 +434,8 @@ function createMuroServer(options = {}) {
       leaveCurrentWall(socket);
       socket.data.userId = null;
       socket.data.accessToken = '';
+      socket.data.refreshToken = '';
+      socket.data.expiresAt = 0;
       acknowledge({ ok: true });
     });
 
@@ -768,14 +799,18 @@ function createMuroServer(options = {}) {
       const texto = cleanText(payload.texto);
       if (!texto) return fail(acknowledge, 'La nota no puede estar vacía.');
       if (payload.color !== undefined && !COLORS.has(payload.color)) return fail(acknowledge, 'El color no es válido.');
-      note.texto = texto;
-      if (payload.color) note.color = payload.color;
-      note.editor = user.name;
-      note.editorId = user.id;
-      note.updatedAt = Date.now();
+      const nextNote = {
+        ...note,
+        texto,
+        color: payload.color || note.color,
+        editor: user.name,
+        editorId: user.id,
+        updatedAt: Date.now()
+      };
       if (storage.schemaReady) {
-        try { await store.updateNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar la nota. Inténtalo nuevamente.'); }
+        try { await store.updateNote(wall.id, nextNote, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar la nota. Inténtalo nuevamente.'); }
       }
+      Object.assign(note, nextNote);
       io.to(`wall:${wall.id}`).emit('note:updated', { wallId: wall.id, note });
       acknowledge({ ok: true, note });
     });
@@ -787,12 +822,11 @@ function createMuroServer(options = {}) {
       if (!canEdit(wall, user)) return fail(acknowledge, 'Tu permiso es de solo lectura.');
       const note = wall.notes.find((item) => item.id === cleanText(payload.id, 100));
       if (!note) return fail(acknowledge, 'La nota ya no existe.');
-      note.x = safeCoordinate(payload.x, note.x);
-      note.y = safeCoordinate(payload.y, note.y);
-      note.updatedAt = Date.now();
+      const nextNote = { ...note, x: safeCoordinate(payload.x, note.x), y: safeCoordinate(payload.y, note.y), updatedAt: Date.now() };
       if (storage.schemaReady) {
-        try { await store.updateNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo mover la nota. Inténtalo nuevamente.'); }
+        try { await store.updateNote(wall.id, nextNote, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo mover la nota. Inténtalo nuevamente.'); }
       }
+      Object.assign(note, nextNote);
       io.to(`wall:${wall.id}`).emit('note:moved', { wallId: wall.id, id: note.id, x: note.x, y: note.y, updatedAt: note.updatedAt });
       acknowledge({ ok: true });
     });

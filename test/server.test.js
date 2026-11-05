@@ -246,6 +246,9 @@ test('reporta a una cuenta compartida y reserva las sanciones al superadmin', as
   assert.equal(report.ok, true);
   const listed = await ack(admin, 'admin:reports:list');
   assert.equal(listed.reports.find((item) => item.id === report.report.id).reportedUserId, adminId);
+  const closed = await ack(admin, 'admin:report:respond', { id: report.report.id, status: 'rechazado', decision: 'Reporte revisado y cerrado sin aplicar una medida.' });
+  assert.equal(closed.ok, true);
+  assert.equal((await ack(member, 'reports:list')).reports.find((item) => item.id === report.report.id).status, 'rechazado');
   assert.equal((await ack(member, 'admin:user:discipline', { userId: adminId, action: 'advertir', message: 'No permitido.' })).ok, false);
   assert.equal((await ack(admin, 'admin:user:discipline', { userId: memberId, action: 'advertir', message: 'Evita repetir esta conducta.' })).ok, true);
 });

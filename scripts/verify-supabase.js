@@ -12,6 +12,8 @@ async function main() {
   const result = {
     publicConnection: false,
     authentication: 'not_run',
+    sessionRefresh: 'not_run',
+    notes: 'not_run',
     rls: 'migration_required',
     invitations: 'not_run',
     reports: 'not_run',
@@ -53,11 +55,15 @@ async function main() {
         if (loginError || !login.session?.access_token) throw loginError || new Error('Supabase no devolvio una sesion.');
         const { data: verified, error: verifyError } = await services.publicClient.auth.getUser(login.session.access_token);
         if (verifyError || verified.user?.id !== created.user.id) throw verifyError || new Error('El usuario autenticado no coincide.');
-        sessions.push({ id: created.user.id, token: login.session.access_token });
+        sessions.push({ id: created.user.id, token: login.session.access_token, refreshToken: login.session.refresh_token });
       }
       result.authentication = 'passed';
 
       if (schemaReady) {
+        const refreshedOwner = await store.refreshSession(sessions[0].refreshToken);
+        sessions[0].token = refreshedOwner.token;
+        sessions[0].refreshToken = refreshedOwner.refreshToken;
+        result.sessionRefresh = refreshedOwner.user.id === sessions[0].id && refreshedOwner.expiresAt > Date.now() ? 'passed' : 'failed';
         const [owner, outsider, guest] = sessions;
         const ownerClient = services.createUserClient(owner.token);
         const outsiderClient = services.createUserClient(outsider.token);
@@ -84,6 +90,18 @@ async function main() {
           nombre_autor: 'Temporal owner'
         });
         if (noteError) throw noteError;
+
+        const { data: updatedNote, error: noteUpdateError } = await ownerClient.from('muro_notas')
+          .update({ contenido: 'Nota privada temporal editada', actualizado_en: new Date().toISOString() })
+          .eq('id', noteId)
+          .select('autor_id,nombre_autor,editado_por_id,nombre_editor,contenido')
+          .single();
+        result.notes = !noteUpdateError
+          && updatedNote?.autor_id === owner.id
+          && updatedNote?.editado_por_id === owner.id
+          && updatedNote?.contenido === 'Nota privada temporal editada'
+          ? 'passed'
+          : 'failed';
 
         const { data: ownerRows, error: ownerReadError } = await ownerClient.from('muro_notas').select('id').eq('id', noteId);
         const { data: hiddenRows, error: outsiderReadError } = await outsiderClient.from('muro_notas').select('id').eq('id', noteId);

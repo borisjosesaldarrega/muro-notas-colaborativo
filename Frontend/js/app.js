@@ -14,6 +14,8 @@
 
   const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
   const TOKEN_KEY = 'muroToken';
+  const REFRESH_TOKEN_KEY = 'muroRefreshToken';
+  const EXPIRES_AT_KEY = 'muroSessionExpiresAt';
   const SESSION_KEY = 'muroSession';
   const THEME_KEY = 'muroTheme';
 
@@ -102,6 +104,8 @@
   let countdownTimerId = null;
   let activeVerifiedUser = null;
   let activeVerifiedToken = '';
+  let activeVerifiedRefreshToken = '';
+  let activeVerifiedExpiresAt = 0;
   let recoveryToken = '';
   let currentUser = null;
   let themeSaveSequence = 0;
@@ -143,12 +147,27 @@
     digitInputs.forEach((input) => { input.value = ''; });
   }
 
-  function enterApp(user, token = '') {
+  function clearStoredSession() {
+    [SESSION_KEY, TOKEN_KEY, REFRESH_TOKEN_KEY, EXPIRES_AT_KEY].forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+  }
+
+  function storeSessionTokens(token = '', refreshToken = '', expiresAt = 0) {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    if (expiresAt) localStorage.setItem(EXPIRES_AT_KEY, String(expiresAt));
+  }
+
+  function enterApp(user, token = '', refreshToken = '', expiresAt = 0) {
     currentUser = user;
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-    if (token) localStorage.setItem(TOKEN_KEY, token);
+    storeSessionTokens(token, refreshToken, expiresAt);
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    sessionStorage.removeItem(EXPIRES_AT_KEY);
     applyTheme(user.settings?.theme || localStorage.getItem(THEME_KEY) || 'system');
     document.body.classList.toggle('compact-notes', Boolean(user.settings?.compactNotes));
 
@@ -224,7 +243,7 @@
     const res = await emitAsync(socket, 'auth:login', { email, password });
     setFormBusy(form, false);
     if (res?.ok) {
-      enterApp(res.user, res.token);
+      enterApp(res.user, res.token, res.refreshToken, res.expiresAt);
       toast(`¡Hola, ${res.user.name}!`);
     } else {
       toast(res?.error || 'Correo o contraseña incorrectos.');
@@ -283,6 +302,8 @@
       pendingRegistration = { name, email, type: 'signup' };
       activeVerifiedUser = null;
       activeVerifiedToken = '';
+      activeVerifiedRefreshToken = '';
+      activeVerifiedExpiresAt = 0;
       $('#registerPassword').value = '';
       $('#registerConfirmPassword').value = '';
       prepareVerification(email, 'signup');
@@ -293,6 +314,8 @@
     }
     activeVerifiedUser = res.user;
     activeVerifiedToken = res.token || '';
+    activeVerifiedRefreshToken = res.refreshToken || '';
+    activeVerifiedExpiresAt = res.expiresAt || 0;
     showAuth('confirm');
     toast('Cuenta creada correctamente.');
   });
@@ -419,6 +442,8 @@
     }
     activeVerifiedUser = res.user;
     activeVerifiedToken = res.token || '';
+    activeVerifiedRefreshToken = res.refreshToken || '';
+    activeVerifiedExpiresAt = res.expiresAt || 0;
     pendingRegistration = null;
     clearInterval(countdownTimerId);
     showAuth('confirm');
@@ -428,7 +453,7 @@
   // Botón para entrar tras confirmación (PASO 3)
   $('#enterAfterConfirmBtn')?.addEventListener('click', () => {
     if (activeVerifiedUser) {
-      enterApp(activeVerifiedUser, activeVerifiedToken);
+      enterApp(activeVerifiedUser, activeVerifiedToken, activeVerifiedRefreshToken, activeVerifiedExpiresAt);
       toast(`¡Hola, ${activeVerifiedUser.name}!`);
     } else {
       showAuth('login');
@@ -524,6 +549,7 @@
         renderAdminRecentUsers(cachedAdminUsers, cachedAdminReports);
         renderAdminUsersTable(cachedAdminUsers, cachedAdminReports);
         renderAdminAllReports(cachedAdminReports);
+        renderAdminReportHistory(cachedAdminReports);
         renderAdminSanctions(cachedAdminUsers);
         if (!reportResult?.ok) toast(reportResult?.error || 'No se pudieron cargar los reportes.');
       });
@@ -665,17 +691,41 @@
     });
   }
 
+  function renderAdminReportHistory(reports = []) {
+    const table = $('#adminReportHistoryTable');
+    if (!table) return;
+    const closedReports = reports.filter((report) => ['resuelto', 'rechazado'].includes(report.status));
+    table.innerHTML = '';
+    if (!closedReports.length) {
+      table.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center;padding:28px;">Todavía no hay reportes cerrados.</td></tr>';
+      return;
+    }
+    closedReports.forEach((report) => {
+      const row = document.createElement('tr');
+      const values = [
+        report.reporterName || 'Usuario',
+        report.reportedUserName || 'Sin usuario asociado',
+        report.status === 'resuelto' ? 'Resuelto' : 'Rechazado',
+        report.decision || 'Sin observación',
+        timeAgo(report.answeredAt || report.reviewedAt || report.createdAt)
+      ];
+      values.forEach((value) => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
+      table.appendChild(row);
+    });
+  }
+
   function renderAdminAllReports(reports = []) {
     const allReportsTable = $('#adminAllReportsTable');
     if (!allReportsTable) return;
 
     allReportsTable.innerHTML = '';
-    if (!reports.length) {
-      allReportsTable.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center; padding:30px;">Todavía no se han recibido reportes.</td></tr>`;
+    const activeReports = reports.filter((report) => ['pendiente', 'en_revision'].includes(report.status));
+    if (!activeReports.length) {
+      allReportsTable.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center; padding:30px;">No hay reportes pendientes de revisión.</td></tr>`;
       return;
     }
 
-    reports.forEach((rep) => {
+    activeReports.forEach((rep) => {
       const tr = document.createElement('tr');
       const reporter = document.createElement('td'); reporter.textContent = rep.reporterName || 'Usuario';
       const reported = document.createElement('td'); const reportedStrong = document.createElement('strong'); reportedStrong.textContent = rep.reportedUserName || 'Sin usuario asociado'; reported.appendChild(reportedStrong); if (rep.reportedUserEmail) { const mail = document.createElement('small'); mail.className = 'muted'; mail.textContent = rep.reportedUserEmail; reported.append(document.createElement('br'), mail); }
@@ -693,6 +743,30 @@
         const target = cachedAdminUsers.find((user) => user.id === rep.reportedUserId);
         if (target) actions.appendChild(makeModerationButton(target, rep));
       }
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'secondary-button compact';
+      close.textContent = 'Cerrar reporte';
+      close.addEventListener('click', async () => {
+        const accepted = await window.MuroUI.confirmAction({
+          title: 'Cerrar reporte',
+          message: 'El reporte quedará en el historial como revisado y sin una medida de cuenta.',
+          confirmText: 'Cerrar reporte',
+          tone: 'primary',
+          icon: '✓'
+        });
+        if (!accepted) return;
+        window.MuroBoard.getSocket().emit('admin:report:respond', {
+          id: rep.id,
+          status: 'rechazado',
+          decision: 'Reporte revisado y cerrado sin aplicar una medida.'
+        }, (res) => {
+          if (!res?.ok) return toast(res?.error || 'No se pudo cerrar el reporte.', 'error');
+          toast('El reporte se cerró y pasó al historial.', 'success');
+          renderAdminDashboard();
+        });
+      });
+      actions.appendChild(close);
       tr.append(reporter, reported, reason, date, actions);
       allReportsTable.appendChild(tr);
     });
@@ -921,10 +995,7 @@
       if (button) { button.disabled = false; button.classList.remove('is-loading'); }
       return toast(result?.error || 'No se pudo cerrar la sesión. Inténtalo nuevamente.', 'error');
     }
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(TOKEN_KEY);
-    sessionStorage.removeItem(SESSION_KEY);
-    sessionStorage.removeItem(TOKEN_KEY);
+    clearStoredSession();
     currentUser = null;
     document.body.classList.remove('compact-notes');
     history.replaceState(null, '', `${location.pathname}${location.search}`);
@@ -943,6 +1014,30 @@
         renderAdminDashboard();
       }
     });
+    boardSocket.on('auth:token-refreshed', (session = {}) => {
+      storeSessionTokens(session.token, session.refreshToken, session.expiresAt);
+    });
+    boardSocket.on('auth:expired', () => {
+      clearStoredSession();
+      currentUser = null;
+      showAuth('login');
+      toast('Tu sesión venció. Inicia sesión nuevamente.', 'error');
+    });
+    boardSocket.on('connect', () => {
+      if (!currentUser) return;
+      const token = localStorage.getItem(TOKEN_KEY) || '';
+      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY) || '';
+      const wallId = window.MuroBoard?.getState()?.currentWall?.id;
+      const wallWasOpen = !$('#appView')?.classList.contains('hidden');
+      boardSocket.emit('auth:restore', { token, refreshToken }, (res) => {
+        if (!res?.ok) return;
+        currentUser = res.user;
+        localStorage.setItem(SESSION_KEY, JSON.stringify(res.user));
+        storeSessionTokens(res.token, res.refreshToken, res.expiresAt);
+        if (wallWasOpen && wallId) window.MuroBoard?.selectWall(wallId);
+        else window.MuroBoard?.fetchWalls();
+      });
+    });
   }
 
   /* ==========================================
@@ -950,15 +1045,13 @@
      ========================================== */
 
   const savedToken = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
+  const savedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY) || sessionStorage.getItem(REFRESH_TOKEN_KEY) || '';
   const sessionSocket = window.MuroBoard?.getSocket();
   if (sessionSocket) {
-    sessionSocket.emit('auth:restore', { token: savedToken }, (res) => {
-      if (res?.ok) enterApp(res.user, res.token);
+    sessionSocket.emit('auth:restore', { token: savedToken, refreshToken: savedRefreshToken }, (res) => {
+      if (res?.ok) enterApp(res.user, res.token, res.refreshToken, res.expiresAt);
       else {
-        localStorage.removeItem(SESSION_KEY);
-        localStorage.removeItem(TOKEN_KEY);
-        sessionStorage.removeItem(SESSION_KEY);
-        sessionStorage.removeItem(TOKEN_KEY);
+        clearStoredSession();
         showAuth('login');
         if (savedToken) toast(res?.error || 'La sesión expiró.');
       }
