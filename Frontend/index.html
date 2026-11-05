@@ -146,38 +146,43 @@
 
   <!-- VISTA 3: LIENZO Y TABLERO DEL MURO ACTIVO (CARA DE USUARIO) -->
   <main id="appView" class="app-shell hidden">
-    <header class="topbar">
-      <button id="backToWallsButton" class="secondary-button compact" title="Volver a la lista de salas">← Mis Muros</button>
-      <div class="board-name">
-        <small>Muro activo</small>
-        <strong id="currentWallTitle">Muro de ideas</strong>
-      </div>
-      <div class="top-actions">
-        <button id="inviteButton" class="btn-invite-room" title="Invitar y compartir código">👥 Invitar al Muro</button>
-        <button id="deleteWallBtn" class="danger-button compact hidden" title="Eliminar este muro">🗑️ Eliminar Sala</button>
-        <span class="presence"><i></i><b id="onlineCount">1</b> conectados</span>
+    <header class="topbar board-topbar">
+      <button id="backToWallsButton" class="board-brand" title="Volver a Mis Muros" aria-label="Volver a Mis Muros">
+        <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span>
+        <span class="board-brand-copy"><strong>Muro</strong><small>Ideas que se mueven juntas</small></span>
+      </button>
+      <span class="presence board-presence"><i></i><span id="connectionStatus">Conectado</span> · <b id="onlineCount">1</b> <span class="presence-label">personas</span></span>
+      <div class="top-actions board-actions">
+        <button id="inviteButton" class="board-action share-action" title="Compartir código de invitación">Compartir</button>
+        <button id="deleteWallBtn" class="board-action delete-action hidden" title="Eliminar este muro" aria-label="Eliminar este muro">Eliminar</button>
+        <button id="newNoteButton" class="board-action new-note-action">＋ Nueva nota</button>
         <button id="profileButton" class="avatar" title="Perfil">P</button>
       </div>
     </header>
-    <section class="toolbar">
-      <button id="newNoteButton" class="primary-button compact">＋ Nueva nota</button>
-      <div class="color-filter" aria-label="Filtrar por color">
-        <button class="swatch active" data-filter="all" title="Todos"></button>
+    <section class="toolbar board-toolbar">
+      <div class="board-heading">
+        <h1 id="currentWallTitle">Muro de ideas</h1>
+        <p>Arrastra las notas, escribe y construyamos algo genial.</p>
+      </div>
+      <div class="board-tools">
+        <div class="color-filter" aria-label="Filtrar por color">
+        <button class="swatch all-colors active" data-filter="all" title="Todos los colores"><span>Todos los colores</span></button>
         <button class="swatch yellow" data-filter="amarillo"></button>
         <button class="swatch pink" data-filter="rosa"></button>
         <button class="swatch blue" data-filter="azul"></button>
         <button class="swatch green" data-filter="verde"></button>
+        </div>
+        <div class="board-zoom" aria-label="Zoom del muro">
+          <button type="button" data-board-zoom="out" title="Alejar">−</button>
+          <span id="boardZoomLabel">100%</span>
+          <button type="button" data-board-zoom="in" title="Acercar">＋</button>
+          <button class="fit-board" type="button" data-board-zoom="fit" title="Ver todo">Ver todo</button>
+        </div>
       </div>
-      <div class="board-zoom" aria-label="Zoom del muro">
-        <button type="button" data-board-zoom="out" title="Alejar">−</button>
-        <span id="boardZoomLabel">100%</span>
-        <button type="button" data-board-zoom="in" title="Acercar">＋</button>
-        <button type="button" data-board-zoom="fit" title="Ver todo">Ver todo</button>
-      </div>
-      <span id="connectionStatus" class="status">Sincronizado</span>
     </section>
     <section id="board" class="board" aria-label="Muro colaborativo">
       <div id="boardStage" class="board-stage"><div id="boardSurface" class="board-surface"></div></div>
+      <p class="board-help">Doble clic en el tablero para crear una nota · Arrastra para mover</p>
     </section>
   </main>
 

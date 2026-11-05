@@ -343,7 +343,7 @@ window.MuroBoard = (function () {
   if (socket) {
     socket.on('connect', () => {
       const status = $('#connectionStatus');
-      if (status) status.textContent = '🟢 Sincronizado';
+      if (status) status.textContent = 'Conectado';
       const token = sessionStorage.getItem('muroToken');
       if (token) socket.emit('auth:restore', { token }, (res) => {
         if (!res?.ok) {
@@ -355,7 +355,7 @@ window.MuroBoard = (function () {
 
     socket.on('disconnect', () => {
       const status = $('#connectionStatus');
-      if (status) status.textContent = '🔴 Reconectando…';
+      if (status) status.textContent = 'Reconectando…';
     });
 
     socket.on('notes:init', (notes) => {
@@ -398,6 +398,8 @@ window.MuroBoard = (function () {
     socket.on('users:count', (count) => {
       state.online = count;
       if ($('#onlineCount')) $('#onlineCount').textContent = count;
+      const label = $('.presence-label');
+      if (label) label.textContent = Number(count) === 1 ? 'persona' : 'personas';
       if ($('#usersStat')) $('#usersStat').textContent = count;
     });
 
@@ -448,11 +450,17 @@ window.MuroBoard = (function () {
   });
 
   // Modal Nueva Nota
-  $('#newNoteButton')?.addEventListener('click', () => {
+  function openNewNoteDialog() {
     $('#noteForm')?.reset();
     if ($('#characterCount')) $('#characterCount').textContent = '0 / 280';
     $('#noteDialog')?.showModal();
     setTimeout(() => $('#noteText')?.focus(), 50);
+  }
+
+  $('#newNoteButton')?.addEventListener('click', openNewNoteDialog);
+  board?.addEventListener('dblclick', (event) => {
+    if (event.target.closest('.note, button, textarea')) return;
+    openNewNoteDialog();
   });
 
   $('#noteText')?.addEventListener('input', (e) => {
