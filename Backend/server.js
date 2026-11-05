@@ -156,19 +156,14 @@ function createMuroServer(options = {}) {
   }
 
   function leaveCurrentWall(socket) {
-    const prevId = socket.data.wallId;
-    if (prevId) {
-      socket.leave(`wall:${prevId}`);
-      socket.data.wallId = null;
-      broadcastRoomOnline(prevId);
-    }
+    if (socket.data.wallId) socket.leave(`wall:${socket.data.wallId}`);
+    socket.data.wallId = null;
   }
 
   function joinWall(socket, wall) {
     leaveCurrentWall(socket);
     socket.data.wallId = wall.id;
     socket.join(`wall:${wall.id}`);
-    broadcastRoomOnline(wall.id);
   }
 
   function emitAdminSnapshot() {
@@ -176,18 +171,6 @@ function createMuroServer(options = {}) {
       const user = findUser(socket);
       if (user?.role === 'superadmin') socket.emit('admin:changed');
     }
-  }
-
-  function getRoomOnlineCount(wallId) {
-    if (!wallId) return 0;
-    const room = io.sockets.adapter.rooms.get(`wall:${wallId}`);
-    return room ? room.size : 0;
-  }
-
-  function broadcastRoomOnline(wallId) {
-    if (!wallId) return;
-    const count = getRoomOnlineCount(wallId);
-    io.to(`wall:${wallId}`).emit('wall:users:count', { wallId, count });
   }
 
   io.on('connection', (socket) => {
@@ -290,22 +273,6 @@ function createMuroServer(options = {}) {
         try { await store.recover(email, process.env.APP_URL || 'http://localhost:3000'); } catch { /* respuesta uniforme para no filtrar cuentas */ }
       }
       acknowledge({ ok: true, message: 'Si la cuenta existe, se envió un enlace seguro.' });
-    });
-
-    socket.on('auth:password:verify-current', async (payload = {}, acknowledge = () => {}) => {
-      const user = requireUser(socket, acknowledge);
-      if (!user) return;
-      const current = String(payload.currentPassword ?? '');
-      if (storage.schemaReady) {
-        try {
-          await store.login({ email: user.email, password: current });
-          return acknowledge({ ok: true });
-        } catch {
-          return fail(acknowledge, 'La contraseña actual es incorrecta.');
-        }
-      }
-      if (user.password !== current) return fail(acknowledge, 'La contraseña actual es incorrecta.');
-      return acknowledge({ ok: true });
     });
 
     socket.on('auth:password', async (payload = {}, acknowledge = () => {}) => {
@@ -414,33 +381,6 @@ function createMuroServer(options = {}) {
       const wall = findWall(payload.id);
       if (!user || !wall) return user && fail(acknowledge, 'El muro no existe.');
       if (!wallRole(wall, user)) return fail(acknowledge, 'No tienes acceso a este muro.');
-      joinWall(socket, wall);
-      acknowledge({ ok: true, wall: wallSummary(wall, user), notes: wall.notes, members: wallMembers(wall) });
-    });
-
-    socket.on('wall:join-code', async (payload = {}, acknowledge = () => {}) => {
-      const user = requireUser(socket, acknowledge);
-      if (!user) return;
-      const rawCode = cleanText(payload.code, 64).toUpperCase().trim();
-      if (!rawCode) return fail(acknowledge, 'Ingresa el código de la sala.');
-
-      // Coincidencia por ID directo o prefijo corto de ID (los primeros 8 caracteres)
-      const wall = walls.find((w) => {
-        const idUpper = w.id.toUpperCase();
-        const shortCode = idUpper.replace(/[^A-Z0-9]/g, '').slice(0, 8);
-        return idUpper === rawCode || shortCode === rawCode.replace(/[^A-Z0-9]/g, '') || idUpper.startsWith(rawCode);
-      });
-
-      if (!wall) return fail(acknowledge, 'No se encontró ninguna sala con ese código.');
-
-      if (!wall.members[user.id]) {
-        wall.members[user.id] = 'editor';
-        if (storage.schemaReady) {
-          try { await store.createMember(wall.id, user.id, 'editor', socket.data.accessToken); } catch {}
-        }
-        emitAdminSnapshot();
-      }
-
       joinWall(socket, wall);
       acknowledge({ ok: true, wall: wallSummary(wall, user), notes: wall.notes, members: wallMembers(wall) });
     });
@@ -595,13 +535,6 @@ function createMuroServer(options = {}) {
       const id = cleanText(payload.id, 100);
       const index = wall.notes.findIndex((item) => item.id === id);
       if (index === -1) return fail(acknowledge, 'La nota ya no existe.');
-      const note = wall.notes[index];
-      // Solo el autor de la nota o el creador de la sala pueden eliminarla
-      const isAuthor = (note.authorId && note.authorId === user.id) || (note.autor === user.name);
-      const isWallOwner = canOwn(wall, user) || wall.ownerId === user.id;
-      if (!isAuthor && !isWallOwner) {
-        return fail(acknowledge, 'Solo la persona que creó la nota o la persona dueña de la sala pueden eliminarla.');
-      }
       if (storage.schemaReady) {
         try { await store.deleteNote(id, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo eliminar la nota en Supabase.'); }
       }
@@ -653,10 +586,7 @@ function createMuroServer(options = {}) {
       emitAdminSnapshot();
     });
 
-    socket.on('disconnect', () => {
-      leaveCurrentWall(socket);
-      io.emit('users:count', io.engine.clientsCount);
-    });
+    socket.on('disconnect', () => io.emit('users:count', io.engine.clientsCount));
   });
 
   return { app, httpServer, io, users, sessions, walls, ready, storage };
