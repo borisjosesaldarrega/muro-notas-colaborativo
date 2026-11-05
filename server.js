@@ -247,6 +247,7 @@ function createMuroServer(options = {}) {
       const password = String(payload.password ?? '');
       const passwordConfirmation = String(payload.passwordConfirmation ?? '');
       if (!name) return fail(acknowledge, 'Escribe tu nombre.');
+      if (users.some((user) => user.name.toLocaleLowerCase() === name.toLocaleLowerCase())) return fail(acknowledge, 'Ese nombre de usuario ya está en uso.');
       if (!email) return fail(acknowledge, 'Escribe un correo válido.');
       if (password.length < 4 || password.length > 128) return fail(acknowledge, 'La contraseña debe tener entre 4 y 128 caracteres.');
       if (password !== passwordConfirmation) return fail(acknowledge, 'Las contraseñas deben coincidir.');
@@ -376,6 +377,7 @@ function createMuroServer(options = {}) {
       if (!user) return;
       const name = cleanText(payload.name, 40);
       if (!name) return fail(acknowledge, 'El nombre no puede estar vacío.');
+      if (users.some((item) => item.id !== user.id && item.name.toLocaleLowerCase() === name.toLocaleLowerCase())) return fail(acknowledge, 'Ese nombre de usuario ya está en uso.');
       const avatar = String(payload.avatar ?? '');
       if (avatar && (!avatar.startsWith('data:image/') || avatar.length > 250_000)) return fail(acknowledge, 'La imagen debe ser válida y menor de 180 KB.');
       user.name = name;

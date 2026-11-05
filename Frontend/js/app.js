@@ -73,7 +73,7 @@
   function validatePassword(password) {
     const str = String(password || '');
     if (!str) return 'La contraseña es obligatoria.';
-    if (str.length < 4 || str.length > 128) return 'La contraseña debe tener entre 4 y 128 caracteres.';
+    if (str.length < 10 || str.length > 128) return 'La contraseña debe tener entre 10 y 128 caracteres.';
     return '';
   }
 
@@ -126,6 +126,7 @@
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(TOKEN_KEY);
     applyTheme(user.settings?.theme || localStorage.getItem(THEME_KEY) || 'system');
+    document.body.classList.toggle('compact-notes', Boolean(user.settings?.compactNotes));
 
     $('#authView')?.classList.add('hidden');
     $('#appView')?.classList.add('hidden');
@@ -439,6 +440,7 @@
         renderAdminRecentUsers(cachedAdminUsers, cachedAdminReports);
         renderAdminUsersTable(cachedAdminUsers, cachedAdminReports);
         renderAdminAllReports(cachedAdminReports);
+        renderAdminSanctions(cachedAdminUsers);
         if (!reportResult?.ok) toast(reportResult?.error || 'No se pudieron cargar los reportes.');
       });
     });
@@ -472,16 +474,7 @@
 
   async function moderateAccount(user, report = null) {
     const reports = reportsForUser(user.id);
-    if (user.role === 'superadmin') {
-      await window.MuroUI.confirmAction({
-        title: 'Cuenta protegida',
-        message: `${user.name} tiene rol de superadministración. Puedes consultar sus ${reports.length} reporte(s), pero las sanciones están bloqueadas para proteger la cuenta responsable del sistema.`,
-        confirmText: 'Entendido',
-        tone: 'primary',
-        showCancel: false
-      });
-      return;
-    }
+    if (user.role === 'superadmin') return;
     const result = await window.MuroUI.moderateUser({
       user,
       reportId: report?.id || '',
@@ -502,10 +495,16 @@
   }
 
   function makeModerationButton(user, report = null) {
+    if (user.role === 'superadmin') {
+      const protectedLabel = document.createElement('span');
+      protectedLabel.className = 'status-badge protected';
+      protectedLabel.textContent = 'Cuenta del sistema';
+      return protectedLabel;
+    }
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'primary-button compact moderation-button';
-    button.textContent = user.role === 'superadmin' ? 'Ver detalles' : 'Revisar';
+    button.textContent = 'Revisar';
     button.addEventListener('click', () => moderateAccount(user, report));
     return button;
   }
@@ -520,7 +519,12 @@
       return;
     }
 
-    [...users].sort((a, b) => reportsForUser(b.id, reports).length - reportsForUser(a.id, reports).length).slice(0, 5).forEach((u) => {
+    const attention = users.filter((user) => user.role !== 'superadmin' && (reportsForUser(user.id, reports).length > 0 || user.status === 'suspendido'));
+    if (!attention.length) {
+      recentTable.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center; padding:24px;">No hay cuentas que requieran atención.</td></tr>`;
+      return;
+    }
+    [...attention].sort((a, b) => reportsForUser(b.id, reports).length - reportsForUser(a.id, reports).length).slice(0, 5).forEach((u) => {
       const tr = document.createElement('tr');
       const name = document.createElement('td'); const strong = document.createElement('strong'); strong.textContent = u.name; name.appendChild(strong);
       const email = document.createElement('td'); email.textContent = u.email;
@@ -538,19 +542,39 @@
 
     tableBody.innerHTML = '';
     if (!userList.length) {
-      tableBody.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center; padding:24px;">No se encontraron usuarios.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="6" class="muted" style="text-align:center; padding:24px;">No se encontraron usuarios.</td></tr>`;
       return;
     }
 
     userList.forEach((u) => {
       const tr = document.createElement('tr');
-      const name = document.createElement('td'); const strong = document.createElement('strong'); strong.textContent = u.name; name.append(strong, document.createElement('br')); const mail = document.createElement('small'); mail.className = 'muted'; mail.textContent = u.email; name.appendChild(mail);
+      const name = document.createElement('td'); const strong = document.createElement('strong'); strong.textContent = u.name; name.appendChild(strong);
+      const email = document.createElement('td'); email.textContent = u.email;
       const count = document.createElement('td'); count.textContent = String(reportsForUser(u.id, reports).length);
       const sanction = document.createElement('td'); sanction.textContent = u.sanctions?.[0] ? `${u.sanctions[0].type} · ${timeAgo(u.sanctions[0].createdAt)}` : 'Sin medidas';
       const statusCell = document.createElement('td'); const status = document.createElement('span'); status.className = `status-badge ${u.status === 'suspendido' ? 'suspended' : 'active'}`; status.textContent = u.status || 'activo'; statusCell.appendChild(status);
       const action = document.createElement('td'); action.appendChild(makeModerationButton(u));
-      tr.append(name, count, sanction, statusCell, action);
+      tr.append(name, email, count, sanction, statusCell, action);
       tableBody.appendChild(tr);
+    });
+  }
+
+  function renderAdminSanctions(users = []) {
+    const table = $('#adminSanctionsTable');
+    if (!table) return;
+    const sanctions = users.flatMap((user) => (user.sanctions || []).map((sanction) => ({ ...sanction, user })));
+    sanctions.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+    table.innerHTML = '';
+    if (!sanctions.length) {
+      table.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;padding:28px;">Todavía no hay medidas registradas.</td></tr>';
+      return;
+    }
+    sanctions.forEach((item) => {
+      const row = document.createElement('tr');
+      [item.user.name, item.type || 'medida', item.message || 'Sin mensaje', timeAgo(item.createdAt)].forEach((value) => {
+        const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell);
+      });
+      table.appendChild(row);
     });
   }
 
@@ -606,12 +630,14 @@
       const tabNameMap = {
         resumen: 'Centro de ayuda',
         usuarios: 'Directorio de Usuarios',
-        reportes: 'Reportes de usuarios'
+        reportes: 'Reportes de usuarios',
+        historial: 'Historial de medidas',
+        guia: 'Guía de moderación'
       };
 
       if ($('#adminTabTitle')) $('#adminTabTitle').textContent = tabNameMap[targetTab] || 'Centro de ayuda';
 
-      const allTabs = ['Resumen', 'Usuarios', 'Reportes'];
+      const allTabs = ['Resumen', 'Usuarios', 'Reportes', 'Historial', 'Guia'];
       allTabs.forEach((name) => {
         const tabEl = $(`#adminTab${name}`);
         if (tabEl) {
@@ -644,23 +670,36 @@
   $('#wallsProfileBtn')?.addEventListener('click', () => openPanel('profile'));
 
   function emitAsync(socket, event, payload) {
-    return new Promise((resolve) => socket.emit(event, payload, resolve));
+    return new Promise((resolve) => {
+      if (!socket?.emit) {
+        resolve({ ok: false, error: 'No hay conexión con el servidor.' });
+        return;
+      }
+      let settled = false;
+      const timer = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve({ ok: false, error: 'El servidor tardó demasiado en responder.' });
+      }, 12000);
+      socket.emit(event, payload, (response) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        resolve(response);
+      });
+    });
   }
 
   function openAccountSettings() {
     if (!currentUser) return;
     $('#sidePanel')?.classList.remove('open');
-    $('#settingsName').value = currentUser.name || '';
-    $('#settingsEmail').value = currentUser.email || '';
-    $('#settingsCurrentPassword').value = '';
-    $('#settingsNewPassword').value = '';
-    $('#settingsConfirmPassword').value = '';
+    $('#settingsUsernameValue').textContent = currentUser.name || 'Usuario';
+    $('#settingsEmailValue').textContent = currentUser.email || '';
     const settings = currentUser.settings || {};
     const theme = settings.theme || localStorage.getItem(THEME_KEY) || 'system';
     const themeInput = document.querySelector(`input[name="theme"][value="${theme}"]`);
     if (themeInput) themeInput.checked = true;
     $('#settingsConfirmDelete').checked = settings.confirmDelete !== false;
-    $('#settingsNotifications').checked = settings.notifications !== false;
     $('#settingsCompactNotes').checked = Boolean(settings.compactNotes);
     $('#accountSettingsDialog')?.showModal();
   }
@@ -669,65 +708,83 @@
   $('#closeAccountSettings')?.addEventListener('click', () => $('#accountSettingsDialog')?.close());
   $('#cancelAccountSettings')?.addEventListener('click', () => $('#accountSettingsDialog')?.close());
 
+  $$('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => $(`#${button.dataset.closeDialog}`)?.close()));
+  $('#openUsernameChange')?.addEventListener('click', () => { $('#newUsername').value = currentUser?.name || ''; $('#usernameDialog')?.showModal(); });
+  $('#openEmailChange')?.addEventListener('click', () => { $('#newEmail').value = currentUser?.email || ''; $('#emailCurrentPassword').value = ''; $('#emailDialog')?.showModal(); });
+  $('#openPasswordChange')?.addEventListener('click', () => { $('#passwordForm')?.reset(); $('#passwordDialog')?.showModal(); });
+
+  $('#usernameForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const name = $('#newUsername').value.trim();
+    if (name.length < 3) return toast('El nombre debe tener al menos 3 caracteres.', 'error');
+    const result = await emitAsync(window.MuroBoard?.getSocket(), 'profile:update', { name, avatar: currentUser.avatar || '' });
+    if (!result?.ok) return toast(result?.error || 'No se pudo cambiar el nombre de usuario.', 'error');
+    currentUser = { ...currentUser, ...result.user };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+    $('#profileName').textContent = currentUser.name;
+    $('#profileButton').textContent = initials(currentUser.name);
+    $('#wallsProfileBtn').textContent = initials(currentUser.name);
+    $('#profileAvatarLarge').textContent = initials(currentUser.name);
+    $('#settingsUsernameValue').textContent = currentUser.name;
+    $('#usernameDialog').close();
+    toast('Nombre de usuario actualizado.', 'success');
+  });
+
+  $('#emailForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = $('#newEmail').value.trim().toLowerCase();
+    const currentPassword = $('#emailCurrentPassword').value;
+    if (validateEmail(email)) return toast(validateEmail(email), 'error');
+    const result = await emitAsync(window.MuroBoard?.getSocket(), 'auth:email', { email, currentPassword });
+    if (!result?.ok) return toast(result?.error || 'No se pudo cambiar el correo.', 'error');
+    currentUser.email = result.email || currentUser.email;
+    localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+    $('#profileEmail').textContent = currentUser.email;
+    $('#settingsEmailValue').textContent = currentUser.email;
+    $('#emailDialog').close();
+    toast(result.pending ? 'Revisa tu correo para confirmar la nueva dirección.' : 'Correo actualizado.', 'success');
+  });
+
+  $('#passwordForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const currentPassword = $('#passwordCurrent').value;
+    const newPassword = $('#passwordNew').value;
+    if (newPassword.length < 10) return toast('La nueva contraseña debe tener al menos 10 caracteres.', 'error');
+    if (newPassword !== $('#passwordConfirm').value) return toast('Las contraseñas nuevas no coinciden.', 'error');
+    const result = await emitAsync(window.MuroBoard?.getSocket(), 'auth:password', { currentPassword, newPassword });
+    if (!result?.ok) return toast(result?.error || 'No se pudo cambiar la contraseña.', 'error');
+    $('#passwordDialog').close();
+    toast('Contraseña actualizada.', 'success');
+  });
+
   $('#accountSettingsForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!currentUser) return;
     const socket = window.MuroBoard?.getSocket();
     if (!socket) return toast('No hay conexión con el servidor.', 'error');
 
-    const name = $('#settingsName').value.trim();
-    const email = $('#settingsEmail').value.trim().toLowerCase();
-    const currentPassword = $('#settingsCurrentPassword').value;
-    const newPassword = $('#settingsNewPassword').value;
-    const confirmPassword = $('#settingsConfirmPassword').value;
     const selectedTheme = document.querySelector('input[name="theme"]:checked')?.value || 'system';
-
-    if (!name) return toast('Escribe el nombre que quieres mostrar.', 'error');
-    if (validateEmail(email)) return toast(validateEmail(email), 'error');
-    if ((email !== currentUser.email || newPassword) && !currentPassword) return toast('Escribe tu contraseña actual para cambiar el acceso.', 'error');
-    if (newPassword && newPassword !== confirmPassword) return toast('Las contraseñas nuevas no coinciden.', 'error');
-    if (newPassword && validatePassword(newPassword)) return toast(validatePassword(newPassword), 'error');
 
     const submit = event.submitter;
     if (submit) submit.disabled = true;
     try {
-      const profileResult = await emitAsync(socket, 'profile:update', { name, avatar: currentUser.avatar || '' });
-      if (!profileResult?.ok) throw new Error(profileResult?.error || 'No se pudo guardar el perfil.');
-
       const settingsResult = await emitAsync(socket, 'settings:update', {
         theme: selectedTheme,
         confirmDelete: $('#settingsConfirmDelete').checked,
         compactNotes: $('#settingsCompactNotes').checked,
-        notifications: $('#settingsNotifications').checked
+        notifications: currentUser.settings?.notifications !== false
       });
       if (!settingsResult?.ok) throw new Error(settingsResult?.error || 'No se pudieron guardar las preferencias.');
 
-      let emailResult = null;
-      if (email !== currentUser.email) {
-        emailResult = await emitAsync(socket, 'auth:email', { email, currentPassword });
-        if (!emailResult?.ok) throw new Error(emailResult?.error || 'No se pudo cambiar el correo.');
-      }
-
-      if (newPassword) {
-        const passwordResult = await emitAsync(socket, 'auth:password', { currentPassword, newPassword });
-        if (!passwordResult?.ok) throw new Error(passwordResult?.error || 'No se pudo cambiar la contraseña.');
-      }
-
       currentUser = {
         ...currentUser,
-        ...profileResult.user,
-        email: emailResult?.email || currentUser.email,
         settings: settingsResult.settings
       };
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
       applyTheme(selectedTheme);
-      $('#profileName').textContent = currentUser.name;
-      $('#profileEmail').textContent = currentUser.email;
-      $('#profileButton').textContent = initials(currentUser.name);
-      $('#wallsProfileBtn').textContent = initials(currentUser.name);
-      $('#profileAvatarLarge').textContent = initials(currentUser.name);
+      document.body.classList.toggle('compact-notes', Boolean(currentUser.settings?.compactNotes));
       $('#accountSettingsDialog')?.close();
-      toast(emailResult?.pending ? 'Cambios guardados. Revisa tu correo para confirmar la nueva dirección.' : 'Configuración guardada.', 'success');
+      toast('Apariencia y preferencias guardadas.', 'success');
     } catch (error) {
       toast(error.message || 'No se pudieron guardar los cambios.', 'error');
     } finally {
@@ -739,23 +796,31 @@
   $('#openAdminFromProfileBtn')?.addEventListener('click', () => openAdminDashboard(currentUser));
 
   $('#closePanel')?.addEventListener('click', () => $('#sidePanel')?.classList.remove('open'));
-  $('#logoutButton')?.addEventListener('click', () => {
+  $('#logoutButton')?.addEventListener('click', async () => {
     const socket = window.MuroBoard?.getSocket();
-    if (socket) {
-      socket.emit('auth:logout', { token: localStorage.getItem(TOKEN_KEY) || '' });
+    const button = $('#logoutButton');
+    if (button) { button.disabled = true; button.classList.add('is-loading'); }
+    const result = socket ? await emitAsync(socket, 'auth:logout', { token: localStorage.getItem(TOKEN_KEY) || '' }) : { ok: true };
+    if (!result?.ok) {
+      if (button) { button.disabled = false; button.classList.remove('is-loading'); }
+      return toast(result?.error || 'No se pudo cerrar la sesión. Inténtalo nuevamente.', 'error');
     }
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(TOKEN_KEY);
     currentUser = null;
+    document.body.classList.remove('compact-notes');
+    history.replaceState(null, '', `${location.pathname}${location.search}`);
     $('#sidePanel')?.classList.remove('open');
     showAuth('login');
+    if (button) { button.disabled = false; button.classList.remove('is-loading'); }
     toast('Sesión cerrada.');
   });
 
   // Escuchar cambios en snapshot de administrador en tiempo real desde el Backend
   const boardSocket = window.MuroBoard?.getSocket();
+  window.MuroApp = { getSettings: () => currentUser?.settings || {} };
   if (boardSocket) {
     boardSocket.on('admin:changed', () => {
       if (!$('#adminView')?.classList.contains('hidden')) {

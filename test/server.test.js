@@ -67,6 +67,8 @@ test('registra, restaura y valida cuentas y roles en el servidor', async () => {
   const restore = await ack(restored, 'auth:restore', { token: first.token });
   assert.equal(restore.ok, true);
   assert.equal(restore.user.id, first.user.id);
+  assert.equal((await ack(restored, 'auth:logout', { token: first.token })).ok, true);
+  assert.equal((await ack(await connect(), 'auth:restore', { token: first.token })).ok, false);
 });
 
 test('actualiza el correo solo después de verificar la contraseña actual', async () => {
@@ -88,6 +90,27 @@ test('actualiza el correo solo después de verificar la contraseña actual', asy
   const login = await ack(await connect(), 'auth:login', { email: 'nuevo@example.com', password: 'clave789' });
   assert.equal(login.ok, true);
   assert.equal(login.user.email, 'nuevo@example.com');
+
+  const password = await ack(socket, 'auth:password', { currentPassword: 'clave789', newPassword: 'clave-mas-segura-10' });
+  assert.equal(password.ok, true);
+  assert.equal((await ack(await connect(), 'auth:login', { email: 'nuevo@example.com', password: 'clave789' })).ok, false);
+  assert.equal((await ack(await connect(), 'auth:login', { email: 'nuevo@example.com', password: 'clave-mas-segura-10' })).ok, true);
+});
+
+test('reserva un nombre de usuario único sin distinguir mayúsculas', async () => {
+  const firstSocket = await connect();
+  const secondSocket = await connect();
+  const first = await ack(firstSocket, 'auth:register', { name: 'NombreUnico', email: 'nombre1@example.com', password: 'clave-segura-10', passwordConfirmation: 'clave-segura-10' });
+  assert.equal(first.ok, true);
+  const duplicate = await ack(secondSocket, 'auth:register', { name: 'nombreunico', email: 'nombre2@example.com', password: 'clave-segura-10', passwordConfirmation: 'clave-segura-10' });
+  assert.equal(duplicate.ok, false);
+  assert.match(duplicate.error, /nombre de usuario ya está en uso/i);
+
+  const second = await ack(secondSocket, 'auth:register', { name: 'NombreAlterno', email: 'nombre2@example.com', password: 'clave-segura-10', passwordConfirmation: 'clave-segura-10' });
+  assert.equal(second.ok, true);
+  const rename = await ack(secondSocket, 'profile:update', { name: 'NOMBREUNICO' });
+  assert.equal(rename.ok, false);
+  assert.match(rename.error, /nombre de usuario ya está en uso/i);
 });
 
 test('sincroniza el ciclo de vida de notas entre clientes', async () => {
