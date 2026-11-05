@@ -128,13 +128,15 @@ async function main() {
 
         const { data: report, error: reportError } = await outsiderClient.rpc('muro_crear_reporte', { motivo_nuevo: 'fallo_aplicacion', detalle_nuevo: 'Verificación temporal del circuito completo.', sala_objetivo: wallId, nota_objetivo: null });
         if (reportError || !report?.id) throw reportError || new Error('No se creó el reporte.');
+        const { data: userReport, error: userReportError } = await outsiderClient.rpc('muro_reportar_usuario', { usuario_objetivo: guest.id, sala_objetivo: wallId, motivo_nuevo: 'spam', detalle_nuevo: 'Verificación temporal de un reporte asociado a una cuenta.' });
+        if (userReportError || !userReport?.id) throw userReportError || new Error('No se creó el reporte de usuario.');
         const { error: promoteError } = await services.adminClient.from('muro_usuarios').update({ rol: 'superadmin' }).eq('id', owner.id);
         if (promoteError) throw promoteError;
         const { data: adminReports, error: adminReportsError } = await ownerClient.rpc('muro_reportes_administracion');
         const { error: takeError } = await ownerClient.rpc('muro_tomar_reporte', { reporte_objetivo: report.id });
         const { error: answerError } = await ownerClient.rpc('muro_responder_reporte', { reporte_objetivo: report.id, estado_nuevo: 'resuelto', respuesta_nueva: 'Circuito verificado correctamente.' });
         const { data: ownReports, error: ownReportsError } = await outsiderClient.rpc('muro_mis_reportes');
-        result.reports = !adminReportsError && adminReports?.some((item) => item.id === report.id) && !takeError && !answerError && !ownReportsError && ownReports?.some((item) => item.id === report.id && item.decision === 'Circuito verificado correctamente.') ? 'passed' : 'failed';
+        result.reports = !adminReportsError && adminReports?.some((item) => item.id === report.id) && adminReports?.some((item) => item.id === userReport.id && item.reportado_id === guest.id) && !takeError && !answerError && !ownReportsError && ownReports?.some((item) => item.id === report.id && item.decision === 'Circuito verificado correctamente.') ? 'passed' : 'failed';
       }
     } finally {
       for (const userId of temporaryUsers.reverse()) {

@@ -2,7 +2,7 @@
 
 **Sistema analizado:** Muro Colaborativo DZ  
 **Arquitectura:** frontend JavaScript desplegado en Netlify, Supabase Auth/Postgres/Realtime y modo alternativo Express + Socket.IO.  
-**Fecha:** 4 de noviembre de 2026
+**Fecha:** 5 de noviembre de 2026
 **Alcance:** código, migraciones SQL, configuración de Netlify/Supabase y dependencias npm de esta copia del proyecto.
 
 ## Resumen ejecutivo
@@ -52,6 +52,8 @@ Quedan como trabajo prioritario A06 (cuotas antiabuso) y A09 (auditoría persist
 - `supabase/migrations/20261104221056_codigo_invitacion_8_y_vista_previa.sql` elimina la dependencia del correo invitado, crea códigos de 8 caracteres y permite inspeccionar únicamente el nombre del muro, la persona invitante, el rol y el vencimiento antes de unirse.
 - `supabase/migrations/20261104221929_codigo_sala_reutilizable.sql` mantiene un código activo por sala y permite que varias cuentas lo utilicen sin consumirlo; la restricción única de membresía impide repetir el alta de una misma cuenta.
 - `.github/workflows/supabase-uptime.yml` consulta cada seis horas una ruta de salud que ejecuta una lectura real en Supabase y deja un fallo visible si la base no responde.
+- `supabase/migrations/20261105040901_reportes_por_usuario_y_sanciones.sql` limita los reportes a cuentas que comparten un muro, protege el historial de sanciones con RLS y reserva las medidas administrativas al servidor.
+- `test/server.test.js` comprueba el movimiento previo no persistente, el reporte de usuario y que una cuenta normal no pueda sancionar a otra.
 
 ## Corrección probada: A10 y creación atómica
 

@@ -9,6 +9,7 @@ const root = path.join(__dirname, '..');
 const migration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20261027002032_completar_invitaciones_y_reportes.sql'), 'utf8');
 const codeMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20261104221056_codigo_invitacion_8_y_vista_previa.sql'), 'utf8');
 const reusableMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20261104221929_codigo_sala_reutilizable.sql'), 'utf8');
+const moderationMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20261105040901_reportes_por_usuario_y_sanciones.sql'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'public', 'netlify-socket.js'), 'utf8');
 
 test('los códigos guardan hashes y crean una membresía por cada cuenta que se une', () => {
@@ -26,8 +27,17 @@ test('los códigos guardan hashes y crean una membresía por cada cuenta que se 
 });
 
 test('el frontend usa RPC para invitaciones y reportes sin exponer service role', () => {
-  for (const name of ['muro_crear_invitacion_codigo', 'muro_inspeccionar_invitacion', 'muro_responder_invitacion', 'muro_crear_reporte', 'muro_responder_reporte']) assert.match(adapter, new RegExp(`rpc\\('${name}'`));
+  for (const name of ['muro_crear_invitacion_codigo', 'muro_inspeccionar_invitacion', 'muro_responder_invitacion', 'muro_crear_reporte', 'muro_reportar_usuario', 'muro_responder_reporte']) assert.match(adapter, new RegExp(`rpc\\('${name}'`));
   assert.doesNotMatch(adapter, /service[_-]?role/i);
+});
+
+test('los reportes apuntan a usuarios compartidos y las sanciones quedan protegidas', () => {
+  assert.match(moderationMigration, /add column if not exists reportado_id/);
+  assert.match(moderationMigration, /origen\.usuario_id = solicitante/);
+  assert.match(moderationMigration, /destino\.usuario_id = usuario_objetivo/);
+  assert.match(moderationMigration, /create table if not exists public\.muro_sanciones/);
+  assert.match(moderationMigration, /alter table public\.muro_sanciones enable row level security/);
+  assert.match(moderationMigration, /revoke insert, update, delete on public\.muro_sanciones from authenticated/);
 });
 
 test('reportes derivan el autor de auth.uid y no devuelven contenido privado del muro', () => {

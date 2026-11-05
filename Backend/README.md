@@ -9,14 +9,14 @@ Este backend reemplaza la demostración que guardaba todo en memoria. Mantiene u
 - Perfil y preferencias del usuario.
 - Creación, edición, selección y eliminación de muros.
 - Gestión de integrantes y permisos: propietario, editor y lector.
-- Creación, edición, movimiento y eliminación de notas en tiempo real.
-- Panel y operaciones protegidas para el superadministrador.
+- Creación, edición, movimiento fluido y eliminación de notas en tiempo real sobre un lienzo común para PC y móvil.
+- Panel protegido de ayuda y moderación: usuarios, reportes y medidas sobre cuentas.
 - Privacidad de muros: ser superadministrador no concede acceso automático a muros ajenos.
 - Persistencia en Supabase con modo en memoria para pruebas locales.
 - Creación atómica de sala y membresía propietaria mediante la RPC `muro_crear_sala`.
 - Un código activo por sala, alfanumérico, con hash SHA-256 y vencimiento; varias cuentas pueden usarlo para unirse.
 - Alta de miembros únicamente después de usar un código válido de 8 caracteres; no se solicita correo del invitado.
-- Reportes privados con bandeja del usuario, recepción del superadmin, toma, respuesta y notificación en tiempo real.
+- Reportes privados asociados a la cuenta reportada, recepción del superadmin, historial y medidas de advertencia, suspensión, reactivación o eliminación.
 
 ## Ejecutar
 
@@ -38,6 +38,6 @@ Responsable de implementación y corrección: **Boris Salda Vargas**.
 
 La entrega anterior había dejado estos dos módulos como pendientes. Boris terminó el contrato del backend y su interfaz: la persona propietaria genera el código, Supabase conserva únicamente el hash y cada cuenta que lo utiliza recibe su propia membresía. Al generar uno nuevo se cancela el anterior; también se controlan vencimiento, duplicados y permisos.
 
-En reportes, el autor sale siempre de la sesión. Cada persona ve únicamente sus solicitudes; el superadmin recibe, toma y responde sin obtener por ello acceso al contenido de muros privados. La respuesta vuelve solamente a la persona que creó el reporte. Las pruebas cubren el recorrido correcto y los intentos no autorizados.
+En reportes, el autor sale siempre de la sesión y la cuenta denunciada debe compartir el mismo muro. Cada persona ve únicamente sus solicitudes; el superadmin recibe, toma y responde sin obtener por ello acceso al contenido de muros privados. Desde el directorio puede revisar el historial y aplicar una medida proporcionada. Las pruebas cubren el recorrido correcto y los intentos no autorizados.
 
-La actualización visual de Pierina se mantuvo intacta y se conectó a estos eventos. La misma versión se publica desde la raíz y queda reflejada en `Backend/`, `Frontend/` y `BaseDeDatos/` para la revisión por áreas.
+La propuesta visual de Pierina se conectó a estos eventos y Boris corrigió los problemas de presentación, modales, notas, responsividad y movimiento compartido. La misma versión se publica desde la raíz y queda reflejada en `Backend/`, `Frontend/` y `BaseDeDatos/` para la revisión por áreas.

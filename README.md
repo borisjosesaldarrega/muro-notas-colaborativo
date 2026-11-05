@@ -11,11 +11,12 @@ Aplicación de notas adhesivas con el lenguaje visual original de Muro DZ y una 
 - Creación atómica de cada muro y su membresía propietaria mediante la RPC transaccional `muro_crear_sala`.
 - Un código activo por sala, reutilizable por varias cuentas: solo se guarda SHA-256, vence en 24 horas y cada usuario obtiene su propia membresía al unirse.
 - Códigos de invitación alfanuméricos de 8 caracteres, vista previa de la sala y alta de membresía únicamente al usarlos.
-- Reportes privados con estados `pendiente`, `en_revision`, `resuelto` y `rechazado`, atención del superadmin y respuesta exclusiva al autor.
-- Notas sincronizadas, arrastrables y disponibles en cinco colores.
+- Reportes privados dirigidos a una cuenta que comparte el muro, con historial para advertencias, suspensiones, reactivación o eliminación.
+- Notas sincronizadas, arrastrables, con tamaño automático según el contenido y movimiento remoto fluido sin guardar cada fotograma.
 - Perfil, avatar y preferencias de apariencia.
-- Panel superadmin para usuarios, muros, miembros y limpieza de contenido.
-- Diseño original: papel crema con puntos, morado `#6658f5`, bordes azul tinta, cintas y post-its pastel.
+- Panel superadmin centrado en ayuda, usuarios y reportes; no abre muros ni notas privadas.
+- Diseño animado y amable: mascota circular, fondos pastel, cintas, botones redondeados y post-its adaptables.
+- Lienzo lógico compartido de `1800 × 1200`: en móvil se puede alejar, acercar y recorrer las mismas coordenadas que en PC.
 
 ## Requisitos
 
@@ -60,7 +61,7 @@ Render asignará la URL al completar el primer despliegue. Abre esa URL para pro
 
 ## Preparar Supabase
 
-Las migraciones versionadas están en `supabase/migrations/`. Crean y actualizan las tablas `muro_usuarios`, `muro_configuraciones_usuario`, `muro_salas`, `muro_sala_miembros`, `muro_notas`, `muro_invitaciones` y `muro_reportes`, junto con índices, funciones y políticas RLS. La migración `20261027000508_corregir_a10_creacion_atomica_muro.sql` añade la RPC transaccional de muros. `20261027002032_completar_invitaciones_y_reportes.sql` termina los flujos que habían quedado incompletos y `20261027002607_bloquear_altas_directas_de_miembros.sql` cierra el atajo que permitía crear membresías sin aceptar una invitación. El prefijo `muro_` evita colisiones con otros esquemas.
+Las migraciones versionadas están en `supabase/migrations/`. Crean y actualizan las tablas `muro_usuarios`, `muro_configuraciones_usuario`, `muro_salas`, `muro_sala_miembros`, `muro_notas`, `muro_invitaciones`, `muro_reportes` y `muro_sanciones`, junto con índices, funciones y políticas RLS. La migración `20261027000508_corregir_a10_creacion_atomica_muro.sql` añade la RPC transaccional de muros. `20261027002032_completar_invitaciones_y_reportes.sql` termina los flujos que habían quedado incompletos, `20261027002607_bloquear_altas_directas_de_miembros.sql` cierra el atajo que permitía crear membresías sin aceptar una invitación y `20261105040901_reportes_por_usuario_y_sanciones.sql` relaciona cada denuncia con la cuenta reportada y conserva el historial de moderación. El prefijo `muro_` evita colisiones con otros esquemas.
 
 ```bash
 npx supabase login
@@ -84,7 +85,8 @@ Después de aplicar la migración, reinicia Node.js. El servidor cargará los da
 - La creación de una sala no admite un propietario enviado por el navegador: la RPC toma `auth.uid()`, inserta sala y membresía en la misma transacción y revierte ambas si algo falla.
 - Los errores enviados a la interfaz se normalizan; los mensajes internos de Postgres/PostgREST no se muestran a las personas usuarias.
 - Los tokens y códigos de invitación nunca se guardan en texto claro; la base compara su hash, bloquea códigos vencidos y evita que una misma cuenta se una dos veces. El código se genera desde la interfaz, no requiere indicar un correo y puede incorporar a varias personas.
-- Los reportes toman el autor desde `auth.uid()` y el listado administrativo no incluye nombres de muros ni contenido de notas privadas.
+- Los reportes toman el autor desde `auth.uid()`, solo permiten denunciar a alguien que comparte el muro y el listado administrativo no incluye contenido de notas privadas.
+- Las sanciones se ejecutan exclusivamente en el servidor; la clave administrativa de Supabase nunca llega al navegador.
 
 ## Verificación
 
@@ -101,7 +103,7 @@ npm run verify:supabase -- --auth
 
 ## Aporte de esta entrega
 
-Responsable de la corrección y cierre del backend: **Boris Salda Vargas**. La implementación anterior dejó pendientes las invitaciones verificables y la atención de reportes; Boris completó ambos recorridos, cerró las altas directas de miembros, aplicó las migraciones y añadió las pruebas. El trabajo visual actualizado por Pierina se conservó e integró con estas funciones tanto en la aplicación principal como en la carpeta `Backend/`.
+Responsable de la corrección y cierre del backend: **Boris Salda Vargas**. Boris completó las invitaciones verificables, la atención de reportes, el historial de sanciones, el lienzo adaptable y la sincronización fluida; también cerró las altas directas de miembros, aplicó las migraciones y añadió las pruebas. La propuesta visual de Pierina se integró y se corrigieron problemas de presentación, modales, tamaños de notas y adaptación móvil tanto en la aplicación principal como en la carpeta `Backend/`.
 
 ## Respaldo en memoria
 

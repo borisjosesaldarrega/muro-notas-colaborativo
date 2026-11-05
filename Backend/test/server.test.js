@@ -93,6 +93,12 @@ test('sincroniza el ciclo de vida de notas entre clientes', async () => {
   assert.equal(moved.x, 0);
   assert.equal(moved.y, 4000);
 
+  const previewEvent = once(member, 'note:preview-moved');
+  admin.emit('note:preview-move', { id: created.note.id, x: 640, y: 420 });
+  const preview = await previewEvent;
+  assert.equal(preview.x, 640);
+  assert.equal(preview.y, 420);
+
   const deletedEvent = once(member, 'note:deleted');
   assert.equal((await ack(admin, 'note:delete', { id: created.note.id })).ok, true);
   assert.equal((await deletedEvent).id, created.note.id);
@@ -148,6 +154,19 @@ test('mantiene reportes privados y permite que el superadmin responda al mismo a
   const outsider = await connect();
   await ack(outsider, 'auth:register', { name: 'Persona externa', email: 'externa@example.com', password: 'clave999', passwordConfirmation: 'clave999' });
   assert.equal((await ack(outsider, 'reports:list')).reports.length, 0);
+});
+
+test('reporta a una cuenta compartida y reserva las sanciones al superadmin', async () => {
+  const admin = clients[0]; const member = clients[1];
+  const wall = server.walls.find((item) => item.name === 'Sprint actualizado');
+  const adminId = server.users.find((user) => user.email === 'saldavargasboris@gmail.com').id;
+  const memberId = server.users.find((user) => user.email === 'brenda@example.com').id;
+  const report = await ack(member, 'report:user:create', { wallId: wall.id, userId: adminId, reason: 'acoso', detail: 'Mensajes insistentes dentro del grupo compartido.' });
+  assert.equal(report.ok, true);
+  const listed = await ack(admin, 'admin:reports:list');
+  assert.equal(listed.reports.find((item) => item.id === report.report.id).reportedUserId, adminId);
+  assert.equal((await ack(member, 'admin:user:discipline', { userId: adminId, action: 'advertir', message: 'No permitido.' })).ok, false);
+  assert.equal((await ack(admin, 'admin:user:discipline', { userId: memberId, action: 'advertir', message: 'Evita repetir esta conducta.' })).ok, true);
 });
 
 test('rechaza roles simulados en el navegador y autoriza solo al superadmin real', async () => {

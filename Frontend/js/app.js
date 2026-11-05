@@ -14,7 +14,8 @@
 
   const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
 
-  function toast(message) {
+  function toast(message, tone = 'info') {
+    if (window.MuroUI) return window.MuroUI.toast(message, tone);
     const item = $('#toast');
     if (!item) return;
     item.textContent = message;
@@ -75,6 +76,7 @@
   let activeVerifiedToken = '';
   let currentUser = null;
   let cachedAdminUsers = [];
+  let cachedAdminReports = [];
 
   /* ==========================================
      NAVEGACIÓN ENTRE VISTAS DE AUTENTICACIÓN
@@ -398,62 +400,24 @@
         return toast(res?.error || 'No se pudo obtener la información de auditoría.');
       }
 
-      const realUsers = res.users || [];
-      const realWalls = res.walls || [];
-      cachedAdminUsers = realUsers;
-
-      const totals = res.totals || {};
-      const totalNotes = totals.notas ?? realWalls.reduce((sum, w) => sum + (w.notesCount || 0), 0);
-
-      if ($('#metricUsersCount')) $('#metricUsersCount').textContent = totals.usuarios ?? realUsers.length;
-      if ($('#metricNotesCount')) $('#metricNotesCount').textContent = totalNotes;
-      if ($('#metricWallsCount')) $('#metricWallsCount').textContent = totals.salas ?? realWalls.length;
-      renderActivityChart(totalNotes);
-
-      // 4. Tabla de Resumen de Usuarios
-      renderAdminRecentUsers(realUsers);
-
-      // 5. Grid de Salas Reales
-      renderAdminWalls(realWalls);
-
-      // 6. Directorio Completo de Usuarios (con buscador)
-      renderAdminUsersTable(realUsers);
-
-      // La base entrega únicamente métricas agregadas; el contenido privado de
-      // los muros no se expone al rol global de administración.
-      renderAdminNotes();
+      cachedAdminUsers = res.users || [];
+      if ($('#metricUsersCount')) $('#metricUsersCount').textContent = cachedAdminUsers.length;
+      if ($('#metricSuspendedCount')) $('#metricSuspendedCount').textContent = cachedAdminUsers.filter((user) => user.status === 'suspendido').length;
 
       socket.emit('admin:reports:list', {}, (reportResult) => {
-        const reports = reportResult?.ok ? reportResult.reports : [];
-        const pending = reports.filter((report) => ['pendiente', 'en_revision'].includes(report.status)).length;
-        if ($('#metricReportsCount')) $('#metricReportsCount').textContent = reports.length;
+        cachedAdminReports = reportResult?.ok ? reportResult.reports : [];
+        const pending = cachedAdminReports.filter((report) => ['pendiente', 'en_revision'].includes(report.status)).length;
+        const resolved = cachedAdminReports.filter((report) => report.status === 'resuelto').length;
+        if ($('#metricReportsCount')) $('#metricReportsCount').textContent = pending;
+        if ($('#metricResolvedCount')) $('#metricResolvedCount').textContent = resolved;
         if ($('#adminPendingBadge')) $('#adminPendingBadge').textContent = pending;
-        renderAdminReports(reports);
-        renderAdminAllReports(reports);
+        renderAdminReports(cachedAdminReports);
+        renderAdminRecentUsers(cachedAdminUsers, cachedAdminReports);
+        renderAdminUsersTable(cachedAdminUsers, cachedAdminReports);
+        renderAdminAllReports(cachedAdminReports);
         if (!reportResult?.ok) toast(reportResult?.error || 'No se pudieron cargar los reportes.');
       });
     });
-  }
-
-  function renderActivityChart(totalNotes) {
-    const bars = $$('.chart-bar');
-    if (!bars.length) return;
-
-    if (totalNotes === 0) {
-      bars.forEach((bar) => {
-        bar.style.height = '6%';
-        bar.setAttribute('title', '0 notas');
-      });
-      const noteLabel = $('#chartFooterLabel');
-      if (noteLabel) noteLabel.textContent = 'Sin notas creadas en el sistema aún';
-    } else {
-      bars.forEach((bar, i) => {
-        const factor = Math.max(0.15, (i + 1) / bars.length);
-        const height = Math.min(100, Math.round(factor * 85));
-        bar.style.height = `${height}%`;
-        bar.setAttribute('title', `${Math.round(totalNotes * factor)} notas registradas`);
-      });
-    }
   }
 
   function renderAdminReports(reports = []) {
@@ -466,11 +430,11 @@
       return;
     }
 
-    reports.slice(0, 4).forEach((rep) => {
+    reports.filter((rep) => ['pendiente', 'en_revision'].includes(rep.status)).slice(0, 4).forEach((rep) => {
       const item = document.createElement('div');
       item.className = 'report-item';
       const info = document.createElement('div'); info.className = 'report-item-info';
-      const title = document.createElement('strong'); title.textContent = rep.reason;
+      const title = document.createElement('strong'); title.textContent = rep.reportedUserName ? `Reporte sobre ${rep.reportedUserName}` : rep.reason;
       const detail = document.createElement('small'); detail.textContent = `${rep.reporterName || 'Usuario'} · ${rep.detail}`;
       const status = document.createElement('span'); status.className = `status-badge ${rep.status}`; status.textContent = rep.status;
       info.append(title, detail); item.append(info, status);
@@ -478,7 +442,42 @@
     });
   }
 
-  function renderAdminRecentUsers(users = []) {
+  function reportsForUser(userId, reports = cachedAdminReports) {
+    return reports.filter((report) => report.reportedUserId === userId);
+  }
+
+  async function moderateAccount(user, report = null) {
+    const reports = reportsForUser(user.id);
+    const result = await window.MuroUI.moderateUser({
+      user,
+      reportId: report?.id || '',
+      reportSummary: report ? `${report.reason}: ${report.detail}` : `${reports.length} reporte(s) recibido(s) · ${user.sanctions?.length || 0} medida(s) previa(s)`
+    });
+    if (!result) return;
+    if (result.action === 'eliminar') {
+      const accepted = await window.MuroUI.confirmAction({ title: 'Eliminar cuenta', message: `La cuenta de ${user.name} se eliminará de forma permanente.`, confirmText: 'Eliminar cuenta', tone: 'danger', icon: '⚠️' });
+      if (!accepted) return;
+    }
+    const socket = window.MuroBoard?.getSocket();
+    socket.emit('admin:user:discipline', { userId: user.id, ...result }, (response) => {
+      if (!response?.ok) return toast(response?.error || 'No se pudo aplicar la medida.', 'error');
+      const finish = () => { toast('Medida aplicada y registrada.', 'success'); renderAdminDashboard(); };
+      if (!result.reportId) return finish();
+      socket.emit('admin:report:respond', { id: result.reportId, status: 'resuelto', decision: result.message }, () => finish());
+    });
+  }
+
+  function makeModerationButton(user, report = null) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'primary-button compact moderation-button';
+    button.textContent = 'Revisar';
+    button.disabled = user.role === 'superadmin';
+    button.addEventListener('click', () => moderateAccount(user, report));
+    return button;
+  }
+
+  function renderAdminRecentUsers(users = [], reports = []) {
     const recentTable = $('#adminRecentUsersTable');
     if (!recentTable) return;
 
@@ -488,80 +487,19 @@
       return;
     }
 
-    users.slice(0, 5).forEach((u) => {
+    [...users].sort((a, b) => reportsForUser(b.id, reports).length - reportsForUser(a.id, reports).length).slice(0, 5).forEach((u) => {
       const tr = document.createElement('tr');
-      const roleBadge = u.role === 'superadmin' ? 'superadmin' : 'user';
-      tr.innerHTML = `
-        <td><strong>${u.name}</strong></td>
-        <td>${u.email}</td>
-        <td><span class="status-badge ${roleBadge}">${u.role}</span></td>
-        <td>${timeAgo(u.createdAt)}</td>
-        <td><span class="status-badge active">Activo</span></td>
-      `;
+      const name = document.createElement('td'); const strong = document.createElement('strong'); strong.textContent = u.name; name.appendChild(strong);
+      const email = document.createElement('td'); email.textContent = u.email;
+      const count = document.createElement('td'); count.textContent = String(reportsForUser(u.id, reports).length);
+      const statusCell = document.createElement('td'); const status = document.createElement('span'); status.className = `status-badge ${u.status === 'suspendido' ? 'suspended' : 'active'}`; status.textContent = u.status || 'activo'; statusCell.appendChild(status);
+      const action = document.createElement('td'); action.appendChild(makeModerationButton(u));
+      tr.append(name, email, count, statusCell, action);
       recentTable.appendChild(tr);
     });
   }
 
-  function renderAdminWalls(walls = []) {
-    const adminWallsGrid = $('#adminWallsGrid');
-    if (!adminWallsGrid) return;
-
-    adminWallsGrid.innerHTML = '';
-    if (!walls.length) {
-      adminWallsGrid.innerHTML = `<p class="muted" style="grid-column:1/-1; text-align:center; padding:30px;">No hay salas creadas en la base de datos.</p>`;
-      return;
-    }
-
-    walls.forEach((w) => {
-      const card = document.createElement('article');
-      card.className = 'wall-card';
-      const membersCount = w.members ? w.members.length : (w.membersCount || 1);
-      card.innerHTML = `
-        <div class="wall-card-head">
-          <span class="wall-card-badge">👁️ Monitoreo</span>
-        </div>
-        <div>
-          <h3>${w.name}</h3>
-          <p>${w.description || 'Sin descripción'}</p>
-        </div>
-        <div class="wall-card-footer">
-          <span class="wall-card-meta">📝 ${w.notesCount ?? 0} notas · 👥 ${membersCount} miembro(s)</span>
-          <small class="muted">Solo lectura</small>
-        </div>
-      `;
-      adminWallsGrid.appendChild(card);
-    });
-  }
-
-  function renderAdminNotes() {
-    const adminNotesGrid = $('#adminNotesGrid');
-    if (!adminNotesGrid) return;
-
-    const notes = window.MuroBoard ? window.MuroBoard.getAllNotes() : [];
-    adminNotesGrid.innerHTML = '';
-
-    if (!notes.length) {
-      adminNotesGrid.innerHTML = `<div class="muted" style="grid-column:1/-1; text-align:center; padding:40px;">No hay notas creadas en el muro activo (Lienzo limpio).</div>`;
-      return;
-    }
-
-    notes.forEach((n) => {
-      const card = document.createElement('article');
-      const colorMap = { amarillo: 'yellow', rosa: 'pink', azul: 'blue', verde: 'green', lila: 'purple' };
-      const colorClass = colorMap[n.color] || 'yellow';
-      card.className = `note-monitor-card ${colorClass}`;
-      card.innerHTML = `
-        <p>${n.texto}</p>
-        <div class="note-monitor-meta">
-          <span>👤 ${n.autor || 'Invitado'}</span>
-          <span>🕒 ${timeAgo(n.updatedAt)}</span>
-        </div>
-      `;
-      adminNotesGrid.appendChild(card);
-    });
-  }
-
-  function renderAdminUsersTable(userList = []) {
+  function renderAdminUsersTable(userList = [], reports = cachedAdminReports) {
     const tableBody = $('#adminAllUsersTable');
     if (!tableBody) return;
 
@@ -573,14 +511,12 @@
 
     userList.forEach((u) => {
       const tr = document.createElement('tr');
-      const roleBadge = u.role === 'superadmin' ? 'superadmin' : 'user';
-      tr.innerHTML = `
-        <td><strong>${u.name}</strong></td>
-        <td>${u.email}</td>
-        <td><span class="status-badge ${roleBadge}">${u.role}</span></td>
-        <td><span class="status-badge active">${timeAgo(u.createdAt)}</span></td>
-        <td><small class="muted">👁️ Espectador</small></td>
-      `;
+      const name = document.createElement('td'); const strong = document.createElement('strong'); strong.textContent = u.name; name.append(strong, document.createElement('br')); const mail = document.createElement('small'); mail.className = 'muted'; mail.textContent = u.email; name.appendChild(mail);
+      const count = document.createElement('td'); count.textContent = String(reportsForUser(u.id, reports).length);
+      const sanction = document.createElement('td'); sanction.textContent = u.sanctions?.[0] ? `${u.sanctions[0].type} · ${timeAgo(u.sanctions[0].createdAt)}` : 'Sin medidas';
+      const statusCell = document.createElement('td'); const status = document.createElement('span'); status.className = `status-badge ${u.status === 'suspendido' ? 'suspended' : 'active'}`; status.textContent = u.status || 'activo'; statusCell.appendChild(status);
+      const action = document.createElement('td'); action.appendChild(makeModerationButton(u));
+      tr.append(name, count, sanction, statusCell, action);
       tableBody.appendChild(tr);
     });
   }
@@ -597,13 +533,10 @@
 
     reports.forEach((rep) => {
       const tr = document.createElement('tr');
-      const values = [rep.reason, rep.detail, rep.reporterName || 'Usuario', timeAgo(rep.createdAt)];
-      values.forEach((value, index) => {
-        const td = document.createElement('td');
-        if (index === 0) { const strong = document.createElement('strong'); strong.textContent = value; td.appendChild(strong); }
-        else td.textContent = value;
-        tr.appendChild(td);
-      });
+      const reporter = document.createElement('td'); reporter.textContent = rep.reporterName || 'Usuario';
+      const reported = document.createElement('td'); const reportedStrong = document.createElement('strong'); reportedStrong.textContent = rep.reportedUserName || 'Sin usuario asociado'; reported.appendChild(reportedStrong); if (rep.reportedUserEmail) { const mail = document.createElement('small'); mail.className = 'muted'; mail.textContent = rep.reportedUserEmail; reported.append(document.createElement('br'), mail); }
+      const reason = document.createElement('td'); const reasonStrong = document.createElement('strong'); reasonStrong.textContent = rep.reason; const detail = document.createElement('small'); detail.className = 'muted'; detail.textContent = rep.detail; reason.append(reasonStrong, document.createElement('br'), detail);
+      const date = document.createElement('td'); date.textContent = timeAgo(rep.createdAt);
       const actions = document.createElement('td');
       const status = document.createElement('span'); status.className = `status-badge ${rep.status}`; status.textContent = rep.status;
       actions.appendChild(status);
@@ -612,17 +545,11 @@
         take.addEventListener('click', () => window.MuroBoard.getSocket().emit('admin:report:take', { id: rep.id }, (res) => res?.ok ? renderAdminDashboard() : toast(res?.error)));
         actions.appendChild(take);
       }
-      if (['pendiente', 'en_revision'].includes(rep.status)) {
-        const answer = document.createElement('button'); answer.type = 'button'; answer.className = 'primary-button compact'; answer.textContent = 'Responder';
-        answer.addEventListener('click', () => {
-          const decision = window.prompt('Respuesta para la persona que reportó:');
-          if (!decision) return;
-          const resolved = window.confirm('Aceptar = resuelto. Cancelar = rechazado.');
-          window.MuroBoard.getSocket().emit('admin:report:respond', { id: rep.id, status: resolved ? 'resuelto' : 'rechazado', decision }, (res) => res?.ok ? renderAdminDashboard() : toast(res?.error));
-        });
-        actions.appendChild(answer);
+      if (['pendiente', 'en_revision'].includes(rep.status) && rep.reportedUserId) {
+        const target = cachedAdminUsers.find((user) => user.id === rep.reportedUserId);
+        if (target) actions.appendChild(makeModerationButton(target, rep));
       }
-      tr.appendChild(actions);
+      tr.append(reporter, reported, reason, date, actions);
       allReportsTable.appendChild(tr);
     });
   }
@@ -644,16 +571,14 @@
 
       const targetTab = tabBtn.dataset.adminTab;
       const tabNameMap = {
-        resumen: 'Resumen General',
-        salas: 'Salas y Muros Monitoreados',
-        notas: 'Notas Globales del Sistema',
+        resumen: 'Centro de ayuda',
         usuarios: 'Directorio de Usuarios',
-        reportes: 'Bandeja de Reportes de Contenido'
+        reportes: 'Reportes de usuarios'
       };
 
       if ($('#adminTabTitle')) $('#adminTabTitle').textContent = tabNameMap[targetTab] || 'Panel de Monitoreo';
 
-      const allTabs = ['Resumen', 'Salas', 'Notas', 'Usuarios', 'Reportes'];
+      const allTabs = ['Resumen', 'Usuarios', 'Reportes'];
       allTabs.forEach((name) => {
         const tabEl = $(`#adminTab${name}`);
         if (tabEl) {
