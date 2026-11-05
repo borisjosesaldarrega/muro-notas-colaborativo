@@ -1063,7 +1063,7 @@ body {
 }
 
 .brand-mark {
-  border-radius: 50%;
+  border-radius: 13px;
   background: linear-gradient(145deg, #9d83ff, #6542e8);
   box-shadow: 0 8px 0 rgba(76, 48, 177, .12), 0 12px 24px rgba(108, 76, 241, .25);
   animation: mascot-float 3.4s ease-in-out infinite;
@@ -1226,6 +1226,7 @@ dialog form { background: linear-gradient(180deg, #fff, #fdfcff); }
   border-radius: 12px;
   background: #6658f5;
   box-shadow: 0 7px 0 rgba(102, 88, 245, .14);
+  animation: none;
   transition: transform .18s ease;
 }
 .board-brand-copy { display: grid; gap: 1px; }
