@@ -190,6 +190,8 @@ test('crea un código de sala reutilizable y agrega cada membresía al unirse', 
   const invited = await ack(admin, 'wall:invite', { wallId, role: 'lector' });
   assert.equal(invited.invitation.status, 'pendiente');
   assert.match(invited.code, /^[A-Z0-9]{8}$/);
+  const activeInvitations = await ack(admin, 'invitations:list');
+  assert.equal(activeInvitations.invitations.find((item) => item.wallId === wallId && item.status === 'pendiente').code, invited.code);
   assert.equal((await ack(member, 'wall:select', { id: wallId })).ok, false);
   const preview = await ack(member, 'invitation:preview', { secret: invited.code.toLowerCase() });
   assert.equal(preview.invitation.wallName, 'Sprint web');
@@ -198,9 +200,15 @@ test('crea un código de sala reutilizable y agrega cada membresía al unirse', 
   assert.equal(accepted.status, 'aceptada');
   assert.equal((await ack(member, 'invitation:answer', { secret: invited.code, answer: 'aceptar' })).ok, false);
   const secondMember = await connect();
-  await ack(secondMember, 'auth:register', { name: 'Carla Invitada', email: 'carla@example.com', password: 'clave78901', passwordConfirmation: 'clave78901' });
+  const secondRegistration = await ack(secondMember, 'auth:register', { name: 'Carla Invitada', email: 'carla@example.com', password: 'clave78901', passwordConfirmation: 'clave78901' });
+  const secondMemberId = secondRegistration.user.id;
   assert.equal((await ack(secondMember, 'invitation:answer', { secret: invited.code.toLowerCase() })).status, 'aceptada');
+  assert.equal((await ack(admin, 'wall:member:update', { wallId, userId: secondMemberId, role: 'editor' })).ok, true);
+  assert.equal((await ack(secondMember, 'wall:select', { id: wallId })).wall.role, 'editor');
+  assert.equal((await ack(admin, 'wall:member:update', { wallId, userId: secondMemberId, role: 'lector' })).ok, true);
   assert.equal((await ack(secondMember, 'wall:select', { id: wallId })).wall.role, 'lector');
+  assert.equal((await ack(admin, 'wall:member:remove', { wallId, userId: secondMemberId })).ok, true);
+  assert.equal((await ack(secondMember, 'wall:select', { id: wallId })).ok, false);
   assert.equal((await ack(member, 'invitation:preview', { secret: 'NOEXISTE' })).error, 'Sala no encontrada.');
   assert.equal((await ack(member, 'wall:select', { id: wallId })).wall.role, 'lector');
   assert.equal((await ack(member, 'note:create', { texto: 'No permitido', color: 'verde' })).ok, false);

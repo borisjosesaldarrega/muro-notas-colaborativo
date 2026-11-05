@@ -103,6 +103,19 @@ window.MuroBoard = (function () {
     return '';
   }
 
+  function applyWallPermissions() {
+    const role = state.currentWall?.role || 'lector';
+    const canEdit = role === 'propietario' || role === 'editor';
+    const canManage = role === 'propietario';
+    const newNote = $('#newNoteButton');
+    const invite = $('#inviteButton');
+    const deleteWall = $('#deleteWallBtn');
+    if (newNote) { newNote.disabled = !canEdit; newNote.title = canEdit ? 'Crear una nota' : 'Tu permiso es de solo lectura'; }
+    if (invite) invite.classList.toggle('hidden', !canManage);
+    if (deleteWall) deleteWall.classList.toggle('hidden', !canManage);
+    state.notes.forEach(renderNote);
+  }
+
   function resizeNoteToContent(element, textarea, text = '') {
     const sizeClass = noteSizeClass(text);
     const minimum = sizeClass === 'size-sm' ? 46 : sizeClass === 'size-lg' ? 96 : 68;
@@ -210,6 +223,11 @@ window.MuroBoard = (function () {
     const sizeClass = noteSizeClass(note.texto);
     element.className = `note ${colorClass(note.color)}${sizeClass ? ` ${sizeClass}` : ''}${state.filter !== 'all' && state.filter !== note.color ? ' filtered' : ''}`;
     const textarea = element.querySelector('textarea');
+    const canEdit = state.currentWall?.role === 'propietario' || state.currentWall?.role === 'editor';
+    textarea.readOnly = !canEdit;
+    element.querySelector('.note-delete').classList.toggle('hidden', !canEdit);
+    element.querySelector('.color-picker-mini').classList.toggle('hidden', !canEdit);
+    element.classList.toggle('read-only', !canEdit);
     if (document.activeElement !== textarea) {
       textarea.value = note.texto || '';
     }
@@ -243,6 +261,7 @@ window.MuroBoard = (function () {
     let lastPreviewAt = 0;
 
     element.addEventListener('pointerdown', (event) => {
+      if (state.currentWall?.role === 'lector') return;
       if (event.target.matches('textarea, button, .dot')) return;
 
       const rect = element.getBoundingClientRect();
@@ -437,6 +456,7 @@ window.MuroBoard = (function () {
             color: res.wall.color,
             members: res.members || []
           };
+          applyWallPermissions();
           if (res.notes) {
             res.notes.forEach(renderNote);
           }
@@ -523,6 +543,32 @@ window.MuroBoard = (function () {
       }
       renderWallsList(state.walls);
       fetchWalls();
+    });
+
+    socket.on('members:changed', async ({ wallId, userId, removed, members }) => {
+      if (state.currentWall?.id !== wallId) return;
+      if (removed && userId === state.user?.id) {
+        state.currentWall = { id: 'general', name: 'Muro de ideas', role: 'propietario' };
+        $('#inviteDialog')?.close();
+        $('#appView')?.classList.add('hidden');
+        $('#wallsView')?.classList.remove('hidden');
+        history.replaceState(null, '', `${location.pathname}${location.search}`);
+        toast('La persona propietaria revocó tu acceso a este muro.', 'info');
+        return fetchWalls();
+      }
+      const result = members ? { ok: true, members } : await emitWithTimeout('wall:select', { id: wallId });
+      if (!result?.ok) {
+        $('#appView')?.classList.add('hidden');
+        $('#wallsView')?.classList.remove('hidden');
+        toast('Tu acceso a este muro cambió.', 'info');
+        return fetchWalls();
+      }
+      state.currentWall.members = result.members || [];
+      const ownMembership = state.currentWall.members.find((member) => member.id === state.user?.id);
+      if (ownMembership) state.currentWall.role = ownMembership.roleInWall;
+      applyWallPermissions();
+      renderWallMembers(state.currentWall.members);
+      if (userId === state.user?.id) toast(`Tu permiso cambió a ${state.currentWall.role === 'lector' ? 'Lector/a' : 'Editor/a'}.`, 'info');
     });
 
     socket.on('walls:changed', fetchWalls);
@@ -712,7 +758,7 @@ window.MuroBoard = (function () {
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
-          <span class="member-role-tag ${role}">${roleLabel}</span>
+          ${isCurrentUserOwner && !isTargetOwner ? `<select class="member-role-select" aria-label="Permiso de ${escapeHTML(m.name || 'miembro')}"><option value="editor"${role === 'editor' ? ' selected' : ''}>Editor/a</option><option value="lector"${role === 'lector' ? ' selected' : ''}>Lector/a</option></select>` : `<span class="member-role-tag ${role}">${roleLabel}</span>`}
           ${m.id !== state.user?.id ? `<button type="button" class="report-member-btn" title="Reportar usuario">Reportar</button>` : ''}
           ${isCurrentUserOwner && !isTargetOwner ? `<button type="button" class="remove-member-btn" data-user-id="${m.id}" title="Quitar miembro">&times;</button>` : ''}
         </div>
@@ -727,6 +773,21 @@ window.MuroBoard = (function () {
       });
 
       if (isCurrentUserOwner && !isTargetOwner) {
+        item.querySelector('.member-role-select')?.addEventListener('change', async (event) => {
+          const select = event.currentTarget;
+          const previousRole = role;
+          select.disabled = true;
+          const response = await emitWithTimeout('wall:member:update', { wallId: state.currentWall.id, userId: m.id, role: select.value });
+          select.disabled = false;
+          if (!response?.ok) {
+            select.value = previousRole;
+            return toast(response?.error || 'No se pudo cambiar el permiso.', 'error');
+          }
+          state.currentWall.members = response.members || state.currentWall.members;
+          renderWallMembers(state.currentWall.members);
+          toast(`${m.name || 'El miembro'} ahora tiene permiso de ${select.value === 'lector' ? 'Lector/a' : 'Editor/a'}.`, 'success');
+        });
+
         item.querySelector('.remove-member-btn')?.addEventListener('click', async () => {
           const accepted = await window.MuroUI.confirmAction({ title: 'Quitar del muro', message: `${m.name || m.email} perderá el acceso a este muro.`, confirmText: 'Quitar acceso', tone: 'danger', icon: '👋' });
           if (accepted) {
@@ -750,7 +811,7 @@ window.MuroBoard = (function () {
   }
 
   // Modal Compartir e Invitar (Unificado según reglas del Backend)
-  $('#inviteButton')?.addEventListener('click', () => {
+  $('#inviteButton')?.addEventListener('click', async () => {
     $('#inviteForm')?.reset();
 
     // El enlace y el código se completan únicamente después de crear una invitación.
@@ -758,6 +819,7 @@ window.MuroBoard = (function () {
     if (shareInput) shareInput.value = '';
     if ($('#inviteCodeOutput')) $('#inviteCodeOutput').value = '';
     if ($('#copyShareLinkBtn')) $('#copyShareLinkBtn').disabled = true;
+    if ($('#inviteCodeStatus')) $('#inviteCodeStatus').textContent = 'Buscando el código activo…';
 
     // Regla estricta del backend: Solo la persona propietaria puede invitar miembros
     const isOwner = state.currentWall?.role === 'propietario';
@@ -773,6 +835,25 @@ window.MuroBoard = (function () {
     renderWallMembers(state.currentWall?.members || []);
 
     $('#inviteDialog')?.showModal();
+
+    if (isOwner && socket) {
+      const response = await emitWithTimeout('invitations:list', {});
+      const active = response?.ok ? response.invitations.find((item) => item.owner && item.wallId === state.currentWall.id && item.status === 'pendiente' && item.expiresAt > Date.now()) : null;
+      if (active?.code) {
+        if ($('#inviteCodeOutput')) $('#inviteCodeOutput').value = active.code;
+        if ($('#inviteRoleSelect')) $('#inviteRoleSelect').value = active.role;
+        if ($('#copyShareLinkBtn')) $('#copyShareLinkBtn').disabled = false;
+        if ($('#sendInviteBtn')) $('#sendInviteBtn').textContent = 'Generar otro código';
+        if ($('#inviteCodeStatus')) $('#inviteCodeStatus').textContent = `Código activo hasta ${new Date(active.expiresAt).toLocaleString('es-EC')}.`;
+      } else if (active) {
+        if ($('#inviteCodeOutput')) $('#inviteCodeOutput').placeholder = 'Código anterior no recuperable';
+        if ($('#sendInviteBtn')) $('#sendInviteBtn').textContent = 'Generar código nuevo';
+        if ($('#inviteCodeStatus')) $('#inviteCodeStatus').textContent = 'Este código se creó antes de poder recuperarlo. Continúa funcionando si lo guardaste; genera uno nuevo solo si lo perdiste.';
+      } else {
+        if ($('#sendInviteBtn')) $('#sendInviteBtn').textContent = 'Generar código';
+        if ($('#inviteCodeStatus')) $('#inviteCodeStatus').textContent = 'Todavía no hay un código activo para este muro.';
+      }
+    }
   });
 
   $('#copyShareLinkBtn')?.addEventListener('click', () => {
@@ -790,9 +871,14 @@ window.MuroBoard = (function () {
   $('#closeInviteModal')?.addEventListener('click', () => $('#inviteDialog')?.close());
   $('#cancelInviteModal')?.addEventListener('click', () => $('#inviteDialog')?.close());
 
-  $('#inviteForm')?.addEventListener('submit', (e) => {
+  $('#inviteForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const role = $('#inviteRoleSelect').value;
+
+    if ($('#inviteCodeOutput')?.value) {
+      const replace = await window.MuroUI.confirmAction({ title: 'Generar otro código', message: 'El código actual dejará de funcionar y será reemplazado por uno nuevo.', confirmText: 'Reemplazar código', tone: 'warning' });
+      if (!replace) return;
+    }
 
     if (socket) {
       socket.emit('wall:invite', { wallId: state.currentWall.id, role }, (res) => {
@@ -803,6 +889,8 @@ window.MuroBoard = (function () {
           if (shareInput) shareInput.value = res.link || shareInput.value;
           if (codeOutput) codeOutput.value = res.code || '';
           if ($('#copyShareLinkBtn')) $('#copyShareLinkBtn').disabled = !res.code;
+          if ($('#sendInviteBtn')) $('#sendInviteBtn').textContent = 'Generar otro código';
+          if ($('#inviteCodeStatus')) $('#inviteCodeStatus').textContent = 'Este código seguirá disponible después de cerrar o recargar la página.';
           toast(`Código ${res.code} creado. Compártelo con quien quieras invitar.`);
         } else {
           toast(res?.error || 'No se pudo enviar la invitación.');

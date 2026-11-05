@@ -9,6 +9,7 @@ const root = path.join(__dirname, '..');
 const migration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20261027002032_completar_invitaciones_y_reportes.sql'), 'utf8');
 const codeMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20261104221056_codigo_invitacion_8_y_vista_previa.sql'), 'utf8');
 const reusableMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20261104221929_codigo_sala_reutilizable.sql'), 'utf8');
+const persistentCodeMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20261105223133_conservar_codigo_invitacion_activo.sql'), 'utf8');
 const moderationMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20261105040901_reportes_por_usuario_y_sanciones.sql'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'public', 'netlify-socket.js'), 'utf8');
 
@@ -29,6 +30,20 @@ test('los códigos guardan hashes y crean una membresía por cada cuenta que se 
 test('el frontend usa RPC para invitaciones y reportes sin exponer service role', () => {
   for (const name of ['muro_crear_invitacion_codigo', 'muro_inspeccionar_invitacion', 'muro_responder_invitacion', 'muro_crear_reporte', 'muro_reportar_usuario', 'muro_responder_reporte']) assert.match(adapter, new RegExp(`rpc\\('${name}'`));
   assert.doesNotMatch(adapter, /service[_-]?role/i);
+});
+
+test('el propietario recupera el código activo y gestiona permisos mediante RPC protegidas', () => {
+  assert.match(persistentCodeMigration, /add column if not exists codigo_visible/);
+  assert.match(persistentCodeMigration, /then i\.codigo_visible/);
+  assert.match(persistentCodeMigration, /muro_cambiar_permiso_miembro/);
+  assert.match(persistentCodeMigration, /muro_revocar_miembro/);
+  assert.match(persistentCodeMigration, /usuario_objetivo = propietario/);
+  assert.match(persistentCodeMigration, /revoke update, delete on public\.muro_sala_miembros from authenticated/);
+  assert.match(adapter, /codigo_visible_nuevo: secrets\.code/);
+  assert.match(adapter, /rpc\('muro_cambiar_permiso_miembro'/);
+  assert.match(adapter, /rpc\('muro_revocar_miembro'/);
+  assert.doesNotMatch(adapter, /from\('muro_sala_miembros'\)\.update/);
+  assert.doesNotMatch(adapter, /from\('muro_sala_miembros'\)\.delete/);
 });
 
 test('los reportes apuntan a usuarios compartidos y las sanciones quedan protegidas', () => {

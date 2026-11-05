@@ -217,7 +217,9 @@ function createMuroServer(options = {}) {
   const invitationView = (invitation, user) => ({
     id: invitation.id, wallId: invitation.wallId, wallName: findWall(invitation.wallId)?.name || 'Muro',
     email: invitation.email, role: invitation.role, status: invitation.status,
-    owner: invitation.invitedBy === user.id, expiresAt: invitation.expiresAt, createdAt: invitation.createdAt
+    owner: invitation.invitedBy === user.id,
+    code: invitation.invitedBy === user.id && invitation.status === 'pendiente' && invitation.expiresAt > Date.now() ? invitation.code : null,
+    expiresAt: invitation.expiresAt, createdAt: invitation.createdAt
   });
   const reportView = (report, admin = false) => ({
     id: report.id, reason: report.reason, detail: report.detail, status: report.status,
@@ -669,7 +671,7 @@ function createMuroServer(options = {}) {
       if (storage.schemaReady) {
         try {
           const rows = await store.listInvitations(socket.data.accessToken);
-          return acknowledge({ ok: true, invitations: rows.map((row) => ({ id: row.id, wallId: row.sala_id, wallName: row.sala_nombre, email: row.correo, role: row.rol, status: row.estado, owner: row.es_propietario, expiresAt: Date.parse(row.vence_en), createdAt: Date.parse(row.creado_en) })) });
+          return acknowledge({ ok: true, invitations: rows.map((row) => ({ id: row.id, wallId: row.sala_id, wallName: row.sala_nombre, email: row.correo, role: row.rol, status: row.estado, owner: row.es_propietario, code: row.codigo || null, expiresAt: Date.parse(row.vence_en), createdAt: Date.parse(row.creado_en) })) });
         } catch { return fail(acknowledge, 'No se pudieron cargar las invitaciones.'); }
       }
       invitations.forEach((item) => { if (item.status === 'pendiente' && item.expiresAt <= Date.now()) item.status = 'vencida'; });
@@ -746,7 +748,9 @@ function createMuroServer(options = {}) {
         try { await store.updateMember(wall.id, payload.userId, payload.role, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo guardar el permiso. Inténtalo nuevamente.'); }
       }
       wall.members[payload.userId] = payload.role;
-      acknowledge({ ok: true, members: wallMembers(wall) });
+      const members = wallMembers(wall);
+      acknowledge({ ok: true, members });
+      io.to(`wall:${wall.id}`).emit('members:changed', { wallId: wall.id, userId: payload.userId, role: payload.role, members });
     });
 
     socket.on('wall:member:remove', async (payload = {}, acknowledge = () => {}) => {
@@ -759,7 +763,9 @@ function createMuroServer(options = {}) {
         try { await store.deleteMember(wall.id, payload.userId, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo quitar al miembro. Inténtalo nuevamente.'); }
       }
       delete wall.members[payload.userId];
-      acknowledge({ ok: true, members: wallMembers(wall) });
+      const members = wallMembers(wall);
+      acknowledge({ ok: true, members });
+      io.to(`wall:${wall.id}`).emit('members:changed', { wallId: wall.id, userId: payload.userId, removed: true, members });
     });
 
     socket.on('note:create', async (payload = {}, acknowledge = () => {}) => {

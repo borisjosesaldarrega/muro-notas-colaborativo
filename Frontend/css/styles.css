@@ -1606,6 +1606,9 @@ button .ui-icon { margin-right: 7px; }
 #copyShareLinkBtn { display: inline-flex; align-items: center; white-space: nowrap; border-radius: 13px; }
 #copyShareLinkBtn:disabled { opacity: .48; cursor: not-allowed; transform: none; }
 .invite-members-title span { display: inline-flex; align-items: center; gap: 7px; }
+.member-role-select { min-width: 106px; height: 34px; padding: 0 28px 0 10px; border: 1px solid #d8d0ee; border-radius: 10px; color: #44368f; background: #f4f0ff; font: inherit; font-size: .76rem; font-weight: 800; cursor: pointer; }
+.member-role-select:disabled { opacity: .58; cursor: wait; }
+html[data-theme="dark"] .member-role-select { color: #eee9ff; background: #342a4d; border-color: #594b78; }
 
 .side-panel { width: min(390px, 100%); padding: 30px; background: #fff; }
 .profile-hero { display: flex; align-items: center; gap: 14px; margin: 25px 0 10px; }
