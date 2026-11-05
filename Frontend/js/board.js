@@ -66,12 +66,15 @@ window.MuroBoard = (function () {
 
       element.innerHTML = `
         <div class="note-header">
-          <div class="color-picker-mini" title="Cambiar color">
-            <button class="dot yellow" data-color="amarillo"></button>
-            <button class="dot pink" data-color="rosa"></button>
-            <button class="dot blue" data-color="azul"></button>
-            <button class="dot green" data-color="verde"></button>
-            <button class="dot purple" data-color="lila"></button>
+          <div style="display:flex; align-items:center; gap:5px;">
+            <button class="note-size-btn" type="button" title="Cambiar tamaño">M</button>
+            <div class="color-picker-mini" title="Cambiar color">
+              <button class="dot yellow" data-color="amarillo"></button>
+              <button class="dot pink" data-color="rosa"></button>
+              <button class="dot blue" data-color="azul"></button>
+              <button class="dot green" data-color="verde"></button>
+              <button class="dot purple" data-color="lila"></button>
+            </div>
           </div>
           <div style="display:flex; gap:4px; align-items:center;">
             <button class="note-report" title="Reportar contenido indebido" style="border:0; background:none; cursor:pointer; font-size:0.9rem;">🚩</button>
@@ -87,6 +90,22 @@ window.MuroBoard = (function () {
 
       if (board) board.appendChild(element);
       setupDrag(element);
+
+      const sizeButton = element.querySelector('.note-size-btn');
+      sizeButton?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (element.classList.contains('size-sm')) {
+          element.classList.remove('size-sm');
+          element.classList.add('size-lg');
+          sizeButton.textContent = 'G';
+        } else if (element.classList.contains('size-lg')) {
+          element.classList.remove('size-lg');
+          sizeButton.textContent = 'M';
+        } else {
+          element.classList.add('size-sm');
+          sizeButton.textContent = 'P';
+        }
+      });
 
       const textarea = element.querySelector('textarea');
       textarea.addEventListener('change', (event) => {
@@ -130,7 +149,8 @@ window.MuroBoard = (function () {
           const current = state.notes.get(note.id);
           if (current && current.color !== selectedColor) {
             current.color = selectedColor;
-            element.className = `note ${colorClass(selectedColor)}${state.filter !== 'all' && state.filter !== selectedColor ? ' filtered' : ''}`;
+            const sizeClass = element.classList.contains('size-sm') ? ' size-sm' : element.classList.contains('size-lg') ? ' size-lg' : '';
+            element.className = `note ${colorClass(selectedColor)}${sizeClass}${state.filter !== 'all' && state.filter !== selectedColor ? ' filtered' : ''}`;
             if (socket) {
               socket.emit('note:update', { id: note.id, texto: textarea.value, color: selectedColor }, (res) => {
                 if (!res?.ok) toast(res?.error || 'No se pudo cambiar el color.');
@@ -141,7 +161,8 @@ window.MuroBoard = (function () {
       });
     }
 
-    element.className = `note ${colorClass(note.color)}${state.filter !== 'all' && state.filter !== note.color ? ' filtered' : ''}`;
+    const sizeClass = element.classList.contains('size-sm') ? ' size-sm' : element.classList.contains('size-lg') ? ' size-lg' : '';
+    element.className = `note ${colorClass(note.color)}${sizeClass}${state.filter !== 'all' && state.filter !== note.color ? ' filtered' : ''}`;
     const textarea = element.querySelector('textarea');
     if (document.activeElement !== textarea) {
       textarea.value = note.texto || '';

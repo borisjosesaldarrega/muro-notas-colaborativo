@@ -14,7 +14,9 @@
   <!-- VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO / VERIFICACIÓN / CONFIRMACIÓN / RECUPERACIÓN) -->
   <main id="authView" class="auth-shell">
     <section class="auth-brand">
-      <div class="brand-mark">M</div>
+      <div class="brand-mark" title="Muro Colaborativo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg>
+      </div>
       <div>
         <p class="eyebrow">Ideas que conectan</p>
         <h1>Tu equipo, en un mismo muro.</h1>
@@ -28,7 +30,7 @@
     <section class="auth-panel">
       <!-- 1. LOGIN -->
       <form id="loginForm" class="auth-card" novalidate>
-        <div class="mobile-logo"><span class="brand-mark">M</span> Muro</div>
+        <div class="mobile-logo"><span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span> Muro</div>
         <p class="eyebrow">Bienvenido de nuevo</p>
         <h2>Inicia sesión</h2>
         <p class="muted">Entra y continúa construyendo grandes ideas.</p>
@@ -118,7 +120,7 @@
   <!-- VISTA 2: DASHBOARD DE MIS MUROS / SALAS (CARA DE USUARIO) -->
   <main id="wallsView" class="walls-shell hidden">
     <header class="topbar">
-      <a class="app-brand" href="#"><span class="brand-mark">M</span><span>Muro</span></a>
+      <a class="app-brand" href="#"><span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span><span>Muro</span></a>
       <div class="board-name"><small>Espacio de trabajo</small><strong>Mis Muros y Salas</strong></div>
       <div class="top-actions">
         <button id="createWallBtn" class="primary-button compact">＋ Crear Muro</button>
@@ -133,7 +135,7 @@
       <form id="acceptInvitationForm" class="invitation-accept-bar">
         <div><strong>¿Recibiste una invitación?</strong><small>Usa el código de 8 letras y números o abre el enlace compartido.</small><small id="acceptInvitationPreview" class="muted"></small></div>
         <input id="acceptInvitationCode" maxlength="128" autocomplete="off" placeholder="Ej. A7K9M2QX" required>
-        <button class="secondary-button compact" type="submit">Unirse</button>
+        <button class="btn-join-code" type="submit">🔑 Unirse</button>
       </form>
       <div id="wallsGrid" class="walls-grid">
         <!-- Tarjetas dinámicas de salas -->
@@ -150,7 +152,7 @@
         <strong id="currentWallTitle">Muro de ideas</strong>
       </div>
       <div class="top-actions">
-        <button id="inviteButton" class="primary-button compact" title="Invitar y compartir enlace">👥 Compartir / Invitar</button>
+        <button id="inviteButton" class="btn-invite-room" title="Invitar y compartir código">👥 Invitar al Muro</button>
         <button id="deleteWallBtn" class="danger-button compact hidden" title="Eliminar este muro">🗑️ Eliminar Sala</button>
         <span class="presence"><i></i><b id="onlineCount">1</b> conectados</span>
         <button id="profileButton" class="avatar" title="Perfil">P</button>
@@ -176,7 +178,7 @@
       <!-- SIDEBAR LATERAL DE ADMINISTRACIÓN -->
       <aside class="admin-sidebar">
         <div class="admin-sidebar-header">
-          <span class="brand-mark">M</span>
+          <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg></span>
           <div>
             <strong>Muro Admin</strong>
             <small class="admin-badge">👁️ Monitor</small>
