@@ -36,9 +36,9 @@ test('expone configuración de cuenta, temas e invitación con lenguaje claro', 
   assert.match(html, /data-admin-tab="guia"/);
   assert.match(board, /Propietario\/a/);
   const css = readFileSync(join(root, 'Frontend/css/styles.css'), 'utf8');
-  assert.match(css, /\.account-settings-dialog::\-webkit-scrollbar-thumb/);
-  assert.match(css, /scrollbar-color:\s*#8f7cf8\s+#eeeaff/);
-  assert.match(css, /html\[data-theme="dark"\] \.account-settings-dialog/);
+  assert.match(css, /\.settings-scroll-content::\-webkit-scrollbar-thumb/);
+  assert.match(css, /scrollbar-color:\s*rgba\(107, 88, 220, \.52\) transparent/);
+  assert.match(css, /html\[data-theme="dark"\] \.settings-scroll-content/);
   assert.match(css, /\.admin-user-info \.avatar[\s\S]*place-items:\s*center/);
   assert.match(html, /class="admin-user-role">Moderador\/a/);
 });
@@ -173,6 +173,16 @@ test('renueva sesiones vencidas, confirma el guardado de notas y conserva el his
   assert.match(html, /id="adminReportHistoryTable"/);
   assert.match(app, /Cerrar reporte/);
   assert.match(app, /renderAdminReportHistory/);
+});
+
+test('mantiene el scroll de configuración dentro del contenido del modal', () => {
+  const html = readFileSync(join(root, 'Frontend/index.html'), 'utf8');
+  const css = readFileSync(join(root, 'Frontend/css/styles.css'), 'utf8');
+  assert.match(html, /class="settings-scroll-content"/);
+  assert.match(css, /\.account-settings-dialog \{[^}]*overflow:\s*hidden/s);
+  assert.match(css, /\.settings-scroll-content \{[^}]*overflow-y:\s*auto/s);
+  assert.match(css, /\.settings-scroll-content::-webkit-scrollbar \{ width:\s*8px/);
+  assert.match(css, /scrollbar-color:\s*rgba\(107, 88, 220, \.52\) transparent/);
 });
 
 test('permite reportar miembros y notifica las medidas por correo sin revelar al reportante', () => {

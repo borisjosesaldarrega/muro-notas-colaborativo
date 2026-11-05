@@ -617,6 +617,7 @@
   <dialog id="accountSettingsDialog" class="account-settings-dialog">
     <form id="accountSettingsForm">
       <div class="dialog-head"><div><p class="eyebrow">Tu espacio personal</p><h3>Configuración de cuenta</h3></div><button id="closeAccountSettings" class="close-button" type="button" aria-label="Cerrar">&times;</button></div>
+      <div class="settings-scroll-content">
       <div class="settings-section">
         <div class="settings-section-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 6v2h18v-2c0-3.5-4-6-9-6Z"/></svg><div><strong>Perfil</strong><small>Cómo te ven las demás personas</small></div></div>
         <div class="settings-action-row"><div><span>Nombre de usuario</span><strong id="settingsUsernameValue">Usuario</strong><small class="username-unique-hint">Este nombre es único y será visible para los demás usuarios.</small></div><button id="openUsernameChange" type="button" class="secondary-button compact">Cambiar usuario</button></div>
@@ -633,6 +634,7 @@
       </div>
       <div class="settings-section settings-toggles"><label><input id="settingsConfirmDelete" type="checkbox">Confirmar antes de eliminar</label><label><input id="settingsCompactNotes" type="checkbox">Usar notas compactas</label></div>
       <div class="dialog-actions"><button id="cancelAccountSettings" type="button" class="secondary-button">Cerrar</button><button type="submit" class="primary-button">Guardar</button></div>
+      </div>
     </form>
   </dialog>
 
