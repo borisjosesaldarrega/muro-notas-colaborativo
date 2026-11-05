@@ -16,6 +16,7 @@ Aplicación de notas adhesivas con el lenguaje visual original de Muro DZ y una 
 - Notas sincronizadas, arrastrables, con tamaño automático según el contenido y movimiento remoto fluido sin guardar cada fotograma.
 - Perfil, avatar, preferencias de apariencia y muros personalizables por color con edición o eliminación reservada al propietario/a.
 - Panel superadmin centrado en ayuda, usuarios y reportes; no abre muros ni notas privadas.
+- Reportes desde la lista de miembros y medidas notificadas dentro de la aplicación y por correo, sin revelar quién reportó.
 - Diseño animado y amable: mascota circular, fondos pastel, cintas, botones redondeados y post-its adaptables.
 - Lienzo lógico compartido de `1800 × 1200`: en móvil se puede alejar, acercar y recorrer las mismas coordenadas que en PC.
 

@@ -425,7 +425,7 @@
     <form id="noteForm" method="dialog">
       <div class="dialog-head">
         <div><p class="eyebrow">Nueva idea</p><h3>Crear una nota</h3></div>
-        <button class="close-button" value="cancel" type="button">&times;</button>
+        <button id="closeNoteModal" class="close-button" value="cancel" type="button" aria-label="Cerrar">&times;</button>
       </div>
       <label>Contenido<textarea id="noteText" maxlength="280" rows="5" placeholder="Escribe tu idea…" required></textarea></label>
       <div id="characterCount" style="text-align:right; font-size:0.78rem; color:var(--muted); margin-top:4px; font-weight:600;">0 / 280</div>
@@ -440,7 +440,7 @@
         </div>
       </fieldset>
       <div class="dialog-actions">
-        <button value="cancel" class="secondary-button" type="button">Cancelar</button>
+        <button id="cancelNoteModal" value="cancel" class="secondary-button" type="button">Cancelar</button>
         <button id="saveNote" type="submit" class="primary-button">Publicar nota</button>
       </div>
     </form>

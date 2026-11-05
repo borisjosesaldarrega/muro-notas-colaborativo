@@ -135,3 +135,28 @@ test('ajusta las notas al contenido y sincroniza el nombre visible de su autor',
   assert.match(migration, /update public\.muro_notas/i);
   assert.match(migration, /nota\.autor_id = usuario\.id/i);
 });
+
+test('permite reportar miembros y notifica las medidas por correo sin revelar al reportante', () => {
+  const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
+  const app = readFileSync(join(root, 'Frontend/js/app.js'), 'utf8');
+  const server = readFileSync(join(root, 'server.js'), 'utf8');
+  assert.match(board, /class="report-member-btn"[^>]*>Reportar</);
+  assert.match(board, /socket\.emit\('report:user:create'/);
+  assert.match(server, /sendModerationEmail\(socket\.data\.accessToken/);
+  assert.match(server, /email: target\.email, name: target\.name, action, message/);
+  assert.doesNotMatch(server, /sendModerationEmail\([\s\S]{0,200}reporter/i);
+  assert.match(app, /La medida se aplicó y se notificó por correo/);
+  assert.match(server, /La medida se aplicó, pero no se pudo enviar el correo de notificación/);
+});
+
+test('el modal de nueva nota cierra sus acciones y no genera desplazamiento horizontal', () => {
+  const html = readFileSync(join(root, 'Frontend/index.html'), 'utf8');
+  const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
+  const css = readFileSync(join(root, 'Frontend/css/styles.css'), 'utf8');
+  assert.match(html, /id="closeNoteModal"/);
+  assert.match(html, /id="cancelNoteModal"/);
+  assert.match(board, /#closeNoteModal[\s\S]*#noteDialog[\s\S]*close\(\)/);
+  assert.match(board, /#cancelNoteModal[\s\S]*#noteDialog[\s\S]*close\(\)/);
+  assert.match(css, /#noteDialog \{[^}]*overflow:\s*hidden/);
+  assert.match(css, /#noteDialog textarea \{[^}]*max-width:\s*100%/);
+});
