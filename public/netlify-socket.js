@@ -3,6 +3,7 @@
 (function installSupabaseSocketAdapter() {
   const dateValue = (value) => value ? Date.parse(value) : Date.now();
   const noteValue = (row) => ({ id: row.id, titulo: row.titulo, texto: row.contenido, color: row.color, x: Number(row.posicion_x), y: Number(row.posicion_y), autor: row.nombre_autor, authorId: row.autor_id, updatedAt: dateValue(row.actualizado_en) });
+  const wallValue = (row) => ({ id: row.id, name: row.nombre, description: row.descripcion || '', color: row.color || 'amarillo', ownerId: row.propietario_id, updatedAt: dateValue(row.actualizado_en) });
   const settingsValue = (row = {}) => ({ theme: row.tema || 'light', confirmDelete: row.confirmar_eliminacion ?? true, compactNotes: row.notas_compactas ?? false, notifications: row.notificaciones ?? true });
   const profileValue = (row, settings) => ({ id: row.id, name: row.nombre, email: row.correo, role: row.rol, avatar: row.avatar || '', createdAt: dateValue(row.creado_en), settings: settingsValue(settings) });
   const sha256 = async (value) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value))))).map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -24,6 +25,10 @@
     if (/invalid login credentials/i.test(message)) return 'Correo o contraseña incorrectos.';
     if (/password should|weak password/i.test(message)) return 'La contraseña no cumple los requisitos de seguridad.';
     if (/email not confirmed/i.test(message)) return 'Confirma tu correo antes de iniciar sesión.';
+    if (/token has expired|otp.*expired/i.test(message)) return 'El código caducó. Solicita uno nuevo.';
+    if (/token has been used|otp.*used/i.test(message)) return 'Ese código ya fue utilizado. Solicita uno nuevo.';
+    if (/token.*invalid|invalid.*otp|otp.*invalid/i.test(message)) return 'El código es incorrecto. Revisa los 8 dígitos.';
+    if (/confirmation.*disabled/i.test(message)) return 'La confirmación por correo no está disponible. Inténtalo más tarde.';
     if ((event === 'auth:register' || event === 'profile:update') && (code === '23505' || /nombre.*(uso|unique|duplicate)/i.test(message))) return 'Ese nombre de usuario ya está en uso.';
     if (/debes iniciar sesión|sesión expiró|se requiere una sesion|jwt/i.test(message) || code === 'PGRST301' || code === '28000') return 'Tu sesión no es válida. Inicia sesión nuevamente.';
     if (event === 'wall:create' && (code === '22023' || code === '23514')) return 'Revisa el nombre y la descripción del muro.';
@@ -61,7 +66,7 @@
 
   class SupabaseSocketAdapter {
     constructor() {
-      this.handlers = new Map(); this.connected = false; this.client = null; this.currentWallId = null; this.online = 1; this.realtimeChannel = null; this.reportChannel = null; this.reportUserId = null;
+      this.handlers = new Map(); this.connected = false; this.client = null; this.currentWallId = null; this.online = 1; this.realtimeChannel = null; this.reportChannel = null; this.wallListChannel = null; this.reportUserId = null;
       this.io = { on: (event, handler) => this.on(`io:${event}`, handler) };
       this.initialize();
     }
@@ -105,7 +110,16 @@
         this.client.from('muro_usuarios').select('*').eq('id', id).single(),
         this.client.from('muro_configuraciones_usuario').select('*').eq('usuario_id', id).single()
       ]);
-      if (profileError) throw profileError; if (settingsError) throw settingsError; const value = profileValue(profile, settings); await this.installReportRealtime(value); return value;
+      if (profileError) throw profileError; if (settingsError) throw settingsError; const value = profileValue(profile, settings); await Promise.all([this.installReportRealtime(value), this.installWallListRealtime(value)]); return value;
+    }
+    async installWallListRealtime(profile) {
+      if (this.wallListChannel) return;
+      const channel = this.client.channel(`lista-muros:${profile.id}:${crypto.randomUUID()}`); this.wallListChannel = channel;
+      channel
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'muro_salas' }, ({ new: row }) => this.trigger('wall:updated', wallValue(row)))
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'muro_salas' }, ({ old: row }) => { this.trigger('wall:deleted', row.id); this.trigger('walls:changed'); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'muro_sala_miembros', filter: `usuario_id=eq.${profile.id}` }, () => this.trigger('walls:changed'));
+      channel.subscribe();
     }
     async installReportRealtime(profile) {
       if (this.reportUserId === profile.id && this.reportChannel) return;
@@ -129,21 +143,21 @@
       ]);
       if (wallError) throw wallError; if (roleError) throw roleError; if (notesError) throw notesError; if (!role) throw new Error('No eres miembro de este muro.');
       this.currentWallId = id; await this.installRealtime(id);
-      return { wall: { id: wall.id, name: wall.nombre, description: wall.descripcion, ownerId: wall.propietario_id, role }, members, notes: (notes || []).map(noteValue) };
+      return { wall: { ...wallValue(wall), role }, members, notes: (notes || []).map(noteValue) };
     }
     async dispatch(event, payload) {
       switch (event) {
         case 'auth:register': {
           const { data, error } = await this.client.auth.signUp({ email: payload.email.trim().toLowerCase(), password: payload.password, options: { data: { name: payload.name.trim() }, emailRedirectTo: location.origin } }); if (error) throw error;
-          if (!data.session) return { ok: true, requiresConfirmation: true };
-          return { ok: true, token: data.session.access_token, user: await this.userProfile(data.user.id) };
+          if (data.session) { await this.client.auth.signOut({ scope: 'local' }); throw new Error('La confirmación por correo no está disponible.'); }
+          return { ok: true, requiresConfirmation: true, email: payload.email.trim().toLowerCase() };
         }
         case 'auth:login': { const { data, error } = await this.client.auth.signInWithPassword({ email: payload.email.trim().toLowerCase(), password: payload.password }); if (error) throw error; return { ok: true, token: data.session.access_token, user: await this.userProfile(data.user.id) }; }
         case 'auth:restore': { const session = await this.session(); if (!session) return { ok: false, error: 'La sesión expiró.' }; return { ok: true, token: session.access_token, user: await this.userProfile(session.user.id) }; }
-        case 'auth:logout': { if (this.realtimeChannel) await this.client.removeChannel(this.realtimeChannel); if (this.reportChannel) await this.client.removeChannel(this.reportChannel); this.realtimeChannel = null; this.reportChannel = null; this.reportUserId = null; const { error } = await this.client.auth.signOut({ scope: 'local' }); if (error) throw error; const { data } = await this.client.auth.getSession(); if (data.session) throw new Error('No se pudo cerrar la sesión local.'); return { ok: true }; }
+        case 'auth:logout': { if (this.realtimeChannel) await this.client.removeChannel(this.realtimeChannel); if (this.reportChannel) await this.client.removeChannel(this.reportChannel); if (this.wallListChannel) await this.client.removeChannel(this.wallListChannel); this.realtimeChannel = null; this.reportChannel = null; this.wallListChannel = null; this.reportUserId = null; const { error } = await this.client.auth.signOut({ scope: 'local' }); if (error) throw error; const { data } = await this.client.auth.getSession(); if (data.session) throw new Error('No se pudo cerrar la sesión local.'); return { ok: true }; }
         case 'auth:recover': { const { error } = await this.client.auth.resetPasswordForEmail(payload.email.trim().toLowerCase(), { redirectTo: location.origin }); if (error) throw error; return { ok: true }; }
         case 'auth:verify-code': {
-          const type = payload.type === 'signup' ? 'signup' : 'recovery'; const { data, error } = await this.client.auth.verifyOtp({ email: payload.email.trim().toLowerCase(), token: payload.token.trim(), type }); if (error) throw error;
+          const type = payload.type === 'recovery' ? 'recovery' : 'email'; const { data, error } = await this.client.auth.verifyOtp({ email: payload.email.trim().toLowerCase(), token: payload.token.trim(), type }); if (error) throw error;
           if (type === 'recovery') return { ok: true, token: data.session?.access_token || '' };
           return { ok: true, token: data.session.access_token, user: await this.userProfile(data.user.id) };
         }
@@ -163,11 +177,11 @@
             this.client.from('muro_salas').select('*').order('actualizado_en', { ascending: false }), this.client.from('muro_sala_miembros').select('sala_id,usuario_id,rol'), this.client.from('muro_notas').select('id,sala_id')
           ]);
           if (wallsError) throw wallsError; if (membersError) throw membersError; if (notesError) throw notesError;
-          return { ok: true, walls: (walls || []).map((wall) => ({ id: wall.id, name: wall.nombre, description: wall.descripcion, ownerId: wall.propietario_id, role: memberships.find((item) => item.sala_id === wall.id && item.usuario_id === user.id)?.rol, notesCount: notes.filter((note) => note.sala_id === wall.id).length, membersCount: memberships.filter((member) => member.sala_id === wall.id).length })) };
+          return { ok: true, walls: (walls || []).map((wall) => ({ ...wallValue(wall), role: memberships.find((item) => item.sala_id === wall.id && item.usuario_id === user.id)?.rol, notesCount: notes.filter((note) => note.sala_id === wall.id).length, membersCount: memberships.filter((member) => member.sala_id === wall.id).length })) };
         }
         case 'wall:select': { const result = await this.selectWall(payload.id); return { ok: true, ...result }; }
-        case 'wall:create': { await this.identity(); const { data: id, error } = await this.client.rpc('muro_crear_sala', { nombre_nuevo: payload.name.trim(), descripcion_nueva: payload.description?.trim() || '' }); if (error) throw error; return { ok: true, id }; }
-        case 'wall:update': { const { error } = await this.client.from('muro_salas').update({ nombre: payload.name.trim(), descripcion: payload.description?.trim() || '', actualizado_en: new Date().toISOString() }).eq('id', payload.id); if (error) throw error; return { ok: true }; }
+        case 'wall:create': { await this.identity(); const { data: id, error } = await this.client.rpc('muro_crear_sala', { nombre_nuevo: payload.name.trim(), descripcion_nueva: payload.description?.trim() || '', color_nuevo: payload.color || 'amarillo' }); if (error) throw error; return { ok: true, id }; }
+        case 'wall:update': { const { data, error } = await this.client.from('muro_salas').update({ nombre: payload.name.trim(), descripcion: payload.description?.trim() || '', color: payload.color, actualizado_en: new Date().toISOString() }).eq('id', payload.id).select().single(); if (error) throw error; const wall = wallValue(data); this.trigger('wall:updated', wall); return { ok: true, wall }; }
         case 'wall:delete': { const { error } = await this.client.from('muro_salas').delete().eq('id', payload.id); if (error) throw error; this.trigger('wall:deleted', payload.id); return { ok: true }; }
         case 'wall:invite': {
           await this.identity(); const secrets = await invitationSecrets();

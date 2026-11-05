@@ -89,6 +89,7 @@ function createMuroServer(options = {}) {
     id: 'general',
     name: 'Muro de ideas',
     description: 'Un espacio compartido para las ideas del equipo.',
+    color: 'amarillo',
     ownerId: null,
     members: {},
     notes: [createWelcomeNote()],
@@ -182,6 +183,7 @@ function createMuroServer(options = {}) {
     id: wall.id,
     name: wall.name,
     description: wall.description,
+    color: wall.color || 'amarillo',
     ownerId: wall.ownerId,
     role: wallRole(wall, user),
     notesCount: wall.notes.length,
@@ -190,6 +192,17 @@ function createMuroServer(options = {}) {
     updatedAt: wall.updatedAt
   });
   const wallMembers = (wall) => Object.entries(wall.members).map(([id, role]) => ({ ...publicUser(users.find((user) => user.id === id)), roleInWall: role })).filter((item) => item.id);
+  const emitWallSummaryToMembers = (wall) => {
+    for (const client of io.sockets.sockets.values()) {
+      const member = users.find((item) => item.id === client.data.userId);
+      if (member && wallRole(wall, member)) client.emit('wall:updated', wallSummary(wall, member));
+    }
+  };
+  const emitWallDeletionToMembers = (wall) => {
+    for (const client of io.sockets.sockets.values()) {
+      if (client.data.userId && wall.members[client.data.userId]) client.emit('wall:deleted', wall.id);
+    }
+  };
   const invitationView = (invitation, user) => ({
     id: invitation.id, wallId: invitation.wallId, wallName: findWall(invitation.wallId)?.name || 'Muro',
     email: invitation.email, role: invitation.role, status: invitation.status,
@@ -249,17 +262,16 @@ function createMuroServer(options = {}) {
       if (!name) return fail(acknowledge, 'Escribe tu nombre.');
       if (users.some((user) => user.name.toLocaleLowerCase() === name.toLocaleLowerCase())) return fail(acknowledge, 'Ese nombre de usuario ya está en uso.');
       if (!email) return fail(acknowledge, 'Escribe un correo válido.');
-      if (password.length < 4 || password.length > 128) return fail(acknowledge, 'La contraseña debe tener entre 4 y 128 caracteres.');
+      if (password.length < 10 || password.length > 128) return fail(acknowledge, 'La contraseña debe tener entre 10 y 128 caracteres.');
       if (password !== passwordConfirmation) return fail(acknowledge, 'Las contraseñas deben coincidir.');
       if (users.some((user) => user.email === email)) return fail(acknowledge, 'Ese correo ya está registrado.');
       if (storage.schemaReady) {
         try {
-          const session = await store.register({ name, email, password });
-          replaceState(await store.loadState());
-          const user = users.find((item) => item.id === session.user.id) || session.user;
-          return acknowledge({ ok: true, ...establishSession(socket, user, session.token) });
-        } catch {
-          return fail(acknowledge, 'No se pudo crear la cuenta en Supabase. Revisa la configuración de Auth.');
+          const result = await store.register({ name, email, password, redirectTo: process.env.APP_URL || 'http://localhost:3000' });
+          return acknowledge({ ok: true, ...result });
+        } catch (error) {
+          if (/confirmation_disabled/i.test(String(error?.message))) return fail(acknowledge, 'La confirmación por correo no está disponible. Inténtalo más tarde.');
+          return fail(acknowledge, 'No se pudo crear la cuenta. Revisa los datos e inténtalo nuevamente.');
         }
       }
       const user = {
@@ -281,6 +293,34 @@ function createMuroServer(options = {}) {
         general.members[user.id] = 'editor';
       }
       return acknowledge({ ok: true, ...establishSession(socket, user) });
+    });
+
+    socket.on('auth:verify-code', async (payload = {}, acknowledge = () => {}) => {
+      const email = validEmail(payload.email);
+      const token = cleanText(payload.token, 16);
+      if (!email || !/^\d{8}$/.test(token)) return fail(acknowledge, 'Ingresa los 8 dígitos del código.');
+      if (!storage.schemaReady) return fail(acknowledge, 'La verificación por correo no está disponible en este entorno.');
+      try {
+        const session = await store.verifySignup({ email, token });
+        replaceState(await store.loadState());
+        const user = users.find((item) => item.id === session.user.id) || session.user;
+        return acknowledge({ ok: true, ...establishSession(socket, user, session.token) });
+      } catch {
+        return fail(acknowledge, 'El código es incorrecto, caducó o ya fue utilizado. Solicita uno nuevo.');
+      }
+    });
+
+    socket.on('auth:resend-code', async (payload = {}, acknowledge = () => {}) => {
+      const email = validEmail(payload.email);
+      if (!email) return fail(acknowledge, 'No encontramos un registro pendiente.');
+      if (!storage.schemaReady) return fail(acknowledge, 'El reenvío no está disponible en este entorno.');
+      try {
+        await store.resendSignup(email, process.env.APP_URL || 'http://localhost:3000');
+        return acknowledge({ ok: true });
+      } catch (error) {
+        const wait = String(error?.message || '').match(/(\d+)\s+seconds?/i);
+        return fail(acknowledge, wait ? `Espera ${wait[1]} segundos antes de solicitar otro código.` : 'No se pudo reenviar el código. Espera un momento e inténtalo nuevamente.');
+      }
     });
 
     socket.on('auth:login', async (payload = {}, acknowledge = () => {}) => {
@@ -314,7 +354,7 @@ function createMuroServer(options = {}) {
           return acknowledge({ ok: true, token, user: publicUser(session.user) });
         } catch (error) {
           const suspended = /banned|suspend/i.test(String(error?.message));
-          return fail(acknowledge, suspended ? 'Tu cuenta está suspendida. Vuelve cuando termine la penalización.' : 'La sesión de Supabase expiró.');
+          return fail(acknowledge, suspended ? 'Tu cuenta está suspendida. Vuelve cuando termine la penalización.' : 'Tu sesión expiró. Inicia sesión nuevamente.');
         }
       }
       const user = users.find((item) => item.id === sessions.get(token));
@@ -343,7 +383,7 @@ function createMuroServer(options = {}) {
       const user = requireUser(socket, acknowledge);
       if (!user) return;
       const next = String(payload.newPassword ?? '');
-      if (next.length < 4 || next.length > 128) return fail(acknowledge, 'La nueva contraseña debe tener entre 4 y 128 caracteres.');
+      if (next.length < 10 || next.length > 128) return fail(acknowledge, 'La nueva contraseña debe tener entre 10 y 128 caracteres.');
       if (storage.schemaReady) {
         try { await store.changePassword(user, String(payload.currentPassword ?? ''), next); }
         catch { return fail(acknowledge, 'La contraseña actual es incorrecta.'); }
@@ -383,7 +423,7 @@ function createMuroServer(options = {}) {
       user.name = name;
       user.avatar = avatar;
       if (storage.schemaReady) {
-        try { await store.saveProfile(user, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo guardar el perfil en Supabase.'); }
+        try { await store.saveProfile(user, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar el perfil. Inténtalo nuevamente.'); }
       }
       acknowledge({ ok: true, user: publicUser(user) });
       io.emit('profile:changed', publicUser(user));
@@ -400,7 +440,7 @@ function createMuroServer(options = {}) {
         notifications: payload.notifications === undefined ? user.settings.notifications : Boolean(payload.notifications)
       };
       if (storage.schemaReady) {
-        try { await store.saveSettings(user, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudieron guardar las preferencias en Supabase.'); }
+        try { await store.saveSettings(user, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudieron guardar las preferencias. Inténtalo nuevamente.'); }
       }
       acknowledge({ ok: true, settings: { ...user.settings } });
     });
@@ -435,10 +475,12 @@ function createMuroServer(options = {}) {
       if (!user) return;
       const name = cleanText(payload.name, 60);
       if (!name) return fail(acknowledge, 'Escribe el nombre del muro.');
+      const color = COLORS.has(payload.color) ? payload.color : 'amarillo';
       const wall = {
         id: crypto.randomUUID(),
         name,
         description: cleanText(payload.description, 160),
+        color,
         ownerId: user.id,
         members: { [user.id]: 'propietario' },
         notes: [],
@@ -449,7 +491,7 @@ function createMuroServer(options = {}) {
         try {
           wall.id = await store.createWall(wall, socket.data.accessToken);
         } catch {
-          return fail(acknowledge, 'No se pudo guardar el muro en Supabase.');
+          return fail(acknowledge, 'No se pudo crear el muro. Inténtalo nuevamente.');
         }
       }
       walls.push(wall);
@@ -473,13 +515,16 @@ function createMuroServer(options = {}) {
       if (!canOwn(wall, user)) return fail(acknowledge, 'Solo la persona propietaria puede editar el muro.');
       const name = cleanText(payload.name, 60);
       if (!name) return fail(acknowledge, 'El nombre no puede quedar vacío.');
+      const color = payload.color === undefined ? (wall.color || 'amarillo') : payload.color;
+      if (!COLORS.has(color)) return fail(acknowledge, 'Selecciona un color válido para el muro.');
       wall.name = name;
       wall.description = cleanText(payload.description, 160);
+      wall.color = color;
       wall.updatedAt = Date.now();
       if (storage.schemaReady) {
-        try { await store.updateWall(wall, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar el muro en Supabase.'); }
+        try { await store.updateWall(wall, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar el muro. Inténtalo nuevamente.'); }
       }
-      io.to(`wall:${wall.id}`).emit('wall:updated', wallSummary(wall, user));
+      emitWallSummaryToMembers(wall);
       acknowledge({ ok: true, wall: wallSummary(wall, user) });
     });
 
@@ -490,10 +535,10 @@ function createMuroServer(options = {}) {
       if (!canOwn(wall, user)) return fail(acknowledge, 'Solo la persona propietaria puede eliminar el muro.');
       if (wall.id === 'general' || wall.id === GENERAL_WALL_ID) return fail(acknowledge, 'El muro general no se puede eliminar.');
       if (storage.schemaReady) {
-        try { await store.deleteWall(wall.id, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo eliminar el muro en Supabase.'); }
+        try { await store.deleteWall(wall.id, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo eliminar el muro. Inténtalo nuevamente.'); }
       }
+      emitWallDeletionToMembers(wall);
       walls.splice(walls.indexOf(wall), 1);
-      io.to(`wall:${wall.id}`).emit('wall:deleted', wall.id);
       acknowledge({ ok: true });
       emitAdminSnapshot();
     });
@@ -597,7 +642,7 @@ function createMuroServer(options = {}) {
       if (payload.userId === wall.ownerId) return fail(acknowledge, 'No puedes cambiar el rol de la persona propietaria.');
       if (!['editor', 'lector'].includes(payload.role) || !wall.members[payload.userId]) return fail(acknowledge, 'Miembro o permiso no válido.');
       if (storage.schemaReady) {
-        try { await store.updateMember(wall.id, payload.userId, payload.role, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo guardar el permiso en Supabase.'); }
+        try { await store.updateMember(wall.id, payload.userId, payload.role, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo guardar el permiso. Inténtalo nuevamente.'); }
       }
       wall.members[payload.userId] = payload.role;
       acknowledge({ ok: true, members: wallMembers(wall) });
@@ -610,7 +655,7 @@ function createMuroServer(options = {}) {
       if (!canOwn(wall, user)) return fail(acknowledge, 'Solo la persona propietaria puede quitar miembros.');
       if (payload.userId === wall.ownerId) return fail(acknowledge, 'No puedes quitar a la persona propietaria.');
       if (storage.schemaReady) {
-        try { await store.deleteMember(wall.id, payload.userId, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo quitar el miembro en Supabase.'); }
+        try { await store.deleteMember(wall.id, payload.userId, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo quitar al miembro. Inténtalo nuevamente.'); }
       }
       delete wall.members[payload.userId];
       acknowledge({ ok: true, members: wallMembers(wall) });
@@ -635,7 +680,7 @@ function createMuroServer(options = {}) {
         updatedAt: Date.now()
       };
       if (storage.schemaReady) {
-        try { await store.createNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo guardar la nota en Supabase.'); }
+        try { await store.createNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo guardar la nota. Inténtalo nuevamente.'); }
       }
       wall.notes.push(note);
       wall.updatedAt = Date.now();
@@ -657,7 +702,7 @@ function createMuroServer(options = {}) {
       if (payload.color) note.color = payload.color;
       note.updatedAt = Date.now();
       if (storage.schemaReady) {
-        try { await store.updateNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar la nota en Supabase.'); }
+        try { await store.updateNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar la nota. Inténtalo nuevamente.'); }
       }
       io.to(`wall:${wall.id}`).emit('note:updated', { wallId: wall.id, note });
       acknowledge({ ok: true, note });
@@ -674,7 +719,7 @@ function createMuroServer(options = {}) {
       note.y = safeCoordinate(payload.y, note.y);
       note.updatedAt = Date.now();
       if (storage.schemaReady) {
-        try { await store.updateNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo mover la nota en Supabase.'); }
+        try { await store.updateNote(wall.id, note, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo mover la nota. Inténtalo nuevamente.'); }
       }
       io.to(`wall:${wall.id}`).emit('note:moved', { wallId: wall.id, id: note.id, x: note.x, y: note.y, updatedAt: note.updatedAt });
       acknowledge({ ok: true });
@@ -703,7 +748,7 @@ function createMuroServer(options = {}) {
       const index = wall.notes.findIndex((item) => item.id === id);
       if (index === -1) return fail(acknowledge, 'La nota ya no existe.');
       if (storage.schemaReady) {
-        try { await store.deleteNote(id, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo eliminar la nota en Supabase.'); }
+        try { await store.deleteNote(id, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo eliminar la nota. Inténtalo nuevamente.'); }
       }
       wall.notes.splice(index, 1);
       io.to(`wall:${wall.id}`).emit('note:deleted', { wallId: wall.id, id });
@@ -790,7 +835,7 @@ function createMuroServer(options = {}) {
       if (!user || !wall) return user && fail(acknowledge, 'El muro no existe.');
       const removed = wall.notes.length;
       if (storage.schemaReady) {
-        try { await store.clearNotes(wall.id); } catch { return fail(acknowledge, 'No se pudieron eliminar las notas en Supabase.'); }
+        try { await store.clearNotes(wall.id); } catch { return fail(acknowledge, 'No se pudieron eliminar las notas. Inténtalo nuevamente.'); }
       }
       wall.notes.splice(0, wall.notes.length);
       io.to(`wall:${wall.id}`).emit('board:cleared', { wallId: wall.id, removed, clearedAt: Date.now() });
@@ -851,7 +896,7 @@ function createMuroServer(options = {}) {
       if (target.email !== SUPERADMIN_EMAIL && payload.role === 'superadmin') return fail(acknowledge, 'El rol superadmin está reservado a la cuenta propietaria.');
       target.role = payload.role;
       if (storage.schemaReady) {
-        try { await store.saveRole(target); } catch { return fail(acknowledge, 'No se pudo guardar el rol en Supabase.'); }
+        try { await store.saveRole(target); } catch { return fail(acknowledge, 'No se pudo guardar el rol. Inténtalo nuevamente.'); }
       }
       acknowledge({ ok: true, user: publicUser(target) });
       io.emit('role:changed', publicUser(target));

@@ -66,7 +66,7 @@
   function validateEmail(email) {
     const clean = String(email || '').trim().toLowerCase();
     if (!clean) return 'El correo electrónico es obligatorio.';
-    if (!EMAIL_REGEX.test(clean)) return 'Ingresa un correo válido (ej: usuario@correo.com).';
+    if (!EMAIL_REGEX.test(clean)) return 'Ingresa un correo electrónico válido.';
     return '';
   }
 
@@ -89,12 +89,21 @@
     $$(`[id^="${prefix}"]`).forEach((el) => el.classList.remove('is-invalid'));
   }
 
+  function setFormBusy(form, busy, busyText = 'Procesando…') {
+    const button = form?.querySelector('button[type="submit"]');
+    if (!button) return;
+    if (!button.dataset.idleText) button.dataset.idleText = button.textContent;
+    button.disabled = busy;
+    button.textContent = busy ? busyText : button.dataset.idleText;
+  }
+
   // Estado de la sesión y registro
   let pendingRegistration = null;
   let countdownTimerId = null;
   let activeVerifiedUser = null;
   let activeVerifiedToken = '';
   let currentUser = null;
+  let themeSaveSequence = 0;
   let cachedAdminUsers = [];
   let cachedAdminReports = [];
 
@@ -171,8 +180,9 @@
      INICIO DE SESIÓN (SUPERADMIN O USUARIO REGULAR)
      ========================================== */
 
-  $('#loginForm')?.addEventListener('submit', (event) => {
+  $('#loginForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     clearFieldErrors('login');
 
     const email = $('#loginEmail').value.trim().toLowerCase();
@@ -194,25 +204,24 @@
     if (hasErrors) return;
 
     const socket = window.MuroBoard?.getSocket();
-    if (socket) {
-      socket.emit('auth:login', { email, password }, (res) => {
-        if (res && res.ok) {
-          enterApp(res.user, res.token);
-          toast(`¡Bienvenida/o ${res.user.name}!`);
-        } else {
-          toast(res?.error || 'Correo o contraseña incorrectos.');
-        }
-      });
+    if (!socket) return toast('Conectando con el servidor...');
+    setFormBusy(form, true, 'Ingresando…');
+    const res = await emitAsync(socket, 'auth:login', { email, password });
+    setFormBusy(form, false);
+    if (res?.ok) {
+      enterApp(res.user, res.token);
+      toast(`¡Hola, ${res.user.name}!`);
     } else {
-      toast('Conectando con el servidor Backend...');
+      toast(res?.error || 'Correo o contraseña incorrectos.');
     }
   });
 
   /* Registro validado por el backend. No se generan ni registran códigos en
      el navegador y el correo nunca se envía a servicios externos. */
 
-  $('#registerForm')?.addEventListener('submit', (event) => {
+  $('#registerForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     clearFieldErrors('register');
 
     const name = $('#registerName').value.trim();
@@ -222,8 +231,8 @@
 
     let hasErrors = false;
 
-    if (!name || name.length < 2) {
-      setFieldError('registerName', 'Escribe tu nombre (mínimo 2 letras).');
+    if (!name || name.length < 3) {
+      setFieldError('registerName', 'Ingresa un nombre de usuario de al menos 3 caracteres.');
       hasErrors = true;
     } else if (name.length > 40) {
       setFieldError('registerName', 'El nombre no puede exceder 40 caracteres.');
@@ -250,18 +259,32 @@
     if (hasErrors) return;
 
     const socket = window.MuroBoard?.getSocket();
-    if (!socket) return toast('Conexión con el servidor no disponible.');
-    socket.emit('auth:register', { name, email, password, passwordConfirmation: confirmPassword }, (res) => {
-      if (!res?.ok) return toast(res?.error || 'No se pudo crear la cuenta.');
-      activeVerifiedUser = res.user;
-      activeVerifiedToken = res.token;
-      showAuth('confirm');
-      toast('✅ Cuenta registrada correctamente.');
-    });
+    if (!socket) return toast('No hay conexión con el servidor. Inténtalo nuevamente.');
+    setFormBusy(form, true, 'Creando cuenta…');
+    const res = await emitAsync(socket, 'auth:register', { name, email, password, passwordConfirmation: confirmPassword });
+    setFormBusy(form, false);
+    if (!res?.ok) return toast(res?.error || 'No se pudo crear la cuenta.');
+    if (res.requiresConfirmation) {
+      pendingRegistration = { name, email };
+      activeVerifiedUser = null;
+      activeVerifiedToken = '';
+      $('#registerPassword').value = '';
+      $('#registerConfirmPassword').value = '';
+      if ($('#verifyEmailTarget')) $('#verifyEmailTarget').textContent = email;
+      digitInputs.forEach((input) => { input.value = ''; });
+      showAuth('verify');
+      startResendCountdown(60);
+      toast('Cuenta creada. Revisa tu correo para verificarla.');
+      return;
+    }
+    activeVerifiedUser = res.user;
+    activeVerifiedToken = res.token || '';
+    showAuth('confirm');
+    toast('Cuenta creada correctamente.');
   });
 
   /* ==========================================
-     INPUTS DE 6 DÍGITOS (MANEJO FLUIDO)
+     INPUTS DE 8 DÍGITOS (MANEJO FLUIDO)
      ========================================== */
 
   const digitInputs = $$('.code-digit');
@@ -284,7 +307,7 @@
     input.addEventListener('paste', (e) => {
       e.preventDefault();
       const pasteData = (e.clipboardData || window.clipboardData).getData('text').trim();
-      const numbers = pasteData.replace(/[^0-9]/g, '').slice(0, 6);
+      const numbers = pasteData.replace(/[^0-9]/g, '').slice(0, digitInputs.length);
       if (numbers.length) {
         numbers.split('').forEach((digit, i) => {
           if (digitInputs[i]) digitInputs[i].value = digit;
@@ -304,6 +327,7 @@
 
     if (countdownText) countdownText.style.display = 'inline';
     if (resendBtn) resendBtn.style.display = 'none';
+    if (timerSpan) timerSpan.textContent = `00:${remaining < 10 ? '0' : ''}${remaining}`;
 
     countdownTimerId = setInterval(() => {
       remaining--;
@@ -318,83 +342,90 @@
     }, 1000);
   }
 
-  $('#resendCodeBtn')?.addEventListener('click', () => {
-    pendingRegistration = null;
-    showAuth('register');
-    toast('Completa nuevamente el registro seguro.');
+  $('#resendCodeBtn')?.addEventListener('click', async (event) => {
+    if (!pendingRegistration?.email) {
+      toast('No encontramos un registro pendiente. Completa el registro nuevamente.');
+      return showAuth('register');
+    }
+    const socket = window.MuroBoard?.getSocket();
+    if (!socket) return toast('No hay conexión con el servidor. Inténtalo nuevamente.');
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = 'Reenviando…';
+    const res = await emitAsync(socket, 'auth:resend-code', { email: pendingRegistration.email, type: 'signup' });
+    button.disabled = false;
+    button.textContent = 'Reenviar nuevo código';
+    if (!res?.ok) return toast(res?.error || 'No se pudo reenviar el código.');
+    digitInputs.forEach((input) => { input.value = ''; });
+    startResendCountdown(60);
+    toast('Enviamos un nuevo código a tu correo.');
   });
 
   /* ==========================================
-     VERIFICACIÓN DEL CÓDIGO (PASO 2) -> REGISTRO EN BACKEND
+     VERIFICACIÓN DEL CÓDIGO (PASO 2) CON SUPABASE AUTH
      ========================================== */
 
-  $('#verifyForm')?.addEventListener('submit', (event) => {
+  $('#verifyForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     if (!pendingRegistration) {
-      toast('No hay un registro pendiente. Vuelve a iniciar.');
+      toast('No encontramos un registro pendiente. Inténtalo nuevamente.');
       return showAuth('register');
     }
 
     const enteredCode = Array.from(digitInputs).map((inp) => inp.value).join('');
-
-    if (enteredCode === pendingRegistration.code) {
-      // Código de correo verificado -> Registrar en la base de datos real del Backend
-      const socket = window.MuroBoard?.getSocket();
-      if (socket) {
-        socket.emit('auth:register', {
-          name: pendingRegistration.name,
-          email: pendingRegistration.email,
-          password: pendingRegistration.password,
-          passwordConfirmation: pendingRegistration.passwordConfirmation
-        }, (res) => {
-          if (res && res.ok) {
-            activeVerifiedUser = res.user;
-            clearInterval(countdownTimerId);
-            showAuth('confirm');
-            toast('✅ ¡Código verificado! Tu cuenta fue registrada exitosamente.');
-          } else {
-            toast(res?.error || 'No se pudo crear la cuenta.');
-          }
-        });
-      } else {
-        toast('Conexión con el servidor no disponible.');
-      }
-    } else {
-      digitInputs.forEach((inp) => {
-        inp.classList.add('error');
-        setTimeout(() => inp.classList.remove('error'), 400);
+    if (!/^\d{8}$/.test(enteredCode)) {
+      digitInputs.forEach((input) => {
+        input.classList.add('error');
+        setTimeout(() => input.classList.remove('error'), 400);
       });
-      toast('❌ Código incorrecto. Revisa los 6 dígitos.');
+      return toast('Ingresa los 8 dígitos del código.');
     }
+    const socket = window.MuroBoard?.getSocket();
+    if (!socket) return toast('No hay conexión con el servidor. Inténtalo nuevamente.');
+    setFormBusy(form, true, 'Verificando…');
+    const res = await emitAsync(socket, 'auth:verify-code', { email: pendingRegistration.email, token: enteredCode, type: 'signup' });
+    setFormBusy(form, false);
+    if (!res?.ok) {
+      digitInputs.forEach((input) => {
+        input.classList.add('error');
+        setTimeout(() => input.classList.remove('error'), 400);
+      });
+      return toast(res?.error || 'El código es incorrecto o caducó.');
+    }
+    activeVerifiedUser = res.user;
+    activeVerifiedToken = res.token || '';
+    pendingRegistration = null;
+    clearInterval(countdownTimerId);
+    showAuth('confirm');
+    toast('Tu cuenta se verificó correctamente.');
   });
 
   // Botón para entrar tras confirmación (PASO 3)
   $('#enterAfterConfirmBtn')?.addEventListener('click', () => {
     if (activeVerifiedUser) {
       enterApp(activeVerifiedUser, activeVerifiedToken);
-      toast(`¡Bienvenida/o ${activeVerifiedUser.name}!`);
+      toast(`¡Hola, ${activeVerifiedUser.name}!`);
     } else {
       showAuth('login');
     }
   });
 
   // Recuperación de contraseña con Backend
-  $('#recoverForm')?.addEventListener('submit', (event) => {
+  $('#recoverForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const email = $('#recoverEmail')?.value.trim().toLowerCase();
     const err = validateEmail(email);
     if (err) return toast(err);
 
     const socket = window.MuroBoard?.getSocket();
-    if (socket) {
-      socket.emit('auth:recover', { email }, (res) => {
-        toast(res?.message || 'Si la cuenta existe, se envió un enlace seguro.');
-        showAuth('login');
-      });
-    } else {
-      toast('Si la cuenta existe, se envió un enlace seguro.');
-      showAuth('login');
-    }
+    if (!socket) return toast('No hay conexión con el servidor. Inténtalo nuevamente.');
+    const form = event.currentTarget;
+    setFormBusy(form, true, 'Enviando…');
+    const res = await emitAsync(socket, 'auth:recover', { email });
+    setFormBusy(form, false);
+    toast(res?.message || res?.error || 'Si la cuenta existe, se envió un enlace seguro.');
+    if (res?.ok) showAuth('login');
   });
 
   /* ==========================================
@@ -708,6 +739,35 @@
   $('#closeAccountSettings')?.addEventListener('click', () => $('#accountSettingsDialog')?.close());
   $('#cancelAccountSettings')?.addEventListener('click', () => $('#accountSettingsDialog')?.close());
 
+  $$('input[name="theme"]').forEach((input) => input.addEventListener('change', async () => {
+    if (!input.checked || !currentUser) return;
+    const previousTheme = currentUser.settings?.theme || 'system';
+    const selectedTheme = input.value;
+    const requestId = ++themeSaveSequence;
+    applyTheme(selectedTheme);
+    currentUser = { ...currentUser, settings: { ...currentUser.settings, theme: selectedTheme } };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+    const result = await emitAsync(window.MuroBoard?.getSocket(), 'settings:update', {
+      ...currentUser.settings,
+      theme: selectedTheme,
+      confirmDelete: $('#settingsConfirmDelete').checked,
+      compactNotes: $('#settingsCompactNotes').checked,
+      notifications: currentUser.settings?.notifications !== false
+    });
+    if (requestId !== themeSaveSequence) return;
+    if (!result?.ok) {
+      currentUser = { ...currentUser, settings: { ...currentUser.settings, theme: previousTheme } };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+      applyTheme(previousTheme);
+      const previousInput = document.querySelector(`input[name="theme"][value="${previousTheme}"]`);
+      if (previousInput) previousInput.checked = true;
+      toast(result?.error || 'No se pudo guardar la apariencia.', 'error');
+      return;
+    }
+    currentUser = { ...currentUser, settings: result.settings };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+  }));
+
   $$('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => $(`#${button.dataset.closeDialog}`)?.close()));
   $('#openUsernameChange')?.addEventListener('click', () => { $('#newUsername').value = currentUser?.name || ''; $('#usernameDialog')?.showModal(); });
   $('#openEmailChange')?.addEventListener('click', () => { $('#newEmail').value = currentUser?.email || ''; $('#emailCurrentPassword').value = ''; $('#emailDialog')?.showModal(); });
@@ -716,7 +776,7 @@
   $('#usernameForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const name = $('#newUsername').value.trim();
-    if (name.length < 3) return toast('El nombre debe tener al menos 3 caracteres.', 'error');
+    if (name.length < 3) return toast('El nombre de usuario debe tener al menos 3 caracteres.', 'error');
     const result = await emitAsync(window.MuroBoard?.getSocket(), 'profile:update', { name, avatar: currentUser.avatar || '' });
     if (!result?.ok) return toast(result?.error || 'No se pudo cambiar el nombre de usuario.', 'error');
     currentUser = { ...currentUser, ...result.user };
@@ -736,13 +796,13 @@
     const currentPassword = $('#emailCurrentPassword').value;
     if (validateEmail(email)) return toast(validateEmail(email), 'error');
     const result = await emitAsync(window.MuroBoard?.getSocket(), 'auth:email', { email, currentPassword });
-    if (!result?.ok) return toast(result?.error || 'No se pudo cambiar el correo.', 'error');
+    if (!result?.ok) return toast(result?.error || 'No se pudo actualizar el correo electrónico.', 'error');
     currentUser.email = result.email || currentUser.email;
     localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
     $('#profileEmail').textContent = currentUser.email;
     $('#settingsEmailValue').textContent = currentUser.email;
     $('#emailDialog').close();
-    toast(result.pending ? 'Revisa tu correo para confirmar la nueva dirección.' : 'Correo actualizado.', 'success');
+    toast(result.pending ? 'Revisa tu correo para confirmar la nueva dirección.' : 'Correo electrónico actualizado.', 'success');
   });
 
   $('#passwordForm')?.addEventListener('submit', async (event) => {
@@ -784,7 +844,7 @@
       applyTheme(selectedTheme);
       document.body.classList.toggle('compact-notes', Boolean(currentUser.settings?.compactNotes));
       $('#accountSettingsDialog')?.close();
-      toast('Apariencia y preferencias guardadas.', 'success');
+      toast('Cambios guardados correctamente.', 'success');
     } catch (error) {
       toast(error.message || 'No se pudieron guardar los cambios.', 'error');
     } finally {

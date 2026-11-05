@@ -21,6 +21,7 @@ window.MuroBoard = (function () {
     online: 1,
     user: null,
     currentWall: { id: 'general', name: 'Muro de ideas', role: 'propietario' },
+    editingWallId: null,
     reportingUserId: null,
     boardScale: window.matchMedia('(max-width: 800px)').matches ? 0.55 : 1
   };
@@ -257,12 +258,22 @@ window.MuroBoard = (function () {
 
     state.walls.forEach((wall) => {
       const card = document.createElement('article');
-      card.className = 'wall-card';
+      card.className = `wall-card wall-color-${colorClass(wall.color)}`;
       const roleText = wall.role ? (wall.role === 'propietario' ? 'Propietario/a' : 'Colaborador/a') : 'Público';
+      const canManage = wall.role === 'propietario' && wall.id !== 'general';
 
       card.innerHTML = `
         <div class="wall-card-head">
           <span class="wall-card-badge">${roleText}</span>
+          ${canManage ? `<div class="wall-card-menu">
+            <button class="wall-card-menu-trigger" type="button" aria-label="Opciones de ${escapeHTML(wall.name || 'muro')}" aria-haspopup="menu" aria-expanded="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+            </button>
+            <div class="wall-card-menu-popover hidden" role="menu">
+              <button type="button" data-wall-action="edit" role="menuitem">Editar</button>
+              <button type="button" data-wall-action="delete" class="danger" role="menuitem">Eliminar</button>
+            </div>
+          </div>` : ''}
         </div>
         <div>
           <h3>${escapeHTML(wall.name || 'Muro sin título')}</h3>
@@ -278,7 +289,53 @@ window.MuroBoard = (function () {
         selectWall(wall.id, wall.name, wall.role);
       });
 
+      const menuTrigger = card.querySelector('.wall-card-menu-trigger');
+      const menu = card.querySelector('.wall-card-menu-popover');
+      menuTrigger?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        document.querySelectorAll('.wall-card-menu-popover').forEach((item) => {
+          if (item !== menu) item.classList.add('hidden');
+        });
+        const willOpen = menu.classList.contains('hidden');
+        menu.classList.toggle('hidden', !willOpen);
+        menuTrigger.setAttribute('aria-expanded', String(willOpen));
+      });
+      menu?.querySelector('[data-wall-action="edit"]')?.addEventListener('click', () => openWallDialog(wall));
+      menu?.querySelector('[data-wall-action="delete"]')?.addEventListener('click', () => deleteWallFromDashboard(wall));
+
       grid.appendChild(card);
+    });
+  }
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('.wall-card-menu')) return;
+    document.querySelectorAll('.wall-card-menu-popover').forEach((menu) => menu.classList.add('hidden'));
+    document.querySelectorAll('.wall-card-menu-trigger').forEach((button) => button.setAttribute('aria-expanded', 'false'));
+  });
+
+  function openWallDialog(wall = null) {
+    state.editingWallId = wall?.id || null;
+    $('#wallForm')?.reset();
+    if ($('#wallDialogEyebrow')) $('#wallDialogEyebrow').textContent = wall ? 'Tu espacio' : 'Nuevo espacio';
+    if ($('#wallDialogTitle')) $('#wallDialogTitle').textContent = wall ? 'Editar muro' : 'Crear un muro';
+    if ($('#saveWallBtn')) $('#saveWallBtn').textContent = wall ? 'Guardar cambios' : 'Crear muro';
+    if ($('#wallNameInput')) $('#wallNameInput').value = wall?.name || '';
+    if ($('#wallDescInput')) $('#wallDescInput').value = wall?.description || '';
+    const selectedColor = document.querySelector(`input[name="wallColor"][value="${wall?.color || 'amarillo'}"]`);
+    if (selectedColor) selectedColor.checked = true;
+    $('#wallDialog')?.showModal();
+  }
+
+  async function deleteWallFromDashboard(wall) {
+    const mustConfirm = window.MuroApp?.getSettings()?.confirmDelete !== false;
+    const accepted = mustConfirm ? await window.MuroUI.confirmAction({ title: 'Eliminar muro', message: `Se eliminará “${wall.name}” con sus notas y dejará de aparecer para todas las personas.`, confirmText: 'Eliminar muro', tone: 'danger' }) : true;
+    if (!accepted) return;
+    if (!socket) return toast('No hay conexión con el servidor.', 'error');
+    socket.emit('wall:delete', { id: wall.id }, (res) => {
+      if (!res?.ok) return toast(res?.error || 'No se pudo eliminar el muro.', 'error');
+      state.walls = state.walls.filter((item) => item.id !== wall.id);
+      renderWallsList(state.walls);
+      toast('Muro eliminado para todas las personas.', 'success');
     });
   }
 
@@ -326,6 +383,7 @@ window.MuroBoard = (function () {
             description: res.wall.description,
             ownerId: res.wall.ownerId,
             role: res.wall.role,
+            color: res.wall.color,
             members: res.members || []
           };
           if (res.notes) {
@@ -392,6 +450,31 @@ window.MuroBoard = (function () {
       document.querySelector(`[data-note-id="${CSS.escape(id)}"]`)?.remove();
       updateNoteCount();
     });
+
+    socket.on('wall:updated', (wall) => {
+      const index = state.walls.findIndex((item) => item.id === wall.id);
+      if (index >= 0) state.walls[index] = { ...state.walls[index], ...wall };
+      if (state.currentWall?.id === wall.id) {
+        state.currentWall = { ...state.currentWall, ...wall };
+        if ($('#currentWallTitle')) $('#currentWallTitle').textContent = wall.name;
+      }
+      if (!$('#wallsView')?.classList.contains('hidden')) renderWallsList(state.walls);
+    });
+
+    socket.on('wall:deleted', (wallId) => {
+      state.walls = state.walls.filter((wall) => wall.id !== wallId);
+      if (state.currentWall?.id === wallId) {
+        state.currentWall = { id: 'general', name: 'Muro de ideas', role: 'propietario' };
+        $('#appView')?.classList.add('hidden');
+        $('#wallsView')?.classList.remove('hidden');
+        history.replaceState(null, '', `${location.pathname}${location.search}`);
+        toast('Este muro fue eliminado por su propietario/a.', 'info');
+      }
+      renderWallsList(state.walls);
+      fetchWalls();
+    });
+
+    socket.on('walls:changed', fetchWalls);
 
     socket.on('users:count', (count) => {
       state.online = count;
@@ -506,25 +589,25 @@ window.MuroBoard = (function () {
   });
 
   // Modal Crear Muro / Sala
-  $('#createWallBtn')?.addEventListener('click', () => {
-    $('#wallForm')?.reset();
-    $('#wallDialog')?.showModal();
-  });
-  $('#closeWallModal')?.addEventListener('click', () => $('#wallDialog')?.close());
-  $('#cancelWallModal')?.addEventListener('click', () => $('#wallDialog')?.close());
+  $('#createWallBtn')?.addEventListener('click', () => openWallDialog());
+  $('#closeWallModal')?.addEventListener('click', () => { state.editingWallId = null; $('#wallDialog')?.close(); });
+  $('#cancelWallModal')?.addEventListener('click', () => { state.editingWallId = null; $('#wallDialog')?.close(); });
 
   $('#wallForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const name = $('#wallNameInput').value.trim();
     const description = $('#wallDescInput').value.trim();
+    const color = document.querySelector('input[name="wallColor"]:checked')?.value || 'amarillo';
 
     if (!name) return toast('Escribe el nombre del muro.');
 
     if (socket) {
-      socket.emit('wall:create', { name, description }, (res) => {
+      const eventName = state.editingWallId ? 'wall:update' : 'wall:create';
+      socket.emit(eventName, { id: state.editingWallId, name, description, color }, (res) => {
         if (res && res.ok) {
           $('#wallDialog')?.close();
-          toast(`¡Muro "${name}" creado!`);
+          toast(state.editingWallId ? 'Muro actualizado.' : `¡Muro "${name}" creado!`, 'success');
+          state.editingWallId = null;
           fetchWalls();
         } else {
           toast(res?.error || 'No se pudo crear el muro.');
@@ -534,12 +617,15 @@ window.MuroBoard = (function () {
       const localWalls = JSON.parse(localStorage.getItem('muroWalls') || 'null') || [
         { id: 'general', name: 'Muro de ideas', description: 'Espacio principal', role: 'propietario', notesCount: 0 }
       ];
-      const newWall = { id: crypto.randomUUID(), name, description, role: 'propietario', notesCount: 0 };
-      localWalls.push(newWall);
+      if (state.editingWallId) {
+        const index = localWalls.findIndex((wall) => wall.id === state.editingWallId);
+        if (index >= 0) localWalls[index] = { ...localWalls[index], name, description, color };
+      } else localWalls.push({ id: crypto.randomUUID(), name, description, color, role: 'propietario', notesCount: 0 });
       localStorage.setItem('muroWalls', JSON.stringify(localWalls));
       renderWallsList(localWalls);
       $('#wallDialog')?.close();
-      toast(`Muro "${name}" creado localmente.`);
+      toast(state.editingWallId ? 'Muro actualizado localmente.' : `Muro "${name}" creado localmente.`);
+      state.editingWallId = null;
     }
   });
 
