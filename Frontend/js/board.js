@@ -127,7 +127,8 @@ window.MuroBoard = (function () {
 
       element.querySelector('.note-delete').addEventListener('click', async (e) => {
         e.stopPropagation();
-        const accepted = await window.MuroUI.confirmAction({ title: 'Eliminar nota', message: 'La nota desaparecerá para todas las personas del muro.', confirmText: 'Eliminar nota', tone: 'danger', icon: '🗑️' });
+        const mustConfirm = window.MuroApp?.getSettings()?.confirmDelete !== false;
+        const accepted = mustConfirm ? await window.MuroUI.confirmAction({ title: 'Eliminar nota', message: 'La nota desaparecerá para todas las personas del muro.', confirmText: 'Eliminar nota', tone: 'danger' }) : true;
         if (accepted) {
           if (socket) {
             socket.emit('note:delete', { id: note.id }, (res) => {
@@ -421,7 +422,8 @@ window.MuroBoard = (function () {
 
   // Modal Eliminar Muro (Dueño del Muro)
   $('#deleteWallBtn')?.addEventListener('click', async () => {
-    const accepted = await window.MuroUI.confirmAction({ title: 'Eliminar muro', message: `Se eliminará “${state.currentWall.name}” y sus notas para todas las personas.`, confirmText: 'Eliminar muro', tone: 'danger', icon: '🧹' });
+    const mustConfirm = window.MuroApp?.getSettings()?.confirmDelete !== false;
+    const accepted = mustConfirm ? await window.MuroUI.confirmAction({ title: 'Eliminar muro', message: `Se eliminará “${state.currentWall.name}” y sus notas para todas las personas.`, confirmText: 'Eliminar muro', tone: 'danger' }) : true;
     if (!accepted) return;
 
     if (socket) {

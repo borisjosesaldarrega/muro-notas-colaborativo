@@ -24,6 +24,7 @@
     if (/invalid login credentials/i.test(message)) return 'Correo o contraseña incorrectos.';
     if (/password should|weak password/i.test(message)) return 'La contraseña no cumple los requisitos de seguridad.';
     if (/email not confirmed/i.test(message)) return 'Confirma tu correo antes de iniciar sesión.';
+    if ((event === 'auth:register' || event === 'profile:update') && (code === '23505' || /nombre.*(uso|unique|duplicate)/i.test(message))) return 'Ese nombre de usuario ya está en uso.';
     if (/debes iniciar sesión|sesión expiró|se requiere una sesion|jwt/i.test(message) || code === 'PGRST301' || code === '28000') return 'Tu sesión no es válida. Inicia sesión nuevamente.';
     if (event === 'wall:create' && (code === '22023' || code === '23514')) return 'Revisa el nombre y la descripción del muro.';
 
@@ -139,7 +140,7 @@
         }
         case 'auth:login': { const { data, error } = await this.client.auth.signInWithPassword({ email: payload.email.trim().toLowerCase(), password: payload.password }); if (error) throw error; return { ok: true, token: data.session.access_token, user: await this.userProfile(data.user.id) }; }
         case 'auth:restore': { const session = await this.session(); if (!session) return { ok: false, error: 'La sesión expiró.' }; return { ok: true, token: session.access_token, user: await this.userProfile(session.user.id) }; }
-        case 'auth:logout': { if (this.realtimeChannel) await this.client.removeChannel(this.realtimeChannel); if (this.reportChannel) await this.client.removeChannel(this.reportChannel); this.realtimeChannel = null; this.reportChannel = null; this.reportUserId = null; const { error } = await this.client.auth.signOut(); if (error) throw error; return { ok: true }; }
+        case 'auth:logout': { if (this.realtimeChannel) await this.client.removeChannel(this.realtimeChannel); if (this.reportChannel) await this.client.removeChannel(this.reportChannel); this.realtimeChannel = null; this.reportChannel = null; this.reportUserId = null; const { error } = await this.client.auth.signOut({ scope: 'local' }); if (error) throw error; const { data } = await this.client.auth.getSession(); if (data.session) throw new Error('No se pudo cerrar la sesión local.'); return { ok: true }; }
         case 'auth:recover': { const { error } = await this.client.auth.resetPasswordForEmail(payload.email.trim().toLowerCase(), { redirectTo: location.origin }); if (error) throw error; return { ok: true }; }
         case 'auth:verify-code': {
           const type = payload.type === 'signup' ? 'signup' : 'recovery'; const { data, error } = await this.client.auth.verifyOtp({ email: payload.email.trim().toLowerCase(), token: payload.token.trim(), type }); if (error) throw error;

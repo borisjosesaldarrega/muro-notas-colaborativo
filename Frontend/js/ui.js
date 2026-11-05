@@ -45,6 +45,7 @@
       $('#moderationReportId').value = reportId;
       const finish = (value) => { dialog.close(); resolve(value); };
       $('#moderationCancel').onclick = () => finish(null);
+      $('#moderationClose').onclick = () => finish(null);
       $('#moderationForm').onsubmit = (event) => {
         event.preventDefault();
         const action = $('#moderationAction').value;
