@@ -4,7 +4,7 @@
  * 1. Validaciones estrictas de correo y contraseña (sin datos inventados)
  * 2. Flujo de registro validado y persistido por el backend
  * 3. Superadministrador: ingreso estándar con correo y contraseña, y acceso al
- *    Panel de Monitoreo (Modo Espectador) a través de una ventanita en su perfil
+ *    Centro privado de ayuda y moderación desde su perfil
  * 4. Métricas, usuarios y salas sincronizados con la base de datos real del Backend
  */
 
@@ -397,7 +397,7 @@
     // Obtener la instantánea con datos REALES de la base de datos del Backend
     socket.emit('admin:snapshot', {}, (res) => {
       if (!res || !res.ok) {
-        return toast(res?.error || 'No se pudo obtener la información de auditoría.');
+        return toast(res?.error || 'No se pudo obtener la información de soporte.');
       }
 
       cachedAdminUsers = res.users || [];
@@ -576,7 +576,7 @@
         reportes: 'Reportes de usuarios'
       };
 
-      if ($('#adminTabTitle')) $('#adminTabTitle').textContent = tabNameMap[targetTab] || 'Panel de Monitoreo';
+      if ($('#adminTabTitle')) $('#adminTabTitle').textContent = tabNameMap[targetTab] || 'Centro de ayuda';
 
       const allTabs = ['Resumen', 'Usuarios', 'Reportes'];
       allTabs.forEach((name) => {
@@ -588,7 +588,7 @@
     });
   });
 
-  // Salir del Panel de Superadministrador y volver a Mis Muros
+  // Salir del centro de ayuda y volver a Mis Muros
   $('#adminExitBtn')?.addEventListener('click', () => {
     $('#adminView')?.classList.add('hidden');
     $('#wallsView')?.classList.remove('hidden');
@@ -610,7 +610,7 @@
   $('#profileButton')?.addEventListener('click', () => openPanel('profile'));
   $('#wallsProfileBtn')?.addEventListener('click', () => openPanel('profile'));
 
-  // Acceso exclusivo al panel de monitoreo desde el perfil
+  // Acceso exclusivo al centro de ayuda desde el perfil
   $('#openAdminFromProfileBtn')?.addEventListener('click', () => openAdminDashboard(currentUser));
 
   $('#closePanel')?.addEventListener('click', () => $('#sidePanel')?.classList.remove('open'));
