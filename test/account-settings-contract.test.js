@@ -153,6 +153,28 @@ test('preserva la autoría, identifica a quien edita y cuenta personas únicas p
   assert.doesNotMatch(server, /io\.emit\('users:count', io\.engine\.clientsCount\)/);
 });
 
+test('renueva sesiones vencidas, confirma el guardado de notas y conserva el historial de reportes', () => {
+  const app = readFileSync(join(root, 'Frontend/js/app.js'), 'utf8');
+  const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
+  const html = readFileSync(join(root, 'Frontend/index.html'), 'utf8');
+  const server = readFileSync(join(root, 'server.js'), 'utf8');
+  const store = readFileSync(join(root, 'lib/supabase-store.js'), 'utf8');
+  assert.match(store, /refreshSession\(\{ refresh_token: refreshToken \}\)/);
+  assert.match(server, /refreshSocketSession\(socket\)/);
+  assert.match(server, /socket\.emit\('auth:token-refreshed'/);
+  assert.match(app, /REFRESH_TOKEN_KEY = 'muroRefreshToken'/);
+  assert.match(app, /boardSocket\.on\('auth:token-refreshed'/);
+  assert.match(app, /boardSocket\.on\('connect'/);
+  assert.match(app, /window\.MuroBoard\?\.selectWall\(wallId\)/);
+  assert.match(board, /function emitWithTimeout/);
+  assert.match(board, /setTimeout\(\(\) => persistNoteEdit\(note\.id, textarea\), 700\)/);
+  assert.match(board, /await emitWithTimeout\('note:create'/);
+  assert.match(server, /const nextNote = \{/);
+  assert.match(html, /id="adminReportHistoryTable"/);
+  assert.match(app, /Cerrar reporte/);
+  assert.match(app, /renderAdminReportHistory/);
+});
+
 test('permite reportar miembros y notifica las medidas por correo sin revelar al reportante', () => {
   const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
   const app = readFileSync(join(root, 'Frontend/js/app.js'), 'utf8');

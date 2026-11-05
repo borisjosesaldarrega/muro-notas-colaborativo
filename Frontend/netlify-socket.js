@@ -2,6 +2,7 @@
 
 (function installSupabaseSocketAdapter() {
   const dateValue = (value) => value ? Date.parse(value) : Date.now();
+  const sessionValue = (session) => ({ token: session?.access_token || '', refreshToken: session?.refresh_token || '', expiresAt: Number(session?.expires_at || 0) * 1000 });
   const noteValue = (row) => ({ id: row.id, titulo: row.titulo, texto: row.contenido, color: row.color, x: Number(row.posicion_x), y: Number(row.posicion_y), autor: row.nombre_autor, authorId: row.autor_id, editor: row.nombre_editor || '', editorId: row.editado_por_id || null, updatedAt: dateValue(row.actualizado_en) });
   const settingsValue = (row = {}) => ({ theme: row.tema || 'light', confirmDelete: row.confirmar_eliminacion ?? true, compactNotes: row.notas_compactas ?? false, notifications: row.notificaciones ?? true });
   const profileValue = (row, settings) => ({ id: row.id, name: row.nombre, email: row.correo, role: row.rol, avatar: row.avatar || '', createdAt: dateValue(row.creado_en), settings: settingsValue(settings) });
@@ -134,14 +135,14 @@
           if (!data.session) return { ok: true, requiresConfirmation: true };
           return { ok: true, token: data.session.access_token, user: await this.userProfile(data.user.id) };
         }
-        case 'auth:login': { const { data, error } = await this.client.auth.signInWithPassword({ email: payload.email.trim().toLowerCase(), password: payload.password }); if (error) throw error; return { ok: true, token: data.session.access_token, user: await this.userProfile(data.user.id) }; }
-        case 'auth:restore': { const session = await this.session(); if (!session) return { ok: false, error: 'La sesión expiró.' }; return { ok: true, token: session.access_token, user: await this.userProfile(session.user.id) }; }
+        case 'auth:login': { const { data, error } = await this.client.auth.signInWithPassword({ email: payload.email.trim().toLowerCase(), password: payload.password }); if (error) throw error; return { ok: true, ...sessionValue(data.session), user: await this.userProfile(data.user.id) }; }
+        case 'auth:restore': { const session = await this.session(); if (!session) return { ok: false, error: 'La sesión expiró.' }; return { ok: true, ...sessionValue(session), user: await this.userProfile(session.user.id) }; }
         case 'auth:logout': { if (this.realtimeChannel) await this.client.removeChannel(this.realtimeChannel); if (this.reportChannel) await this.client.removeChannel(this.reportChannel); this.realtimeChannel = null; this.reportChannel = null; this.reportUserId = null; const { error } = await this.client.auth.signOut(); if (error) throw error; return { ok: true }; }
         case 'auth:recover': { const { error } = await this.client.auth.resetPasswordForEmail(payload.email.trim().toLowerCase(), { redirectTo: location.origin }); if (error) throw error; return { ok: true }; }
         case 'auth:verify-code': {
           const type = payload.type === 'signup' ? 'signup' : 'recovery'; const { data, error } = await this.client.auth.verifyOtp({ email: payload.email.trim().toLowerCase(), token: payload.token.trim(), type }); if (error) throw error;
           if (type === 'recovery') return { ok: true, token: data.session?.access_token || '' };
-          return { ok: true, token: data.session.access_token, user: await this.userProfile(data.user.id) };
+          return { ok: true, ...sessionValue(data.session), user: await this.userProfile(data.user.id) };
         }
         case 'auth:resend-code': {
           const email = payload.email.trim().toLowerCase();

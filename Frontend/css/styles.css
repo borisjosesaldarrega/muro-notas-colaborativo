@@ -464,6 +464,8 @@ button { cursor: pointer; }
 .time-tag { color: #757085; font-size: 0.68rem; }
 
 .note.filtered { opacity: .12; pointer-events: none; }
+.note.is-saving { filter: saturate(.82); }
+.note.is-saving::after { content: 'Guardando…'; position: absolute; right: 12px; bottom: 8px; color: #625b77; font-size: .58rem; font-weight: 700; }
 
 /* Modales y Paneles */
 dialog {

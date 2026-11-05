@@ -399,7 +399,16 @@
 
         <div id="adminTabHistorial" class="admin-tab-content hidden">
           <div class="admin-card-head">
-            <div><h3>Historial de medidas</h3><small class="muted">Medidas aplicadas a cada cuenta</small></div>
+            <div><h3>Historial de reportes y medidas</h3><small class="muted">Decisiones tomadas y medidas aplicadas a las cuentas</small></div>
+          </div>
+          <div class="admin-table-wrap" style="margin-top:16px;">
+            <table class="admin-table">
+              <thead><tr><th>Reportó</th><th>Usuario reportado</th><th>Estado</th><th>Decisión</th><th>Fecha</th></tr></thead>
+              <tbody id="adminReportHistoryTable"></tbody>
+            </table>
+          </div>
+          <div class="admin-card-head" style="margin-top:24px;">
+            <div><h3>Medidas de cuenta</h3><small class="muted">Advertencias, suspensiones y otras medidas registradas</small></div>
           </div>
           <div class="admin-table-wrap" style="margin-top:16px;">
             <table class="admin-table">

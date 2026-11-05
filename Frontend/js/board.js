@@ -14,6 +14,7 @@ window.MuroBoard = (function () {
   const boardSurface = $('#boardSurface');
   const BOARD_WIDTH = 1800;
   const BOARD_HEIGHT = 1200;
+  const noteSaveTimers = new Map();
   const state = {
     notes: new Map(),
     walls: [],
@@ -45,6 +46,49 @@ window.MuroBoard = (function () {
     item.classList.add('show');
     clearTimeout(toast.timer);
     toast.timer = setTimeout(() => item.classList.remove('show'), 2600);
+  }
+
+  function emitWithTimeout(event, payload, timeout = 12_000) {
+    return new Promise((resolve) => {
+      if (!socket) return resolve({ ok: false, error: 'No hay conexión con el servidor.' });
+      let settled = false;
+      const timer = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve({ ok: false, error: 'El servidor tardó demasiado en responder.' });
+      }, timeout);
+      socket.emit(event, payload, (response) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        resolve(response);
+      });
+    });
+  }
+
+  async function persistNoteEdit(noteId, textarea, color) {
+    window.clearTimeout(noteSaveTimers.get(noteId));
+    noteSaveTimers.delete(noteId);
+    const current = state.notes.get(noteId);
+    const element = textarea.closest('.note');
+    const texto = textarea.value.trim();
+    if (!current) return;
+    if (!texto) {
+      textarea.value = current.texto || '';
+      return toast('La nota no puede quedar vacía.', 'error');
+    }
+    const nextColor = color || current.color;
+    if (texto === current.texto && nextColor === current.color) return;
+    element?.classList.add('is-saving');
+    const response = await emitWithTimeout('note:update', { id: noteId, texto, color: nextColor });
+    element?.classList.remove('is-saving');
+    if (!response?.ok) {
+      textarea.value = current.texto || '';
+      resizeNoteToContent(element, textarea, textarea.value);
+      renderNote(current);
+      return toast(response?.error || 'No se pudo guardar la edición.', 'error');
+    }
+    renderNote(response.note || { ...current, texto, color: nextColor, updatedAt: Date.now() });
   }
 
   function colorClass(color) {
@@ -127,18 +171,10 @@ window.MuroBoard = (function () {
         const sizeClass = noteSizeClass(textarea.value);
         element.className = `note ${colorClass(current?.color)}${sizeClass ? ` ${sizeClass}` : ''}${state.filter !== 'all' && state.filter !== current?.color ? ' filtered' : ''}`;
         resizeNoteToContent(element, textarea, textarea.value);
+        window.clearTimeout(noteSaveTimers.get(note.id));
+        noteSaveTimers.set(note.id, window.setTimeout(() => persistNoteEdit(note.id, textarea), 700));
       });
-      textarea.addEventListener('change', (event) => {
-        const newText = event.target.value.trim();
-        const current = state.notes.get(note.id);
-        if (!newText) {
-          textarea.value = current?.texto || '';
-          return toast('La nota no puede quedar vacía.');
-        }
-        if (socket) socket.emit('note:update', { id: note.id, texto: newText, color: current?.color }, (res) => {
-          if (!res?.ok) { textarea.value = current?.texto || ''; toast(res?.error || 'No se pudo editar la nota.'); }
-        });
-      });
+      textarea.addEventListener('change', () => persistNoteEdit(note.id, textarea));
 
       element.querySelector('.note-delete').addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -163,14 +199,9 @@ window.MuroBoard = (function () {
           const selectedColor = btn.dataset.color;
           const current = state.notes.get(note.id);
           if (current && current.color !== selectedColor) {
-            current.color = selectedColor;
             const sizeClass = noteSizeClass(textarea.value);
             element.className = `note ${colorClass(selectedColor)}${sizeClass ? ` ${sizeClass}` : ''}${state.filter !== 'all' && state.filter !== selectedColor ? ' filtered' : ''}`;
-            if (socket) {
-              socket.emit('note:update', { id: note.id, texto: textarea.value, color: selectedColor }, (res) => {
-                if (!res?.ok) toast(res?.error || 'No se pudo cambiar el color.');
-              });
-            }
+            persistNoteEdit(note.id, textarea, selectedColor);
           }
         });
       });
@@ -572,7 +603,7 @@ window.MuroBoard = (function () {
     if (counter) counter.textContent = `${e.target.value.length} / 280`;
   });
 
-  $('#noteForm')?.addEventListener('submit', (event) => {
+  $('#noteForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const text = $('#noteText').value.trim();
     const colorInput = document.querySelector('input[name="color"]:checked');
@@ -592,15 +623,14 @@ window.MuroBoard = (function () {
     };
 
     if (socket) {
-      socket.emit('note:create', payload, (res) => {
-        if (saveBtn) saveBtn.disabled = false;
-        if (res && res.ok) {
-          $('#noteDialog')?.close();
-          toast('Nota publicada en el muro.');
-        } else {
-          toast(res?.error || 'No se pudo publicar la nota.');
-        }
-      });
+      const res = await emitWithTimeout('note:create', payload);
+      if (saveBtn) saveBtn.disabled = false;
+      if (res?.ok) {
+        $('#noteDialog')?.close();
+        toast('Nota publicada en el muro.', 'success');
+      } else {
+        toast(res?.error || 'No se pudo publicar la nota.', 'error');
+      }
     } else {
       if (saveBtn) saveBtn.disabled = false;
       const localNote = { id: crypto.randomUUID(), ...payload, updatedAt: Date.now() };
