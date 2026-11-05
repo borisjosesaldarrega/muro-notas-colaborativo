@@ -76,9 +76,9 @@
 
       <!-- 3. VERIFICAR CÓDIGO (PASO 2) -->
       <form id="verifyForm" class="auth-card hidden">
-        <p class="eyebrow">Paso 2 de 3 · Verificación</p>
-        <h2>Revisa tu correo</h2>
-        <p class="muted">Ingresa el código de 8 dígitos que enviamos a <strong id="verifyEmailTarget" style="color:var(--ink);">tu correo</strong>.</p>
+        <p id="verifyEyebrow" class="eyebrow">Paso 2 de 3 · Verificación</p>
+        <h2 id="verifyTitle">Revisa tu correo</h2>
+        <p id="verifyInstruction" class="muted">Ingresa el código de 8 dígitos que enviamos a <strong id="verifyEmailTarget" style="color:var(--ink);">tu correo</strong>.</p>
 
         <div class="code-inputs-group">
           <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required autofocus>
@@ -96,8 +96,8 @@
           <button id="resendCodeBtn" type="button" class="link-button" style="display:none; float:none;">Reenviar código</button>
         </div>
 
-        <button class="primary-button" type="submit">Verificar código</button>
-        <p class="switch-text"><button type="button" data-view="register">← Volver al registro</button></p>
+        <button id="verifySubmitButton" class="primary-button" type="submit">Verificar código</button>
+        <p class="switch-text"><button id="verifyBackButton" type="button" data-view="register">← Volver al registro</button></p>
       </form>
 
       <!-- 4. CONFIRMACIÓN EXITOSA (PASO 3) -->
@@ -115,10 +115,24 @@
       <!-- 5. RECUPERAR CONTRASEÑA -->
       <form id="recoverForm" class="auth-card hidden">
         <p class="eyebrow">Recupera tu acceso</p><h2>Restablecer contraseña</h2>
-        <p class="muted">Escribe tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.</p>
+        <p class="muted">Escribe tu correo electrónico y te enviaremos un código de 8 dígitos.</p>
         <label>Correo electrónico<input id="recoverEmail" type="email" required></label>
-        <button class="primary-button" type="submit">Enviar enlace</button>
+        <button class="primary-button" type="submit">Enviar código</button>
         <p class="switch-text"><button type="button" data-view="login">Volver al inicio</button></p>
+      </form>
+
+      <form id="resetPasswordForm" class="auth-card hidden" novalidate>
+        <p class="eyebrow">Último paso · Seguridad</p>
+        <h2>Crea una nueva contraseña</h2>
+        <p class="muted">El código fue verificado. Elige una contraseña nueva para recuperar tu acceso.</p>
+        <label>Nueva contraseña
+          <input id="recoveryPassword" type="password" minlength="10" maxlength="128" placeholder="Mínimo 10 caracteres" required autocomplete="new-password">
+        </label>
+        <label>Repetir contraseña
+          <input id="recoveryPasswordConfirm" type="password" minlength="10" maxlength="128" placeholder="Repite tu contraseña" required autocomplete="new-password">
+        </label>
+        <button class="primary-button" type="submit">Actualizar contraseña</button>
+        <p class="switch-text"><button type="button" data-view="login">Cancelar y volver</button></p>
       </form>
     </section>
   </main>
@@ -233,7 +247,7 @@
             <div class="avatar" id="adminAvatar">AD</div>
             <div class="admin-user-copy">
               <strong id="adminUserName">Superadministrador</strong>
-              <small class="admin-user-role">Ayuda y moderación</small>
+              <small class="admin-user-role">Moderador/a</small>
             </div>
           </div>
           <button id="adminExitBtn" class="secondary-button compact admin-exit"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5-7 7 7 7 1.4-1.4L6.8 13H21v-2H6.8l4.6-4.6L10 5Z"/></svg>Volver al muro</button>

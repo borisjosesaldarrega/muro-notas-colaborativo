@@ -301,7 +301,13 @@ function createMuroServer(options = {}) {
       if (!email || !/^\d{8}$/.test(token)) return fail(acknowledge, 'Ingresa los 8 dígitos del código.');
       if (!storage.schemaReady) return fail(acknowledge, 'La verificación por correo no está disponible en este entorno.');
       try {
-        const session = await store.verifySignup({ email, token });
+        const verificationType = payload.type === 'recovery' ? 'recovery' : 'signup';
+        const session = verificationType === 'recovery'
+          ? await store.verifyRecovery({ email, token })
+          : await store.verifySignup({ email, token });
+        if (verificationType === 'recovery') {
+          return acknowledge({ ok: true, token: session.token });
+        }
         replaceState(await store.loadState());
         const user = users.find((item) => item.id === session.user.id) || session.user;
         return acknowledge({ ok: true, ...establishSession(socket, user, session.token) });
@@ -315,7 +321,11 @@ function createMuroServer(options = {}) {
       if (!email) return fail(acknowledge, 'No encontramos un registro pendiente.');
       if (!storage.schemaReady) return fail(acknowledge, 'El reenvío no está disponible en este entorno.');
       try {
-        await store.resendSignup(email, process.env.APP_URL || 'http://localhost:3000');
+        if (payload.type === 'recovery') {
+          await store.recover(email, process.env.APP_URL || 'http://localhost:3000');
+        } else {
+          await store.resendSignup(email, process.env.APP_URL || 'http://localhost:3000');
+        }
         return acknowledge({ ok: true });
       } catch (error) {
         const wait = String(error?.message || '').match(/(\d+)\s+seconds?/i);
@@ -376,7 +386,21 @@ function createMuroServer(options = {}) {
       if (storage.schemaReady && email) {
         try { await store.recover(email, process.env.APP_URL || 'http://localhost:3000'); } catch { /* respuesta uniforme para no filtrar cuentas */ }
       }
-      acknowledge({ ok: true, message: 'Si la cuenta existe, se envió un enlace seguro.' });
+      acknowledge({ ok: true, message: 'Si la cuenta existe, se envió un código de 8 dígitos.' });
+    });
+
+    socket.on('auth:recovery-password', async (payload = {}, acknowledge = () => {}) => {
+      const token = cleanText(payload.token, 4096);
+      const password = String(payload.password ?? '');
+      if (!token) return fail(acknowledge, 'Verifica primero el código enviado a tu correo.');
+      if (password.length < 10 || password.length > 128) return fail(acknowledge, 'La nueva contraseña debe tener entre 10 y 128 caracteres.');
+      if (!storage.schemaReady) return fail(acknowledge, 'La recuperación de contraseña no está disponible en este entorno.');
+      try {
+        await store.completeRecovery(token, password);
+        return acknowledge({ ok: true });
+      } catch {
+        return fail(acknowledge, 'El código de recuperación caducó. Solicita uno nuevo.');
+      }
     });
 
     socket.on('auth:password', async (payload = {}, acknowledge = () => {}) => {
@@ -425,6 +449,14 @@ function createMuroServer(options = {}) {
       if (storage.schemaReady) {
         try { await store.saveProfile(user, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo actualizar el perfil. Inténtalo nuevamente.'); }
       }
+      walls.forEach((wall) => {
+        wall.notes.forEach((note) => {
+          if (note.authorId !== user.id || note.autor === user.name) return;
+          note.autor = user.name;
+          note.updatedAt = Date.now();
+          io.to(`wall:${wall.id}`).emit('note:updated', { wallId: wall.id, note });
+        });
+      });
       acknowledge({ ok: true, user: publicUser(user) });
       io.emit('profile:changed', publicUser(user));
     });

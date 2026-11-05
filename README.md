@@ -58,7 +58,7 @@ El archivo `render.yaml` prepara un Web Service gratuito con `npm ci`, `npm star
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SECRET_KEY` (secreto; solo para el backend)
 
-Render asignará la URL al completar el primer despliegue. Abre esa URL para probar la aplicación y añade también la URL a las Redirect URLs permitidas en la configuración de autenticación de Supabase. Después, configura `APP_URL` en Render con esa URL para los enlaces de recuperación de contraseña. No uses `localhost` como `APP_URL` en producción. No es necesario configurar `JWT_SECRET`, `FRONT_URL` ni `DATABASE_URL` para ejecutar este servicio.
+Render asignará la URL al completar el primer despliegue. Abre esa URL para probar la aplicación y añádela también a las Redirect URLs permitidas en la configuración de autenticación de Supabase. Configura `APP_URL` en Render con esa misma dirección. La recuperación se completa dentro de Muro Colaborativo con un código de 8 dígitos enviado por correo; no depende de abrir un enlace externo. No uses `localhost` como `APP_URL` en producción. No es necesario configurar `JWT_SECRET`, `FRONT_URL` ni `DATABASE_URL` para ejecutar este servicio.
 
 ### Archivos activos en Render
 

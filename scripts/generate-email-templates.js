@@ -11,7 +11,7 @@ const templates = {
     message: 'Confirma tu correo para empezar a crear muros, organizar ideas y colaborar con tu equipo.',
     action: ['Verificar mi cuenta', '{{ .ConfirmationURL }}'],
     code: '{{ .Token }}',
-    codeLabel: 'También puedes usar este código de verificación:',
+    codeLabel: 'En la pantalla de bienvenida de Muro Colaborativo, escribe este código de 8 dígitos:',
     security: 'Si no creaste una cuenta en Muro Colaborativo, puedes ignorar este correo con tranquilidad.'
   },
   invite: {
@@ -35,11 +35,10 @@ const templates = {
   recovery: {
     subject: 'Restablece tu contraseña de Muro Colaborativo',
     eyebrow: 'Recuperación de cuenta',
-    title: 'Crea una nueva contraseña',
-    message: 'Recibimos una solicitud para recuperar tu cuenta. Continúa para elegir una contraseña nueva y segura.',
-    action: ['Restablecer contraseña', '{{ .ConfirmationURL }}'],
+    title: 'Tu código para recuperar la cuenta',
+    message: 'Recibimos una solicitud para recuperar tu cuenta. Vuelve a Muro Colaborativo y escribe el siguiente código para elegir una contraseña nueva.',
     code: '{{ .Token }}',
-    codeLabel: 'Si la aplicación solicita un código, escribe este:',
+    codeLabel: 'Código de recuperación de 8 dígitos:',
     security: 'Si no pediste restablecer tu contraseña, ignora este correo y tu cuenta permanecerá sin cambios.'
   },
   email_change: {

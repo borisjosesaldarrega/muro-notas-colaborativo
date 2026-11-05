@@ -102,6 +102,7 @@
   let countdownTimerId = null;
   let activeVerifiedUser = null;
   let activeVerifiedToken = '';
+  let recoveryToken = '';
   let currentUser = null;
   let themeSaveSequence = 0;
   let cachedAdminUsers = [];
@@ -117,7 +118,7 @@
     $('#appView')?.classList.add('hidden');
     $('#adminView')?.classList.add('hidden');
 
-    const formIds = ['login', 'register', 'verify', 'confirm', 'recover'];
+    const formIds = ['login', 'register', 'verify', 'confirm', 'recover', 'resetPassword'];
     formIds.forEach((name) => {
       const el = $(`#${name}Form`);
       if (el) el.classList.toggle('hidden', name !== view);
@@ -126,6 +127,20 @@
     if (view === 'verify') {
       setTimeout(() => $$('.code-digit')[0]?.focus(), 100);
     }
+  }
+
+  function prepareVerification(email, type = 'signup') {
+    const recovery = type === 'recovery';
+    if ($('#verifyEyebrow')) $('#verifyEyebrow').textContent = recovery ? 'Recuperación · Código de seguridad' : 'Paso 2 de 3 · Verificación';
+    if ($('#verifyTitle')) $('#verifyTitle').textContent = recovery ? 'Escribe el código' : 'Revisa tu correo';
+    if ($('#verifyEmailTarget')) $('#verifyEmailTarget').textContent = email;
+    if ($('#verifySubmitButton')) $('#verifySubmitButton').textContent = recovery ? 'Continuar' : 'Verificar código';
+    const back = $('#verifyBackButton');
+    if (back) {
+      back.dataset.view = recovery ? 'recover' : 'register';
+      back.textContent = recovery ? '← Cambiar correo' : '← Volver al registro';
+    }
+    digitInputs.forEach((input) => { input.value = ''; });
   }
 
   function enterApp(user, token = '') {
@@ -265,13 +280,12 @@
     setFormBusy(form, false);
     if (!res?.ok) return toast(res?.error || 'No se pudo crear la cuenta.');
     if (res.requiresConfirmation) {
-      pendingRegistration = { name, email };
+      pendingRegistration = { name, email, type: 'signup' };
       activeVerifiedUser = null;
       activeVerifiedToken = '';
       $('#registerPassword').value = '';
       $('#registerConfirmPassword').value = '';
-      if ($('#verifyEmailTarget')) $('#verifyEmailTarget').textContent = email;
-      digitInputs.forEach((input) => { input.value = ''; });
+      prepareVerification(email, 'signup');
       showAuth('verify');
       startResendCountdown(60);
       toast('Cuenta creada. Revisa tu correo para verificarla.');
@@ -352,13 +366,14 @@
     const button = event.currentTarget;
     button.disabled = true;
     button.textContent = 'Reenviando…';
-    const res = await emitAsync(socket, 'auth:resend-code', { email: pendingRegistration.email, type: 'signup' });
+    const verificationType = pendingRegistration.type === 'recovery' ? 'recovery' : 'signup';
+    const res = await emitAsync(socket, 'auth:resend-code', { email: pendingRegistration.email, type: verificationType });
     button.disabled = false;
     button.textContent = 'Reenviar nuevo código';
     if (!res?.ok) return toast(res?.error || 'No se pudo reenviar el código.');
     digitInputs.forEach((input) => { input.value = ''; });
     startResendCountdown(60);
-    toast('Enviamos un nuevo código a tu correo.');
+    toast('Enviamos un nuevo código de 8 dígitos a tu correo.');
   });
 
   /* ==========================================
@@ -384,7 +399,8 @@
     const socket = window.MuroBoard?.getSocket();
     if (!socket) return toast('No hay conexión con el servidor. Inténtalo nuevamente.');
     setFormBusy(form, true, 'Verificando…');
-    const res = await emitAsync(socket, 'auth:verify-code', { email: pendingRegistration.email, token: enteredCode, type: 'signup' });
+    const verificationType = pendingRegistration.type === 'recovery' ? 'recovery' : 'signup';
+    const res = await emitAsync(socket, 'auth:verify-code', { email: pendingRegistration.email, token: enteredCode, type: verificationType });
     setFormBusy(form, false);
     if (!res?.ok) {
       digitInputs.forEach((input) => {
@@ -392,6 +408,14 @@
         setTimeout(() => input.classList.remove('error'), 400);
       });
       return toast(res?.error || 'El código es incorrecto o caducó.');
+    }
+    if (verificationType === 'recovery') {
+      recoveryToken = res.token || '';
+      pendingRegistration = null;
+      clearInterval(countdownTimerId);
+      showAuth('resetPassword');
+      toast('Código verificado. Crea una nueva contraseña.');
+      return;
     }
     activeVerifiedUser = res.user;
     activeVerifiedToken = res.token || '';
@@ -424,8 +448,37 @@
     setFormBusy(form, true, 'Enviando…');
     const res = await emitAsync(socket, 'auth:recover', { email });
     setFormBusy(form, false);
-    toast(res?.message || res?.error || 'Si la cuenta existe, se envió un enlace seguro.');
-    if (res?.ok) showAuth('login');
+    if (!res?.ok) return toast(res?.error || 'No se pudo enviar el código. Inténtalo nuevamente.');
+    pendingRegistration = { email, type: 'recovery' };
+    recoveryToken = '';
+    prepareVerification(email, 'recovery');
+    showAuth('verify');
+    startResendCountdown(60);
+    toast('Si la cuenta existe, enviamos un código de 8 dígitos.');
+  });
+
+  $('#resetPasswordForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const password = $('#recoveryPassword')?.value || '';
+    const confirmation = $('#recoveryPasswordConfirm')?.value || '';
+    const error = validatePassword(password);
+    if (error) return toast(error);
+    if (password !== confirmation) return toast('Las contraseñas no coinciden.');
+    if (!recoveryToken) {
+      toast('La verificación caducó. Solicita un código nuevo.');
+      return showAuth('recover');
+    }
+    const socket = window.MuroBoard?.getSocket();
+    if (!socket) return toast('No hay conexión con el servidor. Inténtalo nuevamente.');
+    setFormBusy(form, true, 'Actualizando…');
+    const res = await emitAsync(socket, 'auth:recovery-password', { token: recoveryToken, password });
+    setFormBusy(form, false);
+    if (!res?.ok) return toast(res?.error || 'No se pudo actualizar la contraseña. Solicita un código nuevo.');
+    recoveryToken = '';
+    form.reset();
+    showAuth('login');
+    toast('Contraseña actualizada. Ya puedes iniciar sesión.');
   });
 
   /* ==========================================

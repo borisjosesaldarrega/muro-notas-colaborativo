@@ -1411,7 +1411,7 @@ dialog form { background: linear-gradient(180deg, #fff, #fdfcff); }
 
 #appView .note {
   width: 228px;
-  min-height: 184px;
+  min-height: 164px;
   padding: 25px 18px 14px;
   gap: 8px;
   border: 0;
@@ -1437,7 +1437,7 @@ dialog form { background: linear-gradient(180deg, #fff, #fdfcff); }
 #appView .note.blue { background: #b9dcf9 !important; }
 #appView .note.green { background: #aeebd8 !important; }
 #appView .note.purple { background: #c9c2ff !important; }
-#appView .note.size-sm { width: 210px; min-height: 156px; padding: 24px 17px 13px; }
+#appView .note.size-sm { width: 210px; min-height: 132px; padding: 24px 17px 12px; }
 #appView .note.size-lg { width: 278px; min-height: 220px; padding: 28px 20px 16px; }
 #appView .note-header {
   position: absolute;
@@ -1455,13 +1455,13 @@ dialog form { background: linear-gradient(180deg, #fff, #fdfcff); }
 #appView .note:focus-within .note-delete { opacity: 1; transform: translateY(0); }
 #appView .note-delete { background: rgba(255,255,255,.72); }
 #appView .note textarea {
-  min-height: 76px;
+  min-height: 46px;
   margin-top: 9px;
   color: #29344a;
   font-size: .82rem;
   line-height: 1.38;
 }
-#appView .note-footer { margin-top: auto; color: #566078; font-size: .68rem; }
+#appView .note-footer { margin-top: 4px; color: #566078; font-size: .68rem; }
 #appView .author-tag::before { display: none; }
 
 @media (max-width: 1100px) {
