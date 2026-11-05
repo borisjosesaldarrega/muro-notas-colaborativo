@@ -3,9 +3,15 @@ name: Publicar cambios del Frontend en Render
 on:
   push:
     branches:
-      - agent/completar-muro-colaborativo
+      - main
     paths:
       - 'Frontend/**'
+      - 'server.js'
+      - 'lib/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'render.yaml'
+      - '.github/workflows/render-frontend-auto-deploy.yml'
   workflow_dispatch:
 
 permissions:
