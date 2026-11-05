@@ -8,13 +8,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
-  <!-- VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO / VERIFICACIÓN / CONFIRMACIÓN / RECUPERACIÓN) -->
+  <!-- VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO / RECUPERACIÓN) -->
   <main id="authView" class="auth-shell">
     <section class="auth-brand">
-      <div class="brand-mark">M</div>
+      <div class="brand-mark" title="Muro Colaborativo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg>
+      </div>
       <div>
         <p class="eyebrow">Ideas que conectan</p>
         <h1>Tu equipo, en un mismo muro.</h1>
@@ -26,85 +28,31 @@
     </section>
 
     <section class="auth-panel">
-      <!-- 1. LOGIN -->
-      <form id="loginForm" class="auth-card" novalidate>
-        <div class="mobile-logo"><span class="brand-mark">M</span> Muro</div>
+      <form id="loginForm" class="auth-card">
+        <div class="mobile-logo">
+          <span class="brand-mark">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg>
+          </span> Muro
+        </div>
         <p class="eyebrow">Bienvenido de nuevo</p>
         <h2>Inicia sesión</h2>
         <p class="muted">Entra y continúa construyendo grandes ideas.</p>
-        <label>Correo electrónico
-          <input id="loginEmail" type="email" placeholder="nombre@correo.com" required autocomplete="email">
-          <span id="loginEmailError" class="field-error"></span>
-        </label>
-        <label>Contraseña
-          <input id="loginPassword" type="password" minlength="4" placeholder="••••••••" required autocomplete="current-password">
-          <span id="loginPasswordError" class="field-error"></span>
-        </label>
+        <label>Correo electrónico<input id="loginEmail" type="email" placeholder="nombre@correo.com" required></label>
+        <label>Contraseña<input id="loginPassword" type="password" minlength="4" placeholder="••••••••" required></label>
         <button class="link-button" type="button" data-view="recover">¿Olvidaste tu contraseña?</button>
         <button class="primary-button" type="submit">Ingresar al muro</button>
         <p class="switch-text">¿No tienes cuenta? <button type="button" data-view="register">Regístrate</button></p>
       </form>
 
-      <!-- 2. REGISTRO (PASO 1) -->
-      <form id="registerForm" class="auth-card hidden" novalidate>
-        <p class="eyebrow">Paso 1 de 3 · Registro</p>
-        <h2>Crea tu cuenta</h2>
-        <p class="muted">Te enviaremos un código de confirmación a tu correo.</p>
-        <label>Nombre y Apellido
-          <input id="registerName" maxlength="40" placeholder="Ej: Pierina Medranda" required autocomplete="name">
-          <span id="registerNameError" class="field-error"></span>
-        </label>
-        <label>Correo electrónico
-          <input id="registerEmail" type="email" placeholder="nombre@correo.com" required autocomplete="email">
-          <span id="registerEmailError" class="field-error"></span>
-        </label>
-        <label>Contraseña
-          <input id="registerPassword" type="password" minlength="4" maxlength="128" placeholder="Mínimo 4 caracteres" required autocomplete="new-password">
-          <span id="registerPasswordError" class="field-error"></span>
-        </label>
-        <label>Confirmar Contraseña
-          <input id="registerConfirmPassword" type="password" minlength="4" maxlength="128" placeholder="Repite tu contraseña" required autocomplete="new-password">
-          <span id="registerConfirmError" class="field-error"></span>
-        </label>
-        <button class="primary-button" type="submit">Continuar a Verificación</button>
+      <form id="registerForm" class="auth-card hidden">
+        <p class="eyebrow">Crea tu espacio</p><h2>Regístrate</h2>
+        <label>Nombre<input id="registerName" maxlength="40" required></label>
+        <label>Correo electrónico<input id="registerEmail" type="email" required></label>
+        <label>Contraseña<input id="registerPassword" type="password" minlength="4" required></label>
+        <button class="primary-button" type="submit">Crear cuenta</button>
         <p class="switch-text">¿Ya tienes cuenta? <button type="button" data-view="login">Inicia sesión</button></p>
       </form>
 
-      <!-- 3. VERIFICAR CÓDIGO (PASO 2) -->
-      <form id="verifyForm" class="auth-card hidden">
-        <p class="eyebrow">Paso 2 de 3 · Verificación</p>
-        <h2>Revisa tu correo</h2>
-        <p class="muted">Ingresa el código de 6 dígitos que enviamos a <strong id="verifyEmailTarget" style="color:var(--ink);">tu correo</strong>.</p>
-        
-        <div class="code-inputs-group">
-          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required autofocus>
-          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
-          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
-          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
-          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
-          <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
-        </div>
-
-        <div class="resend-block">
-          <span id="countdownText" class="muted">Reenviar código en <b id="countdownTimer">00:45</b></span>
-          <button id="resendCodeBtn" type="button" class="link-button" style="display:none; float:none;">Reenviar nuevo código</button>
-        </div>
-
-        <button class="primary-button" type="submit">Verificar código</button>
-        <p class="switch-text"><button type="button" data-view="register">← Volver al registro</button></p>
-      </form>
-
-      <!-- 4. CONFIRMACIÓN EXITOSA (PASO 3) -->
-      <form id="confirmForm" class="auth-card hidden text-center">
-        <div class="confirm-circle">✓</div>
-        <p class="eyebrow">Paso 3 de 3 · Cuenta Activada</p>
-        <h2>¡Todo listo!</h2>
-        <p class="muted">Tu cuenta ha sido verificada correctamente. Ya puedes ingresar y comenzar a colaborar en los muros.</p>
-        <button id="enterAfterConfirmBtn" class="primary-button" type="button">Ingresar al Muro</button>
-        <p class="switch-text"><button type="button" data-view="login">Volver al inicio de sesión</button></p>
-      </form>
-
-      <!-- 5. RECUPERAR CONTRASEÑA -->
       <form id="recoverForm" class="auth-card hidden">
         <p class="eyebrow">Recupera tu acceso</p><h2>Restablecer contraseña</h2>
         <p class="muted">Ingresa tu correo para recibir un enlace de recuperación.</p>
@@ -118,11 +66,17 @@
   <!-- VISTA 2: DASHBOARD DE MIS MUROS / SALAS (CARA DE USUARIO) -->
   <main id="wallsView" class="walls-shell hidden">
     <header class="topbar">
-      <a class="app-brand" href="#"><span class="brand-mark">M</span><span>Muro</span></a>
+      <a class="app-brand" href="#">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L14.39 9.61L22 12L14.39 14.39L12 22L9.61 14.39L2 12L9.61 9.61L12 2Z"/></svg>
+        </span>
+        <span>Muro</span>
+      </a>
       <div class="board-name"><small>Espacio de trabajo</small><strong>Mis Muros y Salas</strong></div>
       <div class="top-actions">
-        <button id="joinCodeBtn" class="secondary-button compact">🔑 Unirse con Código</button>
+        <button id="joinWallBtn" class="btn-join-code">🔑 Unirse a una Sala</button>
         <button id="createWallBtn" class="primary-button compact">＋ Crear Muro</button>
+        <button id="wallsAdminButton" class="icon-button hidden" title="Panel Superadministrador">⚙</button>
         <button id="wallsProfileBtn" class="avatar" title="Perfil">P</button>
       </div>
     </header>
@@ -146,15 +100,14 @@
         <strong id="currentWallTitle">Muro de ideas</strong>
       </div>
       <div class="top-actions">
-        <button id="inviteButton" class="primary-button compact" title="Invitar y compartir enlace">👥 Compartir / Invitar</button>
+        <button id="inviteButton" class="btn-invite-room" title="Invitar y compartir enlace">👥 Invitar al Muro</button>
         <button id="deleteWallBtn" class="danger-button compact hidden" title="Eliminar este muro">🗑️ Eliminar Sala</button>
-        <span class="presence" title="Personas conectadas a esta sala"><i></i><b id="onlineCount">1</b> en esta sala</span>
+        <span class="presence"><i></i><b id="onlineCount">1</b> en esta sala</span>
+        <!-- Botón superadmin oculto por defecto para usuarios normales -->
+        <button id="adminButton" class="icon-button hidden" title="Panel Superadministrador">⚙</button>
         <button id="profileButton" class="avatar" title="Perfil">P</button>
       </div>
     </header>
-    <div id="spectatorBanner" class="spectator-room-banner hidden">
-      <span>👁️</span> <span><strong>Modo Visualizador (Superadmin):</strong> Acceso de supervisión en tiempo real. Edición deshabilitada.</span>
-    </div>
     <section class="toolbar">
       <button id="newNoteButton" class="primary-button compact">＋ Nueva nota</button>
       <div class="color-filter" aria-label="Filtrar por color">
@@ -169,231 +122,6 @@
     <section id="board" class="board" aria-label="Muro colaborativo"></section>
   </main>
 
-  <!-- VISTA 4: PANEL DE SUPERADMINISTRADOR (MODO ESPECTADOR / MONITOREO) -->
-  <main id="adminView" class="admin-shell hidden">
-    <div class="admin-layout">
-      <!-- SIDEBAR LATERAL DE ADMINISTRACIÓN -->
-      <aside class="admin-sidebar">
-        <div class="admin-sidebar-header">
-          <span class="brand-mark">M</span>
-          <div>
-            <strong>Muro Admin</strong>
-            <small class="admin-badge">👁️ Monitor</small>
-          </div>
-        </div>
-
-        <nav class="admin-nav">
-          <button class="admin-nav-item active" data-admin-tab="resumen">
-            <span class="nav-icon">📊</span> Resumen General
-          </button>
-          <button class="admin-nav-item" data-admin-tab="salas">
-            <span class="nav-icon">🚪</span> Salas y Muros
-          </button>
-          <button class="admin-nav-item" data-admin-tab="notas">
-            <span class="nav-icon">📝</span> Notas Globales
-          </button>
-          <button class="admin-nav-item" data-admin-tab="usuarios">
-            <span class="nav-icon">👥</span> Usuarios
-          </button>
-          <button class="admin-nav-item" data-admin-tab="reportes">
-            <span class="nav-icon">🚩</span> Reportes
-            <span id="adminPendingBadge" class="nav-count-badge">0</span>
-          </button>
-        </nav>
-
-        <div class="admin-sidebar-footer">
-          <div class="admin-user-info">
-            <div class="avatar" id="adminAvatar">AD</div>
-            <div>
-              <strong id="adminUserName">Superadministrador</strong>
-              <small class="muted" style="color:#b2acc9;">Solo espectador</small>
-            </div>
-          </div>
-          <button id="adminExitBtn" class="secondary-button compact" style="width:100%; margin-top:12px;">← Volver al Muro</button>
-        </div>
-      </aside>
-
-      <!-- CONTENIDO PRINCIPAL DEL DASHBOARD ESPECTADOR -->
-      <section class="admin-main">
-        <header class="admin-topbar">
-          <div>
-            <h1 id="adminTabTitle">Resumen del Sistema</h1>
-            <p class="muted" style="margin:4px 0 0; font-size:0.9rem;">Monitoreo y supervisión en tiempo real del muro colaborativo.</p>
-          </div>
-          <div class="spectator-indicator">
-            <span class="live-dot"></span>
-            <span>Modo Espectador Activo</span>
-          </div>
-        </header>
-
-        <!-- PESTAÑA 1: RESUMEN GENERAL -->
-        <div id="adminTabResumen" class="admin-tab-content">
-          <div class="admin-spectator-alert">
-            <span style="font-size:1.3rem;">ℹ️</span>
-            <div>
-              <strong>Panel de Monitoreo:</strong> Puedes supervisar en tiempo real las estadísticas, usuarios y notas activas. Por política de supervisión pura, las acciones de edición y eliminación están deshabilitadas.
-            </div>
-          </div>
-
-          <!-- 4 Métricas Clave (Pág 20 del PDF) -->
-          <div class="admin-metrics-grid">
-            <article class="metric-card">
-              <span class="metric-icon purple">👥</span>
-              <div>
-                <small>Usuarios Registrados</small>
-                <strong id="metricUsersCount">1</strong>
-              </div>
-            </article>
-            <article class="metric-card">
-              <span class="metric-icon yellow">📝</span>
-              <div>
-                <small>Notas en Tableros</small>
-                <strong id="metricNotesCount">0</strong>
-              </div>
-            </article>
-            <article class="metric-card">
-              <span class="metric-icon blue">🚪</span>
-              <div>
-                <small>Salas Creadas</small>
-                <strong id="metricWallsCount">1</strong>
-              </div>
-            </article>
-            <article class="metric-card">
-              <span class="metric-icon red">🚩</span>
-              <div>
-                <small>Reportes de Contenido</small>
-                <strong id="metricReportsCount">0</strong>
-              </div>
-            </article>
-          </div>
-
-          <!-- Actividad Semanal de Notas & Moderación Pendiente -->
-          <div class="admin-grid-two">
-            <div class="admin-card">
-              <div class="admin-card-head">
-                <h3>Actividad de Notas (Semanal)</h3>
-                <small class="muted">Volumen de aportes recibidos</small>
-              </div>
-              <div class="activity-chart">
-                <div class="chart-col"><div class="bar" style="height:35%;"></div><span>Lun</span></div>
-                <div class="chart-col"><div class="bar" style="height:65%;"></div><span>Mar</span></div>
-                <div class="chart-col"><div class="bar" style="height:50%;"></div><span>Mié</span></div>
-                <div class="chart-col"><div class="bar" style="height:85%;"></div><span>Jue</span></div>
-                <div class="chart-col"><div class="bar" style="height:75%;"></div><span>Vie</span></div>
-                <div class="chart-col"><div class="bar active" style="height:100%;"></div><span>Sáb</span></div>
-                <div class="chart-col"><div class="bar" style="height:45%;"></div><span>Dom</span></div>
-              </div>
-            </div>
-
-            <div class="admin-card">
-              <div class="admin-card-head">
-                <h3>Moderación Pendiente</h3>
-                <small class="muted">Reportes de usuarios</small>
-              </div>
-              <div id="adminRecentReports" class="admin-reports-list">
-                <!-- Cargado dinámicamente -->
-              </div>
-            </div>
-          </div>
-
-          <!-- Tabla de Usuarios Recientes -->
-          <div class="admin-card" style="margin-top:24px;">
-            <div class="admin-card-head">
-              <h3>Usuarios Recientes Monitoreados</h3>
-              <small class="muted">Supervisión sin alteración</small>
-            </div>
-            <div class="admin-table-wrap">
-              <table class="admin-table">
-                <thead>
-                  <tr>
-                    <th>Usuario</th>
-                    <th>Correo Electrónico</th>
-                    <th>Rol</th>
-                    <th>Muros Creados</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
-                <tbody id="adminRecentUsersTable">
-                  <!-- Cargado dinámicamente -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- PESTAÑA 2: SALAS Y MUROS -->
-        <div id="adminTabSalas" class="admin-tab-content hidden">
-          <div class="admin-card-head">
-            <h3>Muros Activos en la Plataforma</h3>
-            <small class="muted">Espacios colaborativos creados por los equipos</small>
-          </div>
-          <div id="adminWallsGrid" class="walls-grid" style="margin-top:20px;">
-            <!-- Cargado dinámicamente -->
-          </div>
-        </div>
-
-        <!-- PESTAÑA 3: NOTAS GLOBALES -->
-        <div id="adminTabNotas" class="admin-tab-content hidden">
-          <div class="admin-card-head">
-            <h3>Notas en Tiempo Real</h3>
-            <small class="muted">Visualización continua de ideas de los participantes</small>
-          </div>
-          <div id="adminNotesGrid" class="admin-notes-grid" style="margin-top:20px;">
-            <!-- Cargado dinámicamente -->
-          </div>
-        </div>
-
-        <!-- PESTAÑA 4: USUARIOS -->
-        <div id="adminTabUsuarios" class="admin-tab-content hidden">
-          <div class="admin-card-head">
-            <h3>Directorio de Cuentas</h3>
-            <input id="adminUserSearch" type="search" placeholder="🔍 Buscar por nombre o correo..." style="max-width:320px; padding:10px 14px; border-radius:12px; border:1px solid var(--line);">
-          </div>
-          <div class="admin-table-wrap" style="margin-top:16px;">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Correo Electrónico</th>
-                  <th>Rol Asignado</th>
-                  <th>Estado</th>
-                  <th>Permiso del Panel</th>
-                </tr>
-              </thead>
-              <tbody id="adminAllUsersTable">
-                <!-- Cargado dinámicamente -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- PESTAÑA 5: REPORTES -->
-        <div id="adminTabReportes" class="admin-tab-content hidden">
-          <div class="admin-card-head">
-            <h3>Bandeja de Reportes de Contenido</h3>
-            <small class="muted">Alertas enviadas con el botón 🚩 por los usuarios</small>
-          </div>
-          <div class="admin-table-wrap" style="margin-top:16px;">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>Motivo</th>
-                  <th>Detalle del reporte</th>
-                  <th>Muro Afectado</th>
-                  <th>Fecha</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody id="adminAllReportsTable">
-                <!-- Cargado dinámicamente -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-    </div>
-  </main>
-
   <!-- MODAL: CREAR NOTA -->
   <dialog id="noteDialog">
     <form id="noteForm" method="dialog">
@@ -402,7 +130,6 @@
         <button class="close-button" value="cancel" type="button">&times;</button>
       </div>
       <label>Contenido<textarea id="noteText" maxlength="280" rows="5" placeholder="Escribe tu idea…" required></textarea></label>
-      <div id="characterCount" style="text-align:right; font-size:0.78rem; color:var(--muted); margin-top:4px; font-weight:600;">0 / 280</div>
       <fieldset>
         <legend>Color</legend>
         <div class="color-options">
@@ -416,6 +143,24 @@
       <div class="dialog-actions">
         <button value="cancel" class="secondary-button" type="button">Cancelar</button>
         <button id="saveNote" type="submit" class="primary-button">Publicar nota</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL: UNIRSE A SALA CON CÓDIGO -->
+  <dialog id="joinWallDialog">
+    <form id="joinWallForm">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Acceso Rápido</p><h3>Unirse a una Sala</h3></div>
+        <button class="close-button" id="closeJoinWallModal" type="button">&times;</button>
+      </div>
+      <p class="muted">Ingresa el código o ID de la sala para acceder y colaborar:</p>
+      <label>Código o ID de la Sala
+        <input id="joinWallCodeInput" placeholder="Ej: general o ID del muro" required maxlength="100">
+      </label>
+      <div class="dialog-actions">
+        <button id="cancelJoinWallModal" type="button" class="secondary-button">Cancelar</button>
+        <button id="submitJoinWallBtn" type="submit" class="primary-button">Entrar a la Sala</button>
       </div>
     </form>
   </dialog>
@@ -436,138 +181,71 @@
     </form>
   </dialog>
 
-  <!-- MODAL: 3 MÉTODOS DE INVITACIÓN A LA SALA (CÓDIGO, URL, CUENTA DIRECTA) -->
+  <!-- MODAL UNIFICADO: INVITAR COLABORADORES Y COPIAR ENLACE -->
   <dialog id="inviteDialog">
     <form id="inviteForm">
       <div class="dialog-head">
-        <div><p class="eyebrow">Colaboración</p><h3>Invitar a esta Sala</h3></div>
+        <div><p class="eyebrow">Colaboración</p><h3>Invitar a la Sala</h3></div>
         <button class="close-button" id="closeInviteModal" type="button">&times;</button>
       </div>
 
-      <!-- Selector de Métodos de Invitación -->
-      <div class="invite-methods-tabs">
-        <button type="button" class="invite-tab-btn active" data-invite-tab="code">🔑 Código de Sala</button>
-        <button type="button" class="invite-tab-btn" data-invite-tab="url">🔗 Enlace URL</button>
-        <button type="button" class="invite-tab-btn" data-invite-tab="account">✉️ Invitación Directa</button>
+      <!-- Código de la Sala para compartir -->
+      <div style="background: #f5f3fa; padding: 14px 16px; border-radius: 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <small style="font-size: 0.72rem; font-weight: 800; color: var(--primary); letter-spacing: 0.1em; display: block; text-transform: uppercase;">Código de esta Sala</small>
+          <strong id="wallCodeText" style="font-family: monospace; font-size: 1.15rem; color: var(--ink);">general</strong>
+        </div>
+        <button id="copyWallCodeBtn" type="button" class="secondary-button compact">📋 Copiar Código</button>
       </div>
-
-      <!-- MÉTODO 1: MEDIANTE CÓDIGO DE SALA -->
-      <div id="inviteTabCode" class="invite-tab-pane">
-        <p class="muted" style="margin:0 0 12px; font-size:0.9rem;">Comparte este código para que tu compañero ingrese desde "Unirse con Código":</p>
-        <div class="code-share-box">
-          <div class="code-value-wrapper">
-            <span class="code-sub">CÓDIGO DE SALA</span>
-            <strong id="wallCodeDisplay" class="code-big-text">CARGANDO...</strong>
-          </div>
-          <button id="copyCodeBtn" type="button" class="primary-button compact">📋 Copiar Código</button>
+      
+      <!-- Bloque 1: Enlace directo a la sala (estilo Figma / Google Docs) -->
+      <div style="background: #f5f3fa; padding: 14px 16px; border-radius: 14px; margin-bottom: 18px;">
+        <label style="margin-top:0; font-weight:700; font-size:0.85rem; color: var(--ink);">🔗 Enlace directo a esta sala</label>
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <input id="shareLinkInput" type="text" readonly style="background:#fff; font-size:0.85rem; padding:10px;" />
+          <button id="copyShareLinkBtn" type="button" class="secondary-button compact" style="white-space:nowrap; padding:10px 14px;">📋 Copiar</button>
         </div>
       </div>
 
-      <!-- MÉTODO 2: MEDIANTE ENLACE (URL) -->
-      <div id="inviteTabUrl" class="invite-tab-pane hidden">
-        <p class="muted" style="margin:0 0 12px; font-size:0.9rem;">Copia el enlace directo para enviarlo por WhatsApp, Teams o correo:</p>
-        <div style="background: #f5f3fa; padding: 16px; border-radius: 14px; margin-bottom: 12px;">
-          <label style="margin-top:0; font-weight:700; font-size:0.88rem; color: var(--ink);">🔗 Enlace directo a esta sala</label>
-          <div style="display:flex; gap:10px; margin-top:8px;">
-            <input id="shareLinkInput" type="text" readonly style="background:#fff; font-size:0.85rem; padding:10px;" />
-            <button id="copyShareLinkBtn" type="button" class="secondary-button compact" style="white-space:nowrap; padding:10px 14px;">📋 Copiar</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- MÉTODO 3: INVITACIÓN DIRECTA MEDIANTE LA CUENTA -->
-      <div id="inviteTabAccount" class="invite-tab-pane hidden">
-        <div id="inviteOwnerOnlyNotice" class="hidden" style="margin-bottom:12px; padding:10px 14px; background:#fffbeb; border:1px solid #fef3c7; border-radius:10px; font-size:0.83rem; color:#92400e;">
-          ⚠️ Solo la persona propietaria de esta sala puede invitar o cambiar permisos de miembros.
-        </div>
-        <label>Correo electrónico registrado
-          <input id="inviteEmailInput" type="email" placeholder="usuario@correo.com">
-        </label>
-        <label>Permiso en la sala
-          <select id="inviteRoleSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);">
-            <option value="editor">Editor (Puede crear, mover y editar sus notas)</option>
-            <option value="lector">Lector (Solo puede visualizar el muro)</option>
-          </select>
-        </label>
-        <button id="sendInviteBtn" type="submit" class="primary-button" style="width:100%; margin-top:14px;">✉️ Enviar Invitación a la Cuenta</button>
-      </div>
-
-      <!-- Miembros actuales de la sala con tiempo real -->
-      <div id="wallMembersContainer" class="invite-members-list" style="margin-top:20px;">
-        <div class="invite-members-title">
-          <span>👥 Miembros de esta sala</span>
-          <small id="wallMembersCount" class="muted">1 miembro</small>
-        </div>
-        <div id="wallMembersList" style="max-height: 180px; overflow-y: auto;">
-          <!-- Lista dinámica de miembros reales del backend -->
-        </div>
-      </div>
-
+      <!-- Bloque 2: Invitar por correo -->
+      <p class="muted" style="margin-bottom:10px; font-weight:600; font-size: 0.9rem;">O invita a un colaborador por correo electrónico:</p>
+      <label>Correo electrónico<input id="inviteEmailInput" type="email" placeholder="compañero@correo.com"></label>
+      <label>Rol de permisos
+        <select id="inviteRoleSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);">
+          <option value="editor">Editor (Puede crear, mover y editar notas)</option>
+          <option value="lector">Lector (Solo puede ver el muro)</option>
+        </select>
+      </label>
       <div class="dialog-actions">
         <button id="cancelInviteModal" type="button" class="secondary-button">Cerrar</button>
+        <button id="sendInviteBtn" type="submit" class="primary-button">Enviar Invitación</button>
       </div>
     </form>
   </dialog>
 
-  <!-- MODAL: REPORTAR CONTENIDO / NOTA -->
+  <!-- MODAL: REPORTAR CONTENIDO / ERROR EN LA APLICACIÓN -->
   <dialog id="reportDialog">
     <form id="reportForm">
       <div class="dialog-head">
-        <div><p class="eyebrow">Moderación</p><h3>Reportar Contenido</h3></div>
+        <div><p class="eyebrow">Soporte y Mejora</p><h3>Reportar sobre la Aplicación</h3></div>
         <button class="close-button" id="closeReportModal" type="button">&times;</button>
       </div>
-      <p class="muted">Indica el motivo de tu reporte para enviar la revisión al superadministrador.</p>
-      <label>Motivo del reporte
+      <p class="muted">Ayúdanos a mejorar reportando fallas, errores o sugerencias técnicas de la aplicación.</p>
+      <label>Tipo de problema en la aplicación
         <select id="reportReasonSelect" style="width:100%; padding:14px; border-radius:12px; border:1px solid var(--line);" required>
-          <option value="Contenido ofensivo">Contenido ofensivo o inapropiado</option>
-          <option value="Spam repetido">Spam o mensajes repetidos</option>
-          <option value="Enlace inseguro">Enlace no seguro</option>
-          <option value="Otro">Otro motivo</option>
+          <option value="Error de sincronización">Error de sincronización o conexión</option>
+          <option value="Falla al cargar sala o notas">Falla al cargar la sala o las notas</option>
+          <option value="Problema visual o de diseño">Problema visual o de diseño en pantalla</option>
+          <option value="Error al invitar o unirse">Error al invitar o unirse a una sala</option>
+          <option value="Sugerencia de mejora">Sugerencia de mejora para la app</option>
         </select>
       </label>
-      <label>Detalle opcional<input id="reportDetailInput" placeholder="Escribe detalles del reporte..." maxlength="200"></label>
+      <label>Detalle del problema<input id="reportDetailInput" placeholder="Describe brevemente qué sucedió..." maxlength="200" required></label>
       <div class="dialog-actions">
         <button id="cancelReportModal" type="button" class="secondary-button">Cancelar</button>
         <button id="sendReportBtn" type="submit" class="danger-button" style="margin-top:0;">Enviar Reporte</button>
       </div>
     </form>
-  </dialog>
-
-  <!-- MODAL: UNIRSE A SALA CON CÓDIGO -->
-  <dialog id="joinCodeDialog">
-    <form id="joinCodeForm">
-      <div class="dialog-head">
-        <div><p class="eyebrow">Acceso Rápido</p><h3>Unirse con Código</h3></div>
-        <button class="close-button" id="closeJoinCodeModal" type="button">&times;</button>
-      </div>
-      <p class="muted">Ingresa el código proporcionado por la persona que creó la sala:</p>
-      <label>Código de la Sala
-        <input id="joinCodeInput" placeholder="Ej: 8A4F12 o ID de la sala" required maxlength="60" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;">
-      </label>
-      <div class="dialog-actions">
-        <button id="cancelJoinCodeModal" type="button" class="secondary-button">Cancelar</button>
-        <button id="submitJoinCodeBtn" type="submit" class="primary-button">Entrar a la Sala →</button>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- MODAL DE INSPECCIÓN VISUAL PARA SUPERADMIN (SOLO LECTURA) -->
-  <dialog id="adminDetailDialog">
-    <div style="padding:28px;">
-      <div class="dialog-head">
-        <div>
-          <p class="eyebrow" id="adminDetailEyebrow">Inspección de Tarjeta</p>
-          <h3 id="adminDetailTitle">Detalle de Información</h3>
-        </div>
-        <button class="close-button" id="closeAdminDetailBtn" type="button">&times;</button>
-      </div>
-      <div id="adminDetailContent" class="admin-detail-content" style="margin-top:16px;">
-        <!-- Contenido dinámico cargado en solo lectura -->
-      </div>
-      <div class="dialog-actions" style="margin-top:24px;">
-        <button id="closeAdminDetailActionBtn" type="button" class="secondary-button">Cerrar Inspección</button>
-      </div>
-    </div>
   </dialog>
 
   <!-- PANEL LATERAL DE PERFIL -->
@@ -577,61 +255,53 @@
       <p class="eyebrow">Tu cuenta</p>
       <h2 id="profileName">Usuario</h2>
       <p id="profileEmail" class="muted"></p>
-      <div id="profileRoleBadge" class="profile-role-tag usuario" style="margin-top:6px; display:inline-block;">Rol: Usuario</div>
-      
-      <!-- Ventanita exclusiva que aparece solo para Superadministrador -->
-      <div id="profileAdminAccess" class="hidden" style="margin:20px 0 16px; padding:16px; background: rgba(109, 74, 255, 0.08); border: 1px solid rgba(109, 74, 255, 0.22); border-radius: 14px; text-align: left;">
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-          <span style="font-size:1.2rem;">👁️</span>
-          <strong style="color:var(--brand); font-size:0.95rem;">Panel de Monitoreo</strong>
-        </div>
-        <p class="muted" style="font-size:0.82rem; margin:0 0 14px 0; line-height:1.4;">Acceso exclusivo de Superadministrador en modo espectador (auditoría en tiempo real).</p>
-        <button id="openAdminFromProfileBtn" class="primary-button compact" style="width:100%;">📊 Ingresar al Panel de Admin</button>
+      <button id="logoutButton" class="danger-button">Cerrar sesión</button>
+    </div>
+    <!-- Módulo de Superadmin: modo visual (salas y reportes de la app) -->
+    <div id="adminPanel" class="hidden">
+      <p class="eyebrow">Superadministrador (Modo Visual)</p>
+      <h2>Supervisión del Sistema</h2>
+      <p class="muted" style="font-size:0.86rem; margin-top:-4px;">Monitoreo de salas activas y reportes técnicos de la aplicación (solo lectura).</p>
+      <div class="stats">
+        <article><strong id="notesStat">0</strong><span>Notas en Sala</span></article>
+        <article><strong id="wallsStat">0</strong><span>Salas Creadas</span></article>
       </div>
 
-      <!-- SECCIÓN DE CAMBIO DE CONTRASEÑA CON CÓDIGO AL CORREO -->
-      <div class="profile-security-card" style="margin-top:18px; padding:16px; border:1px solid var(--line); border-radius:14px; background:#faf9fd; text-align:left;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <strong style="font-size:0.92rem; color:var(--ink);">🔐 Cambiar Contraseña</strong>
-          <button id="toggleChangePasswordBtn" type="button" class="link-button" style="margin:0; font-size:0.82rem;">Configurar</button>
+      <!-- Lista visual de salas del sistema -->
+      <div class="admin-visual-box">
+        <h3>Salas en el Sistema</h3>
+        <div id="adminWallsList" class="admin-visual-list">
+          <!-- Cargado con información real del backend -->
         </div>
-
-        <form id="changePasswordForm" class="hidden" style="margin-top:14px;">
-          <!-- Paso 1: Contraseña Actual -->
-          <div id="cpStepCurrent">
-            <label style="margin-top:0; font-size:0.85rem;">Contraseña Actual
-              <input id="cpCurrentPassword" type="password" placeholder="Tu contraseña actual" required style="padding:10px 12px; font-size:0.88rem;">
-            </label>
-            <button id="cpRequestCodeBtn" type="button" class="secondary-button compact" style="width:100%; margin-top:10px;">Solicitar Código al Correo</button>
-          </div>
-
-          <!-- Paso 2: Código + Nueva Contraseña -->
-          <div id="cpStepNew" class="hidden" style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--line);">
-            <div style="font-size:0.8rem; color:#6d4aff; font-weight:700; margin-bottom:8px;">
-              ✉️ Código enviado a tu correo. Revisa tu bandeja.
-            </div>
-            <label style="margin-top:6px; font-size:0.85rem;">Código de 6 dígitos
-              <input id="cpVerificationCode" type="text" maxlength="6" placeholder="Ej: 489201" pattern="[0-9]{6}" required style="padding:10px 12px; letter-spacing:3px; font-weight:700; text-align:center;">
-            </label>
-            <label style="margin-top:8px; font-size:0.85rem;">Nueva Contraseña
-              <input id="cpNewPassword" type="password" minlength="4" placeholder="Mínimo 4 caracteres" required style="padding:10px 12px; font-size:0.88rem;">
-            </label>
-            <label style="margin-top:8px; font-size:0.85rem;">Confirmar Nueva Contraseña
-              <input id="cpConfirmPassword" type="password" minlength="4" placeholder="Repite tu nueva contraseña" required style="padding:10px 12px; font-size:0.88rem;">
-            </label>
-            <button id="cpSubmitBtn" type="submit" class="primary-button compact" style="width:100%; margin-top:12px;">Confirmar Cambio</button>
-          </div>
-        </form>
       </div>
 
-      <button id="logoutButton" class="danger-button" style="margin-top:20px;">Cerrar sesión</button>
+      <!-- Lista de reportes de la aplicación -->
+      <div class="admin-visual-box">
+        <h3>Reportes de la Aplicación</h3>
+        <div id="adminReportsList" class="admin-visual-list">
+          <!-- Reportes de fallas técnicas -->
+        </div>
+      </div>
     </div>
   </aside>
+
+  <!-- MODAL DE CONFIRMACIÓN ESTILIZADO -->
+  <dialog id="confirmDialog">
+    <div class="confirm-box">
+      <div id="confirmIcon" class="confirm-icon">🗑️</div>
+      <h3 id="confirmTitle" class="confirm-title">¿Eliminar elemento?</h3>
+      <p id="confirmMessage" class="confirm-message">Esta acción no se puede deshacer.</p>
+      <div class="confirm-actions">
+        <button id="cancelConfirmBtn" type="button" class="secondary-button">Cancelar</button>
+        <button id="acceptConfirmBtn" type="button" class="danger-button" style="margin-top:0;">Eliminar</button>
+      </div>
+    </div>
+  </dialog>
 
   <div id="toast" class="toast" role="status"></div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="js/board.js"></script>
-  <script src="js/app.js"></script>
+  <script src="/js/board.js"></script>
+  <script src="/js/app.js"></script>
 </body>
 </html>

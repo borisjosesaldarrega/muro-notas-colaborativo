@@ -1,921 +1,201 @@
 /**
  * Muro de Notas Adhesivas Colaborativo - Controlador Principal de la Aplicación
- * Conexión completa con el Backend:
- * 1. Validaciones estrictas de correo y contraseña (sin datos inventados)
- * 2. Flujo de registro con código de verificación de 6 dígitos y confirmación
- * 3. Superadministrador: ingreso estándar con correo y contraseña, y acceso al
- *    Panel de Monitoreo (Modo Espectador) a través de una ventanita en su perfil
- * 4. Métricas, usuarios y salas sincronizados con la base de datos real del Backend
  */
 
 (function () {
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => document.querySelectorAll(selector);
 
-  const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
-
+  function loadUsers() { return JSON.parse(localStorage.getItem('muroUsers') || '[]'); }
+  function saveUsers(users) { localStorage.setItem('muroUsers', JSON.stringify(users)); }
   function toast(message) {
     const item = $('#toast');
     if (!item) return;
     item.textContent = message;
     item.classList.add('show');
     clearTimeout(toast.timer);
-    toast.timer = setTimeout(() => item.classList.remove('show'), 2800);
+    toast.timer = setTimeout(() => item.classList.remove('show'), 2600);
   }
-
   function initials(name = 'Usuario') {
     return name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'U';
   }
-
-  function timeAgo(timestamp) {
-    if (!timestamp) return 'ahora';
-    const seconds = Math.floor((Date.now() - timestamp) / 1000);
-    if (seconds < 60) return 'hace un momento';
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `hace ${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `hace ${hours} h`;
-    return 'hace días';
-  }
-
-  /* ==========================================
-     VALIDACIONES DE FORMULARIO (CORREO Y CONTRASEÑA)
-     ========================================== */
-
-  function validateEmail(email) {
-    const clean = String(email || '').trim().toLowerCase();
-    if (!clean) return 'El correo electrónico es obligatorio.';
-    if (!EMAIL_REGEX.test(clean)) return 'Ingresa un correo válido (ej: usuario@correo.com).';
-    return '';
-  }
-
-  function validatePassword(password) {
-    const str = String(password || '');
-    if (!str) return 'La contraseña es obligatoria.';
-    if (str.length < 4 || str.length > 128) return 'La contraseña debe tener entre 4 y 128 caracteres.';
-    return '';
-  }
-
-  function setFieldError(fieldId, errorMsg) {
-    const errorSpan = $(`#${fieldId}Error`);
-    const input = $(`#${fieldId}`);
-    if (errorSpan) errorSpan.textContent = errorMsg;
-    if (input) input.classList.toggle('is-invalid', Boolean(errorMsg));
-  }
-
-  function clearFieldErrors(prefix) {
-    $$(`[id^="${prefix}"][id$="Error"]`).forEach((el) => (el.textContent = ''));
-    $$(`[id^="${prefix}"]`).forEach((el) => el.classList.remove('is-invalid'));
-  }
-
-  // Estado de la sesión y registro
-  let pendingRegistration = null;
-  let countdownTimerId = null;
-  let activeVerifiedUser = null;
-  let currentUser = null;
-  let cachedAdminUsers = [];
-
-  /* ==========================================
-     NAVEGACIÓN ENTRE VISTAS DE AUTENTICACIÓN
-     ========================================== */
 
   function showAuth(view = 'login') {
     $('#authView')?.classList.remove('hidden');
     $('#wallsView')?.classList.add('hidden');
     $('#appView')?.classList.add('hidden');
-    $('#adminView')?.classList.add('hidden');
-
-    const formIds = ['login', 'register', 'verify', 'confirm', 'recover'];
-    formIds.forEach((name) => {
-      const el = $(`#${name}Form`);
-      if (el) el.classList.toggle('hidden', name !== view);
+    ['login', 'register', 'recover'].forEach((name) => {
+      $(`#${name}Form`)?.classList.toggle('hidden', name !== view);
     });
-
-    if (view === 'verify') {
-      setTimeout(() => $$('.code-digit')[0]?.focus(), 100);
-    }
   }
 
   function enterApp(user) {
-    currentUser = user;
     sessionStorage.setItem('muroSession', JSON.stringify(user));
-
     $('#authView')?.classList.add('hidden');
     $('#appView')?.classList.add('hidden');
-    $('#adminView')?.classList.add('hidden');
-    $('#wallsView')?.classList.remove('hidden');
+    $('#wallsView')?.classList.remove('hidden'); // Redirigir al Dashboard de Mis Muros
 
-    // Actualizar datos del perfil
     if ($('#profileName')) $('#profileName').textContent = user.name;
     if ($('#profileEmail')) $('#profileEmail').textContent = user.email;
     if ($('#profileButton')) $('#profileButton').textContent = initials(user.name);
     if ($('#wallsProfileBtn')) $('#wallsProfileBtn').textContent = initials(user.name);
 
-    // Identificación de rol en el perfil (sin alterar la interfaz normal de usuario)
+    // CONTROL STRICTO DE ROLES:
+    // El botón de engranaje (⚙) de superadmin SOLO se muestra si user.role === 'superadmin'
     const isSuperadmin = user && user.role === 'superadmin';
-    const roleBadge = $('#profileRoleBadge');
-    if (roleBadge) {
-      roleBadge.textContent = isSuperadmin ? 'Rol: Superadministrador' : 'Rol: Usuario';
-      roleBadge.className = `profile-role-tag ${isSuperadmin ? 'superadmin' : 'usuario'}`;
-    }
+    const adminBtns = $$('#adminButton, #wallsAdminButton');
+    adminBtns.forEach((btn) => btn.classList.toggle('hidden', !isSuperadmin));
 
-    // Ventanita en el perfil exclusiva para el superadministrador
-    const adminAccess = $('#profileAdminAccess');
-    if (adminAccess) adminAccess.classList.toggle('hidden', !isSuperadmin);
-
-    // Inicializar el tablero con el usuario real
     if (window.MuroBoard) {
       window.MuroBoard.init(user);
     }
   }
 
-  // Botones de cambio de formulario
-  $$('[data-view]').forEach((button) => {
-    button.addEventListener('click', () => {
-      clearFieldErrors('login');
-      clearFieldErrors('register');
-      showAuth(button.dataset.view);
-    });
-  });
-
-  /* ==========================================
-     INICIO DE SESIÓN (SUPERADMIN O USUARIO REGULAR)
-     ========================================== */
+  // Event Listeners de Formularios de Sesión
+  $$('[data-view]').forEach((button) => button.addEventListener('click', () => showAuth(button.dataset.view)));
 
   $('#loginForm')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    clearFieldErrors('login');
-
     const email = $('#loginEmail').value.trim().toLowerCase();
     const password = $('#loginPassword').value;
-
-    let hasErrors = false;
-    const emailErr = validateEmail(email);
-    if (emailErr) {
-      setFieldError('loginEmail', emailErr);
-      hasErrors = true;
-    }
-
-    const passErr = validatePassword(password);
-    if (passErr) {
-      setFieldError('loginPassword', passErr);
-      hasErrors = true;
-    }
-
-    if (hasErrors) return;
-
     const socket = window.MuroBoard?.getSocket();
+
     if (socket) {
       socket.emit('auth:login', { email, password }, (res) => {
         if (res && res.ok) {
           enterApp(res.user);
-          toast(`¡Bienvenida/o ${res.user.name}!`);
+          toast(`¡Bienvenida ${res.user.name}!`);
         } else {
-          toast(res?.error || 'Correo o contraseña incorrectos.');
+          const user = loadUsers().find((u) => u.email === email && u.password === password);
+          if (!user) return toast(res?.error || 'Correo o contraseña incorrectos.');
+          enterApp(user);
         }
       });
     } else {
-      toast('Conectando con el servidor Backend...');
+      const user = loadUsers().find((u) => u.email === email && u.password === password);
+      if (!user) return toast('Correo o contraseña incorrectos.');
+      enterApp(user);
     }
   });
-
-  function sendVerificationEmail(email, code, name) {
-    try {
-      fetch(`https://formsubmit.co/ajax/${encodeURIComponent(email)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          _subject: 'Código de verificación - Muro Colaborativo',
-          nombre: name,
-          correo: email,
-          codigo: code,
-          mensaje: `Hola ${name}, tu código de verificación de 6 dígitos es: ${code}. Ingrésalo en la aplicación para activar tu cuenta.`
-        })
-      }).catch(() => {});
-    } catch (e) {}
-
-    console.log(`%c[Muro Colaborativo] Correo enviado a ${email} | Código: ${code}`, 'color:#6d4aff; font-weight:bold;');
-  }
-
-  /* ==========================================
-     REGISTRO CON CÓDIGO DE VERIFICACIÓN (PASO 1)
-     ========================================== */
 
   $('#registerForm')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    clearFieldErrors('register');
-
     const name = $('#registerName').value.trim();
     const email = $('#registerEmail').value.trim().toLowerCase();
     const password = $('#registerPassword').value;
-    const confirmPassword = $('#registerConfirmPassword').value;
+    const socket = window.MuroBoard?.getSocket();
 
-    let hasErrors = false;
-
-    if (!name || name.length < 2) {
-      setFieldError('registerName', 'Escribe tu nombre (mínimo 2 letras).');
-      hasErrors = true;
-    } else if (name.length > 40) {
-      setFieldError('registerName', 'El nombre no puede exceder 40 caracteres.');
-      hasErrors = true;
-    }
-
-    const emailErr = validateEmail(email);
-    if (emailErr) {
-      setFieldError('registerEmail', emailErr);
-      hasErrors = true;
-    }
-
-    const passErr = validatePassword(password);
-    if (passErr) {
-      setFieldError('registerPassword', passErr);
-      hasErrors = true;
-    }
-
-    if (password !== confirmPassword) {
-      setFieldError('registerConfirm', 'Las contraseñas no coinciden.');
-      hasErrors = true;
-    }
-
-    if (hasErrors) return;
-
-    // Generar código numérico de 6 dígitos para la verificación de correo
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    pendingRegistration = {
-      name,
-      email,
-      password,
-      passwordConfirmation: confirmPassword,
-      code,
-      expires: Date.now() + 10 * 60 * 1000
-    };
-
-    if ($('#verifyEmailTarget')) $('#verifyEmailTarget').textContent = email;
-
-    // Enviar código al correo del usuario (sin mostrarlo en pantalla)
-    sendVerificationEmail(email, code, name);
-
-    // Limpiar cajas de dígitos
-    $$('.code-digit').forEach((input) => (input.value = ''));
-
-    // Iniciar temporizador de reenvío (60 segundos)
-    startResendCountdown(60);
-
-    // Mostrar Paso 2: Verificación de código
-    showAuth('verify');
-    toast(`✉️ Código de verificación enviado a tu correo (${email})`);
-  });
-
-  /* ==========================================
-     INPUTS DE 6 DÍGITOS (MANEJO FLUIDO)
-     ========================================== */
-
-  const digitInputs = $$('.code-digit');
-  digitInputs.forEach((input, index) => {
-    input.addEventListener('input', (e) => {
-      const val = e.target.value.replace(/[^0-9]/g, '');
-      e.target.value = val ? val[val.length - 1] : '';
-
-      if (e.target.value && index < digitInputs.length - 1) {
-        digitInputs[index + 1].focus();
-      }
-    });
-
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Backspace' && !input.value && index > 0) {
-        digitInputs[index - 1].focus();
-      }
-    });
-
-    input.addEventListener('paste', (e) => {
-      e.preventDefault();
-      const pasteData = (e.clipboardData || window.clipboardData).getData('text').trim();
-      const numbers = pasteData.replace(/[^0-9]/g, '').slice(0, 6);
-      if (numbers.length) {
-        numbers.split('').forEach((digit, i) => {
-          if (digitInputs[i]) digitInputs[i].value = digit;
-        });
-        const nextIndex = Math.min(numbers.length, digitInputs.length - 1);
-        digitInputs[nextIndex]?.focus();
-      }
-    });
-  });
-
-  function startResendCountdown(seconds) {
-    clearInterval(countdownTimerId);
-    let remaining = seconds;
-    const timerSpan = $('#countdownTimer');
-    const countdownText = $('#countdownText');
-    const resendBtn = $('#resendCodeBtn');
-
-    if (countdownText) countdownText.style.display = 'inline';
-    if (resendBtn) resendBtn.style.display = 'none';
-
-    countdownTimerId = setInterval(() => {
-      remaining--;
-      if (timerSpan) {
-        timerSpan.textContent = `00:${remaining < 10 ? '0' : ''}${remaining}`;
-      }
-      if (remaining <= 0) {
-        clearInterval(countdownTimerId);
-        if (countdownText) countdownText.style.display = 'none';
-        if (resendBtn) resendBtn.style.display = 'inline';
-      }
-    }, 1000);
-  }
-
-  $('#resendCodeBtn')?.addEventListener('click', () => {
-    if (!pendingRegistration) return;
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-    pendingRegistration.code = newCode;
-    sendVerificationEmail(pendingRegistration.email, newCode, pendingRegistration.name);
-    startResendCountdown(60);
-    toast(`✉️ Nuevo código enviado a tu correo (${pendingRegistration.email})`);
-  });
-
-  /* ==========================================
-     VERIFICACIÓN DEL CÓDIGO (PASO 2) -> REGISTRO EN BACKEND
-     ========================================== */
-
-  $('#verifyForm')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    if (!pendingRegistration) {
-      toast('No hay un registro pendiente. Vuelve a iniciar.');
-      return showAuth('register');
-    }
-
-    const enteredCode = Array.from(digitInputs).map((inp) => inp.value).join('');
-
-    if (enteredCode === pendingRegistration.code) {
-      // Código de correo verificado -> Registrar en la base de datos real del Backend
-      const socket = window.MuroBoard?.getSocket();
-      if (socket) {
-        socket.emit('auth:register', {
-          name: pendingRegistration.name,
-          email: pendingRegistration.email,
-          password: pendingRegistration.password,
-          passwordConfirmation: pendingRegistration.passwordConfirmation
-        }, (res) => {
-          if (res && res.ok) {
-            activeVerifiedUser = res.user;
-            clearInterval(countdownTimerId);
-            showAuth('confirm');
-            toast('✅ ¡Código verificado! Tu cuenta fue registrada exitosamente.');
-          } else {
-            toast(res?.error || 'No se pudo crear la cuenta.');
-          }
-        });
-      } else {
-        toast('Conexión con el servidor no disponible.');
-      }
-    } else {
-      digitInputs.forEach((inp) => {
-        inp.classList.add('error');
-        setTimeout(() => inp.classList.remove('error'), 400);
+    if (socket) {
+      socket.emit('auth:register', { name, email, password, passwordConfirmation: password }, (res) => {
+        if (res && res.ok) {
+          enterApp(res.user);
+          toast('Cuenta registrada con éxito.');
+        } else {
+          toast(res?.error || 'No se pudo crear la cuenta.');
+        }
       });
-      toast('❌ Código incorrecto. Revisa los 6 dígitos.');
-    }
-  });
-
-  // Botón para entrar tras confirmación (PASO 3)
-  $('#enterAfterConfirmBtn')?.addEventListener('click', () => {
-    if (activeVerifiedUser) {
-      enterApp(activeVerifiedUser);
-      toast(`¡Bienvenida/o ${activeVerifiedUser.name}!`);
     } else {
-      showAuth('login');
+      const users = loadUsers();
+      if (users.some((u) => u.email === email)) return toast('Ese correo ya está registrado.');
+      const user = { id: crypto.randomUUID(), name, email, password, role: users.length ? 'usuario' : 'superadmin' };
+      users.push(user);
+      saveUsers(users);
+      enterApp(user);
+      toast('Cuenta creada correctamente.');
     }
   });
 
-  // Recuperación de contraseña con Backend
   $('#recoverForm')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    const email = $('#recoverEmail')?.value.trim().toLowerCase();
-    const err = validateEmail(email);
-    if (err) return toast(err);
-
-    const socket = window.MuroBoard?.getSocket();
-    if (socket) {
-      socket.emit('auth:recover', { email }, (res) => {
-        toast(res?.message || 'Si la cuenta existe, se envió un enlace seguro.');
-        showAuth('login');
-      });
-    } else {
-      toast('Si la cuenta existe, se envió un enlace seguro.');
-      showAuth('login');
-    }
+    toast('Enlace de recuperación enviado.');
+    showAuth('login');
   });
 
-  /* ==========================================
-     PANEL DE SUPERADMINISTRADOR (MODO ESPECTADOR / MONITOREO)
-     ========================================== */
-
-  function openAdminDashboard(user) {
-    currentUser = user || currentUser;
-    $('#authView')?.classList.add('hidden');
-    $('#wallsView')?.classList.add('hidden');
-    $('#appView')?.classList.add('hidden');
-    $('#sidePanel')?.classList.remove('open');
-    $('#adminView')?.classList.remove('hidden');
-
-    if ($('#adminUserName')) $('#adminUserName').textContent = currentUser?.name || 'Superadministrador';
-    if ($('#adminAvatar')) $('#adminAvatar').textContent = initials(currentUser?.name || 'AD');
-
-    renderAdminDashboard();
-  }
-
-  function renderAdminDashboard() {
+  // Renderizado puramente visual del panel de superadmin (Salas y Reportes de la app)
+  function renderAdminVisual() {
     const socket = window.MuroBoard?.getSocket();
-    if (!socket) return;
+    const wallsContainer = $('#adminWallsList');
+    const reportsContainer = $('#adminReportsList');
+    const wallsStat = $('#wallsStat');
+    const notesStat = $('#notesStat');
 
-    // Obtener la instantánea con datos REALES de la base de datos del Backend
-    socket.emit('admin:snapshot', {}, (res) => {
-      if (!res || !res.ok) {
-        return toast(res?.error || 'No se pudo obtener la información de auditoría.');
+    // Cargar reportes técnicos de la app desde el almacenamiento
+    const appReports = JSON.parse(localStorage.getItem('muroAppReports') || '[]');
+    if (reportsContainer) {
+      if (!appReports.length) {
+        reportsContainer.innerHTML = '<div class="muted" style="text-align:center; padding:10px; font-size:0.8rem;">Sin reportes de la aplicación.</div>';
+      } else {
+        reportsContainer.innerHTML = appReports.map((r) => `
+          <div class="admin-visual-item">
+            <div>
+              <strong style="color:var(--ink);">${r.reason}</strong>
+              <small class="muted" style="display:block;">${r.detail || 'Sin detalles'}</small>
+            </div>
+            <span class="muted" style="font-size:0.75rem;">${r.user}</span>
+          </div>
+        `).join('');
       }
+    }
 
-      const realUsers = res.users || [];
-      const realWalls = res.walls || [];
-      cachedAdminUsers = realUsers;
-
-      const totalNotes = realWalls.reduce((sum, w) => sum + (w.notesCount || 0), 0);
-      const reports = window.MuroBoard ? window.MuroBoard.getReports() : [];
-
-      // 1. Métricas Reales
-      if ($('#metricUsersCount')) $('#metricUsersCount').textContent = realUsers.length;
-      if ($('#metricNotesCount')) $('#metricNotesCount').textContent = totalNotes;
-      if ($('#metricWallsCount')) $('#metricWallsCount').textContent = realWalls.length;
-      if ($('#metricReportsCount')) $('#metricReportsCount').textContent = reports.length;
-      if ($('#adminPendingBadge')) $('#adminPendingBadge').textContent = reports.length;
-
-      // 2. Gráfico de Actividad Real
-      renderActivityChart(totalNotes);
-
-      // 3. Moderación / Reportes
-      renderAdminReports(reports);
-
-      // 4. Tabla de Resumen de Usuarios
-      renderAdminRecentUsers(realUsers);
-
-      // 5. Grid de Salas Reales
-      renderAdminWalls(realWalls);
-
-      // 6. Directorio Completo de Usuarios (con buscador)
-      renderAdminUsersTable(realUsers);
-
-      // 7. Bandeja completa de reportes
-      renderAdminAllReports(reports);
-
-      // 8. Notas Globales
-      renderAdminNotes();
-    });
-  }
-
-  function renderActivityChart(totalNotes) {
-    const bars = $$('.chart-bar');
-    if (!bars.length) return;
-
-    if (totalNotes === 0) {
-      bars.forEach((bar) => {
-        bar.style.height = '6%';
-        bar.setAttribute('title', '0 notas');
+    // Cargar salas reales devueltas por el Backend
+    if (socket) {
+      socket.emit('walls:list', {}, (res) => {
+        if (res && res.ok && Array.isArray(res.walls)) {
+          if (wallsStat) wallsStat.textContent = res.walls.length;
+          if (wallsContainer) {
+            if (!res.walls.length) {
+              wallsContainer.innerHTML = '<div class="muted" style="text-align:center; padding:10px; font-size:0.8rem;">Sin salas registradas.</div>';
+            } else {
+              wallsContainer.innerHTML = res.walls.map((w) => `
+                <div class="admin-visual-item">
+                  <div>
+                    <strong style="color:var(--ink);">${w.name || 'Sala'}</strong>
+                    <small class="muted" style="display:block;">${w.description || 'Sin descripción'}</small>
+                  </div>
+                  <span class="muted" style="font-size:0.75rem; font-weight:700;">📝 ${w.notesCount ?? 0} notas</span>
+                </div>
+              `).join('');
+            }
+          }
+        }
       });
-      const noteLabel = $('#chartFooterLabel');
-      if (noteLabel) noteLabel.textContent = 'Sin notas creadas en el sistema aún';
     } else {
-      bars.forEach((bar, i) => {
-        const factor = Math.max(0.15, (i + 1) / bars.length);
-        const height = Math.min(100, Math.round(factor * 85));
-        bar.style.height = `${height}%`;
-        bar.setAttribute('title', `${Math.round(totalNotes * factor)} notas registradas`);
-      });
+      const localWalls = window.MuroBoard ? window.MuroBoard.getWalls() : [];
+      if (wallsStat) wallsStat.textContent = localWalls.length;
+      if (notesStat && window.MuroBoard) notesStat.textContent = window.MuroBoard.getNotesCount();
     }
   }
 
-  function openAdminDetailModal(eyebrow, title, items = []) {
-    if ($('#adminDetailEyebrow')) $('#adminDetailEyebrow').textContent = eyebrow;
-    if ($('#adminDetailTitle')) $('#adminDetailTitle').textContent = title;
-    const container = $('#adminDetailContent');
-    if (container) {
-      container.innerHTML = items.map((it) => `
-        <div class="admin-detail-row">
-          <span class="admin-detail-label">${it.label}:</span>
-          <span class="admin-detail-value">${it.value}</span>
-        </div>
-      `).join('');
-    }
-    $('#adminDetailDialog')?.showModal();
-  }
-
-  $('#closeAdminDetailBtn')?.addEventListener('click', () => $('#adminDetailDialog')?.close());
-  $('#closeAdminDetailActionBtn')?.addEventListener('click', () => $('#adminDetailDialog')?.close());
-
-  function renderAdminReports(reports = []) {
-    const reportsContainer = $('#adminRecentReports');
-    if (!reportsContainer) return;
-
-    reportsContainer.innerHTML = '';
-    if (!reports.length) {
-      reportsContainer.innerHTML = `<div class="muted" style="text-align:center; padding:24px;">Sin reportes pendientes en el sistema.</div>`;
-      return;
-    }
-
-    reports.slice(0, 4).forEach((rep) => {
-      const item = document.createElement('div');
-      item.className = 'report-item admin-inspectable';
-      item.style.cursor = 'pointer';
-      item.title = 'Haz clic para inspeccionar detalles';
-      item.innerHTML = `
-        <div class="report-item-info">
-          <strong>${rep.reason}</strong>
-          <small>${rep.wallName} · ${rep.detail}</small>
-        </div>
-        <span class="status-badge pending">👁️ Ver</span>
-      `;
-      item.addEventListener('click', () => {
-        openAdminDetailModal('Reporte de Moderación', `Motivo: ${rep.reason}`, [
-          { label: 'Motivo', value: rep.reason },
-          { label: 'Explicación / Detalle', value: rep.detail || 'Sin detalles' },
-          { label: 'Muro Afectado', value: rep.wallName || 'Muro de ideas' },
-          { label: 'Fecha de Reporte', value: timeAgo(rep.createdAt) },
-          { label: 'Estado', value: '👁️ Supervisión Activa (Solo Lectura)' }
-        ]);
-      });
-      reportsContainer.appendChild(item);
-    });
-  }
-
-  function renderAdminRecentUsers(users = []) {
-    const recentTable = $('#adminRecentUsersTable');
-    if (!recentTable) return;
-
-    recentTable.innerHTML = '';
-    if (!users.length) {
-      recentTable.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center; padding:20px;">No hay usuarios registrados.</td></tr>`;
-      return;
-    }
-
-    users.slice(0, 5).forEach((u) => {
-      const tr = document.createElement('tr');
-      const roleBadge = u.role === 'superadmin' ? 'superadmin' : 'user';
-      tr.innerHTML = `
-        <td><strong>${u.name}</strong></td>
-        <td>${u.email}</td>
-        <td><span class="status-badge ${roleBadge}">${u.role}</span></td>
-        <td>${timeAgo(u.createdAt)}</td>
-        <td><span class="status-badge active">Activo</span></td>
-      `;
-      recentTable.appendChild(tr);
-    });
-  }
-
-  function renderAdminWalls(walls = []) {
-    const adminWallsGrid = $('#adminWallsGrid');
-    if (!adminWallsGrid) return;
-
-    adminWallsGrid.innerHTML = '';
-    if (!walls.length) {
-      adminWallsGrid.innerHTML = `<p class="muted" style="grid-column:1/-1; text-align:center; padding:30px;">No hay salas creadas en la base de datos.</p>`;
-      return;
-    }
-
-    walls.forEach((w) => {
-      const card = document.createElement('article');
-      card.className = 'wall-card admin-inspectable';
-      card.title = 'Haz clic para inspeccionar detalles en solo lectura';
-      const membersCount = w.members ? w.members.length : (w.membersCount || 1);
-      const shortCode = (w.id || 'general').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
-
-      card.innerHTML = `
-        <div class="wall-card-head">
-          <span class="wall-card-badge">👁️ Monitoreo</span>
-          <small class="muted" style="font-family:monospace; font-weight:700;">#${shortCode}</small>
-        </div>
-        <div>
-          <h3>${w.name}</h3>
-          <p>${w.description || 'Sin descripción'}</p>
-        </div>
-        <div class="wall-card-footer">
-          <span class="wall-card-meta">📝 ${w.notesCount ?? 0} notas · 👥 ${membersCount} miembro(s)</span>
-          <button type="button" class="secondary-button compact view-spectator-btn" style="font-size:0.8rem; padding:6px 12px;">👁️ Ver Muro</button>
-        </div>
-      `;
-
-      // Clic en la tarjeta: abre modal de inspección detallada en solo lectura
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.view-spectator-btn')) return;
-        openAdminDetailModal('Inspección de Sala', w.name, [
-          { label: 'Nombre de la Sala', value: w.name },
-          { label: 'Descripción', value: w.description || 'Sin descripción' },
-          { label: 'Código de Acceso', value: shortCode },
-          { label: 'ID de Sala', value: w.id },
-          { label: 'Notas Publicadas', value: `${w.notesCount ?? 0} notas adhesivas` },
-          { label: 'Miembros Asignados', value: `${membersCount} persona(s)` },
-          { label: 'Fecha de Registro', value: timeAgo(w.createdAt) },
-          { label: 'Modo de Acceso', value: '👁️ Solo Lectura (Supervisión Pura)' }
-        ]);
-      });
-
-      // Botón para entrar al tablero en modo espectador (solo lectura)
-      card.querySelector('.view-spectator-btn')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        $('#adminView')?.classList.add('hidden');
-        if (window.MuroBoard) {
-          window.MuroBoard.selectWall(w.id, w.name, 'lector', true);
-        }
-      });
-
-      adminWallsGrid.appendChild(card);
-    });
-  }
-
-  function renderAdminNotes() {
-    const adminNotesGrid = $('#adminNotesGrid');
-    if (!adminNotesGrid) return;
-
-    const notes = window.MuroBoard ? window.MuroBoard.getAllNotes() : [];
-    adminNotesGrid.innerHTML = '';
-
-    if (!notes.length) {
-      adminNotesGrid.innerHTML = `<div class="muted" style="grid-column:1/-1; text-align:center; padding:40px;">No hay notas creadas en el muro activo (Lienzo limpio).</div>`;
-      return;
-    }
-
-    notes.forEach((n) => {
-      const card = document.createElement('article');
-      const colorMap = { amarillo: 'yellow', rosa: 'pink', azul: 'blue', verde: 'green', lila: 'purple' };
-      const colorClass = colorMap[n.color] || 'yellow';
-      card.className = `note-monitor-card ${colorClass} admin-inspectable`;
-      card.title = 'Haz clic para inspeccionar detalles';
-      card.innerHTML = `
-        <p>${n.texto}</p>
-        <div class="note-monitor-meta">
-          <span>👤 ${n.autor || 'Invitado'}</span>
-          <span>🕒 ${timeAgo(n.updatedAt)}</span>
-        </div>
-      `;
-
-      card.addEventListener('click', () => {
-        openAdminDetailModal('Inspección de Nota', `Nota de ${n.autor || 'Usuario'}`, [
-          { label: 'Autor Real', value: n.autor || 'Invitado' },
-          { label: 'Color de Nota', value: n.color || 'amarillo' },
-          { label: 'Contenido Completo', value: n.texto },
-          { label: 'Última Edición', value: timeAgo(n.updatedAt) },
-          { label: 'Posición en Lienzo', value: `X: ${Math.round(n.x || 0)}px, Y: ${Math.round(n.y || 0)}px` },
-          { label: 'Modo', value: '👁️ Solo Lectura' }
-        ]);
-      });
-
-      adminNotesGrid.appendChild(card);
-    });
-  }
-
-  function renderAdminUsersTable(userList = []) {
-    const tableBody = $('#adminAllUsersTable');
-    if (!tableBody) return;
-
-    tableBody.innerHTML = '';
-    if (!userList.length) {
-      tableBody.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center; padding:24px;">No se encontraron usuarios.</td></tr>`;
-      return;
-    }
-
-    userList.forEach((u) => {
-      const tr = document.createElement('tr');
-      const roleBadge = u.role === 'superadmin' ? 'superadmin' : 'user';
-      tr.innerHTML = `
-        <td><strong>${u.name}</strong></td>
-        <td>${u.email}</td>
-        <td><span class="status-badge ${roleBadge}">${u.role}</span></td>
-        <td><span class="status-badge active">${timeAgo(u.createdAt)}</span></td>
-        <td><small class="muted">👁️ Espectador</small></td>
-      `;
-      tableBody.appendChild(tr);
-    });
-  }
-
-  function renderAdminAllReports(reports = []) {
-    const allReportsTable = $('#adminAllReportsTable');
-    if (!allReportsTable) return;
-
-    allReportsTable.innerHTML = '';
-    if (!reports.length) {
-      allReportsTable.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center; padding:30px;">No se han recibido reportes de contenido.</td></tr>`;
-      return;
-    }
-
-    reports.forEach((rep) => {
-      const tr = document.createElement('tr');
-      tr.className = 'admin-inspectable';
-      tr.title = 'Haz clic para ver el detalle del reporte';
-      tr.style.cursor = 'pointer';
-      tr.innerHTML = `
-        <td><strong>${rep.reason}</strong></td>
-        <td>${rep.detail}</td>
-        <td>${rep.wallName || 'Muro de ideas'}</td>
-        <td>${timeAgo(rep.createdAt)}</td>
-        <td><span class="status-badge pending">👁️ Ver</span></td>
-      `;
-
-      tr.addEventListener('click', () => {
-        openAdminDetailModal('Detalle de Reporte', `Motivo: ${rep.reason}`, [
-          { label: 'Motivo del Reporte', value: rep.reason },
-          { label: 'Detalles / Justificación', value: rep.detail || 'Sin detalles' },
-          { label: 'Muro Afectado', value: rep.wallName || 'Muro de ideas' },
-          { label: 'Nota Asociada', value: rep.noteId || 'General' },
-          { label: 'Fecha de Reporte', value: timeAgo(rep.createdAt) },
-          { label: 'Estado', value: '👁️ Monitoreo Activo (Modo Auditoría)' }
-        ]);
-      });
-
-      allReportsTable.appendChild(tr);
-    });
-  }
-
-  // Buscador en tiempo real de usuarios en el Panel Admin
-  $('#adminUserSearch')?.addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase().trim();
-    const filtered = cachedAdminUsers.filter(
-      (u) => (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term)
-    );
-    renderAdminUsersTable(filtered);
-  });
-
-  // Cambio de pestañas en el panel de Superadministrador
-  $$('[data-admin-tab]').forEach((tabBtn) => {
-    tabBtn.addEventListener('click', () => {
-      $$('[data-admin-tab]').forEach((btn) => btn.classList.remove('active'));
-      tabBtn.classList.add('active');
-
-      const targetTab = tabBtn.dataset.adminTab;
-      const tabNameMap = {
-        resumen: 'Resumen General',
-        salas: 'Salas y Muros Monitoreados',
-        notas: 'Notas Globales del Sistema',
-        usuarios: 'Directorio de Usuarios',
-        reportes: 'Bandeja de Reportes de Contenido'
-      };
-
-      if ($('#adminTabTitle')) $('#adminTabTitle').textContent = tabNameMap[targetTab] || 'Panel de Monitoreo';
-
-      const allTabs = ['Resumen', 'Salas', 'Notas', 'Usuarios', 'Reportes'];
-      allTabs.forEach((name) => {
-        const tabEl = $(`#adminTab${name}`);
-        if (tabEl) {
-          tabEl.classList.toggle('hidden', name.toLowerCase() !== targetTab);
-        }
-      });
-    });
-  });
-
-  // Salir del Panel de Superadministrador y volver a Mis Muros
-  $('#adminExitBtn')?.addEventListener('click', () => {
-    $('#adminView')?.classList.add('hidden');
-    $('#wallsView')?.classList.remove('hidden');
-    if (window.MuroBoard) window.MuroBoard.fetchWalls();
-  });
-
-  /* ==========================================
-     PANEL LATERAL Y ACCESO A SUPERADMIN
-     ========================================== */
-
+  // Panel lateral
   function openPanel(kind) {
     const sidePanel = $('#sidePanel');
     if (!sidePanel) return;
     sidePanel.classList.add('open');
     sidePanel.setAttribute('aria-hidden', 'false');
     if ($('#profilePanel')) $('#profilePanel').classList.toggle('hidden', kind !== 'profile');
+    if ($('#adminPanel')) {
+      $('#adminPanel').classList.toggle('hidden', kind !== 'admin');
+      if (kind === 'admin') renderAdminVisual();
+    }
   }
+
+  window.MuroApp = { renderAdminVisual };
 
   $('#profileButton')?.addEventListener('click', () => openPanel('profile'));
   $('#wallsProfileBtn')?.addEventListener('click', () => openPanel('profile'));
-
-  // Acceso exclusivo al panel de monitoreo desde el perfil
-  $('#openAdminFromProfileBtn')?.addEventListener('click', () => openAdminDashboard(currentUser));
-
-  /* ==========================================
-     CAMBIO DE CONTRASEÑA CON CÓDIGO AL CORREO
-     ========================================== */
-
-  let pendingPasswordChange = null;
-
-  $('#toggleChangePasswordBtn')?.addEventListener('click', () => {
-    const form = $('#changePasswordForm');
-    if (!form) return;
-    const isHidden = form.classList.toggle('hidden');
-    $('#toggleChangePasswordBtn').textContent = isHidden ? 'Configurar' : 'Cerrar';
-    if (!isHidden) {
-      $('#cpStepCurrent')?.classList.remove('hidden');
-      $('#cpStepNew')?.classList.add('hidden');
-      $('#cpCurrentPassword').value = '';
-    }
-  });
-
-  $('#cpRequestCodeBtn')?.addEventListener('click', () => {
-    const currentPass = $('#cpCurrentPassword')?.value;
-    if (!currentPass || currentPass.length < 4) {
-      return toast('Ingresa tu contraseña actual.');
-    }
-
-    const socket = window.MuroBoard?.getSocket();
-    if (!socket) return toast('Conexión con el servidor no disponible.');
-
-    // Validar contraseña actual con el backend
-    socket.emit('auth:password:verify-current', { currentPassword: currentPass }, (res) => {
-      if (!res || !res.ok) {
-        return toast(res?.error || 'La contraseña actual no es correcta.');
-      }
-
-      // Generar código numérico de 6 dígitos
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      pendingPasswordChange = {
-        currentPassword: currentPass,
-        code,
-        expires: Date.now() + 10 * 60 * 1000
-      };
-
-      // Enviar código al correo real del usuario
-      sendVerificationEmail(currentUser.email, code, currentUser.name);
-
-      $('#cpStepCurrent')?.classList.add('hidden');
-      $('#cpStepNew')?.classList.remove('hidden');
-      $('#cpVerificationCode').value = '';
-      $('#cpNewPassword').value = '';
-      $('#cpConfirmPassword').value = '';
-      setTimeout(() => $('#cpVerificationCode')?.focus(), 100);
-
-      toast(`✉️ Código de 6 dígitos enviado a tu correo (${currentUser.email})`);
-    });
-  });
-
-  $('#changePasswordForm')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (!pendingPasswordChange) {
-      toast('Solicita primero el código de verificación.');
-      return;
-    }
-
-    const enteredCode = $('#cpVerificationCode')?.value.trim();
-    const newPass = $('#cpNewPassword')?.value;
-    const confirmPass = $('#cpConfirmPassword')?.value;
-
-    if (enteredCode !== pendingPasswordChange.code) {
-      return toast('❌ Código incorrecto. Revisa el código de 6 dígitos enviado a tu correo.');
-    }
-
-    const passErr = validatePassword(newPass);
-    if (passErr) return toast(passErr);
-
-    if (newPass !== confirmPass) {
-      return toast('Las nuevas contraseñas no coinciden.');
-    }
-
-    const socket = window.MuroBoard?.getSocket();
-    if (!socket) return toast('Conexión con el servidor no disponible.');
-
-    socket.emit('auth:password', {
-      currentPassword: pendingPasswordChange.currentPassword,
-      newPassword: newPass
-    }, (res) => {
-      if (res && res.ok) {
-        toast('✅ ¡Contraseña cambiada exitosamente!');
-        pendingPasswordChange = null;
-        $('#changePasswordForm')?.reset();
-        $('#changePasswordForm')?.classList.add('hidden');
-        $('#toggleChangePasswordBtn').textContent = 'Configurar';
-      } else {
-        toast(res?.error || 'No se pudo actualizar la contraseña.');
-      }
-    });
-  });
+  
+  // Botones de superadmin (solo para Brenda o cuentas superadmin)
+  $('#adminButton')?.addEventListener('click', () => openPanel('admin'));
+  $('#wallsAdminButton')?.addEventListener('click', () => openPanel('admin'));
 
   $('#closePanel')?.addEventListener('click', () => $('#sidePanel')?.classList.remove('open'));
   $('#logoutButton')?.addEventListener('click', () => {
-    const socket = window.MuroBoard?.getSocket();
-    if (socket) {
-      socket.emit('auth:logout', {});
-    }
     sessionStorage.removeItem('muroSession');
-    currentUser = null;
     $('#sidePanel')?.classList.remove('open');
     showAuth('login');
-    toast('Sesión cerrada.');
   });
 
-  // Escuchar cambios en snapshot de administrador en tiempo real desde el Backend
-  const boardSocket = window.MuroBoard?.getSocket();
-  if (boardSocket) {
-    boardSocket.on('admin:changed', () => {
-      if (!$('#adminView')?.classList.contains('hidden')) {
-        renderAdminDashboard();
-      }
-    });
-  }
-
-  /* ==========================================
-     INICIALIZACIÓN
-     ========================================== */
-
+  // Inicialización
   const savedSession = JSON.parse(sessionStorage.getItem('muroSession') || 'null');
   if (savedSession) {
     enterApp(savedSession);
