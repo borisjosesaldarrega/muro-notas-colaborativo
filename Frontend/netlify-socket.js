@@ -159,7 +159,8 @@
             this.client.from('muro_salas').select('*').order('actualizado_en', { ascending: false }), this.client.from('muro_sala_miembros').select('sala_id,usuario_id,rol'), this.client.from('muro_notas').select('id,sala_id')
           ]);
           if (wallsError) throw wallsError; if (membersError) throw membersError; if (notesError) throw notesError;
-          return { ok: true, walls: (walls || []).map((wall) => ({ id: wall.id, name: wall.nombre, description: wall.descripcion, ownerId: wall.propietario_id, role: memberships.find((item) => item.sala_id === wall.id && item.usuario_id === user.id)?.rol, notesCount: notes.filter((note) => note.sala_id === wall.id).length, membersCount: memberships.filter((member) => member.sala_id === wall.id).length })) };
+          const permittedIds = new Set(memberships.filter((member) => member.usuario_id === user.id).map((member) => member.sala_id));
+          return { ok: true, walls: (walls || []).filter((wall) => wall.propietario_id === user.id || permittedIds.has(wall.id)).map((wall) => ({ id: wall.id, name: wall.nombre, description: wall.descripcion, ownerId: wall.propietario_id, role: wall.propietario_id === user.id ? 'propietario' : memberships.find((item) => item.sala_id === wall.id && item.usuario_id === user.id)?.rol, notesCount: notes.filter((note) => note.sala_id === wall.id).length, membersCount: memberships.filter((member) => member.sala_id === wall.id).length })) };
         }
         case 'wall:select': { const result = await this.selectWall(payload.id); return { ok: true, ...result }; }
         case 'wall:create': { await this.identity(); const { data: id, error } = await this.client.rpc('muro_crear_sala', { nombre_nuevo: payload.name.trim(), descripcion_nueva: payload.description?.trim() || '' }); if (error) throw error; return { ok: true, id }; }

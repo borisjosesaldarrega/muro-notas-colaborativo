@@ -21,7 +21,8 @@ window.MuroBoard = (function () {
     filter: 'all',
     online: 1,
     user: null,
-    currentWall: { id: 'general', name: 'Muro de ideas', role: 'propietario' },
+    currentWall: null,
+    sessionVersion: 0,
     editingWallId: null,
     reportingUserId: null,
     boardScale: window.matchMedia('(max-width: 800px)').matches ? 0.55 : 1
@@ -316,7 +317,7 @@ window.MuroBoard = (function () {
      ========================================== */
 
   function renderWallsList(walls) {
-    state.walls = walls || [];
+    state.walls = (walls || []).filter((wall) => Boolean(wall.role) || wall.isPublic === true);
     const grid = $('#wallsGrid');
     if (!grid) return;
     grid.innerHTML = '';
@@ -410,8 +411,12 @@ window.MuroBoard = (function () {
   }
 
   function fetchWalls() {
+    if (!state.user?.id) return;
+    const requestVersion = state.sessionVersion;
+    const requestUserId = state.user.id;
     if (socket) {
       socket.emit('walls:list', {}, (res) => {
+        if (requestVersion !== state.sessionVersion || state.user?.id !== requestUserId) return;
         if (res && res.ok && Array.isArray(res.walls)) {
           renderWallsList(res.walls);
           const requestedId = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('wall');
@@ -428,6 +433,9 @@ window.MuroBoard = (function () {
   }
 
   function selectWall(wallId, wallName, role = 'propietario') {
+    if (!state.user?.id) return;
+    const requestVersion = state.sessionVersion;
+    const requestUserId = state.user.id;
     state.currentWall = { id: wallId, name: wallName, role };
     window.location.hash = `wall=${wallId}`;
 
@@ -446,6 +454,7 @@ window.MuroBoard = (function () {
 
     if (socket) {
       socket.emit('wall:select', { id: wallId }, (res) => {
+        if (requestVersion !== state.sessionVersion || state.user?.id !== requestUserId || state.currentWall?.id !== wallId) return;
         if (res && res.ok) {
           state.currentWall = {
             id: res.wall.id,
@@ -462,7 +471,12 @@ window.MuroBoard = (function () {
           }
           toast(`Entraste a la sala: ${res.wall.name}`);
         } else {
-          toast(res?.error || 'No se pudo cargar la sala.');
+          state.currentWall = null;
+          $('#appView')?.classList.add('hidden');
+          $('#wallsView')?.classList.remove('hidden');
+          history.replaceState(null, '', `${location.pathname}${location.search}`);
+          fetchWalls();
+          toast(res?.error || 'No se pudo cargar la sala.', 'error');
         }
       });
     } else {
@@ -957,6 +971,9 @@ window.MuroBoard = (function () {
   // Botón Volver a Mis Muros (Salir de la sala)
   $('#backToWallsButton')?.addEventListener('click', () => {
     socket?.emit('wall:leave', {}, () => {});
+    state.currentWall = null;
+    state.notes.clear();
+    if (boardSurface) boardSurface.innerHTML = '';
     $('#appView')?.classList.add('hidden');
     $('#wallsView')?.classList.remove('hidden');
     window.location.hash = '';
@@ -973,7 +990,20 @@ window.MuroBoard = (function () {
   });
 
   return {
+    resetSession() {
+      state.sessionVersion += 1;
+      state.user = null;
+      state.currentWall = null;
+      state.walls = [];
+      state.notes.clear();
+      for (const timer of noteSaveTimers.values()) window.clearTimeout(timer);
+      noteSaveTimers.clear();
+      if (boardSurface) boardSurface.innerHTML = '';
+      if ($('#wallsGrid')) $('#wallsGrid').innerHTML = '';
+    },
     init(user) {
+      if (!user?.id) return;
+      if (state.user?.id !== user.id) this.resetSession();
       state.user = user;
       const invitation = new URLSearchParams(window.location.search).get('invitacion');
       if (invitation && socket) socket.emit('invitation:answer', { secret: invitation, answer: 'aceptar' }, (res) => {

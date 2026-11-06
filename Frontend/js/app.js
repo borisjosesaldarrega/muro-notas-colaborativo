@@ -108,6 +108,9 @@
   let activeVerifiedExpiresAt = 0;
   let recoveryToken = '';
   let currentUser = null;
+  let authGeneration = 0;
+  let restoreInFlight = false;
+  const sameIdentity = (user) => Boolean(user?.id && currentUser?.id === user.id);
   let themeSaveSequence = 0;
   let cachedAdminUsers = [];
   let cachedAdminReports = [];
@@ -161,6 +164,10 @@
   }
 
   function enterApp(user, token = '', refreshToken = '', expiresAt = 0) {
+    if (!user?.id) return;
+    authGeneration += 1;
+    restoreInFlight = false;
+    if (!sameIdentity(user)) window.MuroBoard?.resetSession?.();
     currentUser = user;
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
     storeSessionTokens(token, refreshToken, expiresAt);
@@ -240,13 +247,17 @@
     const socket = window.MuroBoard?.getSocket();
     if (!socket) return toast('Conectando con el servidor...');
     setFormBusy(form, true, 'Ingresando…');
+    const requestGeneration = ++authGeneration;
     const res = await emitAsync(socket, 'auth:login', { email, password });
     setFormBusy(form, false);
+    if (requestGeneration !== authGeneration) return;
     if (res?.ok) {
       enterApp(res.user, res.token, res.refreshToken, res.expiresAt);
       toast(`¡Hola, ${res.user.name}!`);
     } else {
-      toast(res?.error || 'Correo o contraseña incorrectos.');
+      const message = res?.error || 'No pudimos iniciar sesión. Revisa tu correo y contraseña.';
+      setFieldError('loginPassword', message);
+      toast(message, 'error');
     }
   });
 
@@ -995,8 +1006,10 @@
       if (button) { button.disabled = false; button.classList.remove('is-loading'); }
       return toast(result?.error || 'No se pudo cerrar la sesión. Inténtalo nuevamente.', 'error');
     }
+    authGeneration += 1;
     clearStoredSession();
     currentUser = null;
+    window.MuroBoard?.resetSession?.();
     document.body.classList.remove('compact-notes');
     history.replaceState(null, '', `${location.pathname}${location.search}`);
     $('#sidePanel')?.classList.remove('open');
@@ -1018,19 +1031,25 @@
       storeSessionTokens(session.token, session.refreshToken, session.expiresAt);
     });
     boardSocket.on('auth:expired', () => {
+      authGeneration += 1;
       clearStoredSession();
       currentUser = null;
+      window.MuroBoard?.resetSession?.();
       showAuth('login');
       toast('Tu sesión venció. Inicia sesión nuevamente.', 'error');
     });
     boardSocket.on('connect', () => {
-      if (!currentUser) return;
+      if (!currentUser || restoreInFlight) return;
+      restoreInFlight = true;
+      const requestGeneration = authGeneration;
+      const expectedUserId = currentUser.id;
       const token = localStorage.getItem(TOKEN_KEY) || '';
       const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY) || '';
       const wallId = window.MuroBoard?.getState()?.currentWall?.id;
       const wallWasOpen = !$('#appView')?.classList.contains('hidden');
       boardSocket.emit('auth:restore', { token, refreshToken }, (res) => {
-        if (!res?.ok) return;
+        restoreInFlight = false;
+        if (requestGeneration !== authGeneration || !res?.ok || res.user?.id !== expectedUserId) return;
         currentUser = res.user;
         localStorage.setItem(SESSION_KEY, JSON.stringify(res.user));
         storeSessionTokens(res.token, res.refreshToken, res.expiresAt);
@@ -1048,8 +1067,10 @@
   const savedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY) || sessionStorage.getItem(REFRESH_TOKEN_KEY) || '';
   const sessionSocket = window.MuroBoard?.getSocket();
   if (sessionSocket) {
+    const requestGeneration = authGeneration;
     sessionSocket.emit('auth:restore', { token: savedToken, refreshToken: savedRefreshToken }, (res) => {
-      if (res?.ok) enterApp(res.user, res.token, res.refreshToken, res.expiresAt);
+      if (requestGeneration !== authGeneration) return;
+      if (res?.ok && res.user?.id) enterApp(res.user, res.token, res.refreshToken, res.expiresAt);
       else {
         clearStoredSession();
         showAuth('login');

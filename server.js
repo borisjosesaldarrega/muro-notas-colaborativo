@@ -328,7 +328,7 @@ function createMuroServer(options = {}) {
       if (users.some((user) => user.email === email)) return fail(acknowledge, 'Ese correo ya está registrado.');
       if (storage.schemaReady) {
         try {
-          const result = await store.register({ name, email, password, redirectTo: process.env.APP_URL || 'http://localhost:3000' });
+          const result = await store.register({ name, email, password, redirectTo: process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000') });
           return acknowledge({ ok: true, ...result });
         } catch (error) {
           if (/confirmation_disabled/i.test(String(error?.message))) return fail(acknowledge, 'La confirmación por correo no está disponible. Inténtalo más tarde.');
@@ -383,9 +383,9 @@ function createMuroServer(options = {}) {
       if (!storage.schemaReady) return fail(acknowledge, 'El reenvío no está disponible en este entorno.');
       try {
         if (payload.type === 'recovery') {
-          await store.recover(email, process.env.APP_URL || 'http://localhost:3000');
+          await store.recover(email, process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000'));
         } else {
-          await store.resendSignup(email, process.env.APP_URL || 'http://localhost:3000');
+          await store.resendSignup(email, process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000'));
         }
         return acknowledge({ ok: true });
       } catch (error) {
@@ -414,9 +414,18 @@ function createMuroServer(options = {}) {
 
     socket.on('auth:restore', async (payload = {}, acknowledge = () => {}) => {
       const token = cleanText(payload.token, 4096);
+      const refreshToken = cleanText(payload.refreshToken, 4096);
+      if (!token && !refreshToken) {
+        leaveCurrentWall(socket);
+        socket.data.userId = null;
+        socket.data.accessToken = '';
+        socket.data.refreshToken = '';
+        socket.data.expiresAt = 0;
+        return fail(acknowledge, 'Inicia sesión para continuar.');
+      }
       if (storage.schemaReady) {
         try {
-          const session = await store.restore(token, cleanText(payload.refreshToken, 4096));
+          const session = await store.restore(token, refreshToken);
           const index = users.findIndex((item) => item.id === session.user.id);
           if (index >= 0) users[index] = session.user; else users.push(session.user);
           return acknowledge({ ok: true, ...establishSession(socket, session.user, session) });
@@ -444,7 +453,7 @@ function createMuroServer(options = {}) {
     socket.on('auth:recover', async (payload = {}, acknowledge = () => {}) => {
       const email = validEmail(payload.email);
       if (storage.schemaReady && email) {
-        try { await store.recover(email, process.env.APP_URL || 'http://localhost:3000'); } catch { /* respuesta uniforme para no filtrar cuentas */ }
+        try { await store.recover(email, process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000')); } catch { /* respuesta uniforme para no filtrar cuentas */ }
       }
       acknowledge({ ok: true, message: 'Si la cuenta existe, se envió un código de 8 dígitos.' });
     });
@@ -662,7 +671,7 @@ function createMuroServer(options = {}) {
         } catch { return fail(acknowledge, 'No se pudo crear la invitación.'); }
       }
       invitations.push(invitation);
-      const link = `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}`;
+      const link = `${process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000')}/?invitacion=${encodeURIComponent(secrets.token)}`;
       acknowledge({ ok: true, invitation: invitationView(invitation, user), code: secrets.code, link, members: wallMembers(wall) });
     });
 
@@ -729,12 +738,12 @@ function createMuroServer(options = {}) {
       if (storage.schemaReady) {
         try {
           const saved = await store.resendInvitation({ id: payload.id, ...secrets }, socket.data.accessToken);
-          return acknowledge({ ok: true, invitation: saved, code: secrets.code, link: `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}` });
+          return acknowledge({ ok: true, invitation: saved, code: secrets.code, link: `${process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000')}/?invitacion=${encodeURIComponent(secrets.token)}` });
         } catch { return fail(acknowledge, 'La invitación no se puede reenviar.'); }
       }
       const invitation = invitations.find((item) => item.id === payload.id && item.invitedBy === user.id && !['aceptada', 'cancelada'].includes(item.status));
       if (!invitation) return fail(acknowledge, 'La invitación no se puede reenviar.'); Object.assign(invitation, secrets, { status: 'pendiente' });
-      acknowledge({ ok: true, invitation: invitationView(invitation, user), code: secrets.code, link: `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}` });
+      acknowledge({ ok: true, invitation: invitationView(invitation, user), code: secrets.code, link: `${process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000')}/?invitacion=${encodeURIComponent(secrets.token)}` });
     });
 
     socket.on('wall:member:update', async (payload = {}, acknowledge = () => {}) => {

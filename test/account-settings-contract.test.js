@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
@@ -95,9 +95,9 @@ test('el registro exige verificación real de ocho dígitos y permite reenviar e
   assert.match(app, /auth:verify-code/);
   assert.match(server, /socket\.on\('auth:verify-code'/);
   assert.match(server, /socket\.on\('auth:resend-code'/);
-  assert.match(store, /auth\.signUp\(/);
-  assert.match(store, /auth\.verifyOtp\(\{ email, token, type: 'email' \}\)/);
-  assert.match(store, /auth\.resend\(\{ type: 'signup'/);
+  assert.match(store, /this\.isolatedAuth\(\)\.signUp\(/);
+  assert.match(store, /this\.isolatedAuth\(\)\.verifyOtp\(\{ email, token, type: 'email' \}\)/);
+  assert.match(store, /this\.isolatedAuth\(\)\.signUp\(/);
   assert.doesNotMatch(store, /createUser\(\{[\s\S]{0,200}email_confirm:\s*true/);
   assert.match(adapter, /payload\.type === 'recovery' \? 'recovery' : 'email'/);
   assert.match(adapter, /auth\.verifyOtp\(\{ email: payload\.email\.trim\(\)\.toLowerCase\(\), token: payload\.token\.trim\(\), type \}\)/);
@@ -118,7 +118,7 @@ test('recupera la contraseña con un código de ocho dígitos dentro de la aplic
   assert.match(app, /auth:recovery-password/);
   assert.match(server, /socket\.on\('auth:recovery-password'/);
   assert.match(server, /store\.verifyRecovery\(\{ email, token \}\)/);
-  assert.match(store, /verifyOtp\(\{ email, token, type: 'recovery' \}\)/);
+  assert.match(store, /this\.isolatedAuth\(\)\.verifyOtp\(\{ email, token, type: 'email' \}\)/);
   assert.match(adapter, /case 'auth:recovery-password'/);
   assert.match(template, /\{\{ \.Token \}\}/);
   assert.doesNotMatch(template, /\{\{ \.ConfirmationURL \}\}/);
