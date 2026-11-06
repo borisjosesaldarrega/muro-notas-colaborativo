@@ -197,6 +197,36 @@ test('recupera el código activo y permite cambiar o revocar permisos de miembro
   assert.match(board, /socket\.on\('members:changed'/);
 });
 
+test('aísla cambios de sesión, muestra el filtro lila y deja crecer las notas', () => {
+  const app = readFileSync(join(root, 'Frontend/js/app.js'), 'utf8');
+  const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
+  const html = readFileSync(join(root, 'Frontend/index.html'), 'utf8');
+  const css = readFileSync(join(root, 'Frontend/css/styles.css'), 'utf8');
+  assert.match(app, /let authGeneration = 0/);
+  assert.match(app, /requestGeneration !== authGeneration/);
+  assert.match(app, /window\.MuroBoard\?\.resetSession\?\.\(\)/);
+  assert.match(board, /sessionVersion/);
+  assert.match(board, /window\.addEventListener\('hashchange'/);
+  assert.match(html, /data-filter="lila"/);
+  assert.doesNotMatch(board, /Math\.min\(260/);
+  assert.match(css, /#appView \.note textarea \{ max-height: none/);
+  assert.match(css, /\.settings-toggles input\[type="checkbox"\]/);
+});
+
+test('autoriza un único muro comunitario sin transferir su propiedad', () => {
+  const migration = readFileSync(join(root, 'supabase/migrations/20261106031614_muro_comunitario_controlado.sql'), 'utf8');
+  const server = readFileSync(join(root, 'server.js'), 'utf8');
+  const store = readFileSync(join(root, 'lib/supabase-store.js'), 'utf8');
+  assert.match(migration, /dd48c980-d72b-414f-89c7-6a0692b0982e/);
+  assert.match(migration, /9ffbb480-2f2c-4ddc-9d8a-7c5995373c6a/);
+  assert.match(migration, /autor_id = \(select auth\.uid\(\)\)/);
+  assert.match(migration, /notas_actualizar_como_editor_o_autor_comunitario/);
+  assert.match(server, /membershipRole/);
+  assert.match(server, /wallRole\(wall, user\) === 'comunitario'/);
+  assert.match(server, /members: membershipRole\(wall, user\) \? wallMembers\(wall\) : \[\]/);
+  assert.match(store, /es_comunitario/);
+});
+
 test('permite reportar miembros y notifica las medidas por correo sin revelar al reportante', () => {
   const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
   const app = readFileSync(join(root, 'Frontend/js/app.js'), 'utf8');

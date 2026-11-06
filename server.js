@@ -174,8 +174,11 @@ function createMuroServer(options = {}) {
   const findWall = (id) => walls.find((wall) => wall.id === cleanText(id, 100));
   // El rol global administra la plataforma, pero no concede acceso implícito al
   // contenido privado de los muros. La membresía siempre se comprueba por muro.
-  const wallRole = (wall, user) => wall?.members[user?.id];
+  const membershipRole = (wall, user) => wall?.members[user?.id];
+  const wallRole = (wall, user) => membershipRole(wall, user) || (wall?.community && user ? 'comunitario' : undefined);
   const canEdit = (wall, user) => ['propietario', 'editor'].includes(wallRole(wall, user));
+  const canCreateNote = (wall, user) => canEdit(wall, user) || wallRole(wall, user) === 'comunitario';
+  const canModifyNote = (wall, user, note) => canEdit(wall, user) || (wallRole(wall, user) === 'comunitario' && note?.authorId === user?.id);
   const canOwn = (wall, user) => wallRole(wall, user) === 'propietario';
   const requireUser = (socket, acknowledge) => {
     const user = findUser(socket);
@@ -195,6 +198,7 @@ function createMuroServer(options = {}) {
     name: wall.name,
     description: wall.description,
     color: wall.color || 'amarillo',
+    community: Boolean(wall.community),
     ownerId: wall.ownerId,
     role: wallRole(wall, user),
     notesCount: wall.notes.length,
@@ -211,7 +215,7 @@ function createMuroServer(options = {}) {
   };
   const emitWallDeletionToMembers = (wall) => {
     for (const client of io.sockets.sockets.values()) {
-      if (client.data.userId && wall.members[client.data.userId]) client.emit('wall:deleted', wall.id);
+      if (client.data.userId && (wall.community || wall.members[client.data.userId])) client.emit('wall:deleted', wall.id);
     }
   };
   const invitationView = (invitation, user) => ({
@@ -655,7 +659,7 @@ function createMuroServer(options = {}) {
       if (!user || !wall) return user && fail(acknowledge, 'El muro no existe.');
       if (!wallRole(wall, user)) return fail(acknowledge, 'No tienes acceso a este muro.');
       joinWall(socket, wall);
-      acknowledge({ ok: true, wall: wallSummary(wall, user), notes: wall.notes, members: wallMembers(wall) });
+      acknowledge({ ok: true, wall: wallSummary(wall, user), notes: wall.notes, members: membershipRole(wall, user) ? wallMembers(wall) : [] });
     });
 
     socket.on('wall:leave', (_payload = {}, acknowledge = () => {}) => {
@@ -824,7 +828,7 @@ function createMuroServer(options = {}) {
       const user = requireUser(socket, acknowledge);
       const wall = findWall(socket.data.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'Selecciona un muro.');
-      if (!canEdit(wall, user)) return fail(acknowledge, 'Tu permiso es de solo lectura.');
+      if (!canCreateNote(wall, user)) return fail(acknowledge, 'Tu permiso es de solo lectura.');
       const texto = cleanText(payload.texto);
       if (!texto) return fail(acknowledge, 'La nota no puede estar vacía.');
       if (!COLORS.has(payload.color)) return fail(acknowledge, 'Selecciona un color válido.');
@@ -851,9 +855,9 @@ function createMuroServer(options = {}) {
       const user = requireUser(socket, acknowledge);
       const wall = findWall(socket.data.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'Selecciona un muro.');
-      if (!canEdit(wall, user)) return fail(acknowledge, 'Tu permiso es de solo lectura.');
       const note = wall.notes.find((item) => item.id === cleanText(payload.id, 100));
       if (!note) return fail(acknowledge, 'La nota ya no existe.');
+      if (!canModifyNote(wall, user, note)) return fail(acknowledge, 'Solo puedes editar tus propias notas en el muro comunitario.');
       const texto = cleanText(payload.texto);
       if (!texto) return fail(acknowledge, 'La nota no puede estar vacía.');
       if (payload.color !== undefined && !COLORS.has(payload.color)) return fail(acknowledge, 'El color no es válido.');
@@ -877,9 +881,9 @@ function createMuroServer(options = {}) {
       const user = requireUser(socket, acknowledge);
       const wall = findWall(socket.data.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'Selecciona un muro.');
-      if (!canEdit(wall, user)) return fail(acknowledge, 'Tu permiso es de solo lectura.');
       const note = wall.notes.find((item) => item.id === cleanText(payload.id, 100));
       if (!note) return fail(acknowledge, 'La nota ya no existe.');
+      if (!canModifyNote(wall, user, note)) return fail(acknowledge, 'Solo puedes mover tus propias notas en el muro comunitario.');
       const nextNote = { ...note, x: safeCoordinate(payload.x, note.x), y: safeCoordinate(payload.y, note.y), updatedAt: Date.now() };
       if (storage.schemaReady) {
         try { await store.updateNote(wall.id, nextNote, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo mover la nota. Inténtalo nuevamente.'); }
@@ -892,9 +896,9 @@ function createMuroServer(options = {}) {
     socket.on('note:preview-move', (payload = {}) => {
       const user = findUser(socket);
       const wall = findWall(socket.data.wallId);
-      if (!user || !wall || !canEdit(wall, user)) return;
+      if (!user || !wall) return;
       const note = wall.notes.find((item) => item.id === cleanText(payload.id, 100));
-      if (!note) return;
+      if (!note || !canModifyNote(wall, user, note)) return;
       socket.to(`wall:${wall.id}`).volatile.emit('note:preview-moved', {
         wallId: wall.id,
         id: note.id,
@@ -907,10 +911,10 @@ function createMuroServer(options = {}) {
       const user = requireUser(socket, acknowledge);
       const wall = findWall(socket.data.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'Selecciona un muro.');
-      if (!canEdit(wall, user)) return fail(acknowledge, 'Tu permiso es de solo lectura.');
       const id = cleanText(payload.id, 100);
       const index = wall.notes.findIndex((item) => item.id === id);
       if (index === -1) return fail(acknowledge, 'La nota ya no existe.');
+      if (!canModifyNote(wall, user, wall.notes[index])) return fail(acknowledge, 'Solo puedes eliminar tus propias notas en el muro comunitario.');
       if (storage.schemaReady) {
         try { await store.deleteNote(id, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo eliminar la nota. Inténtalo nuevamente.'); }
       }
