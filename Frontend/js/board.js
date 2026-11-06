@@ -975,11 +975,15 @@ window.MuroBoard = (function () {
     const compact = field.value.trim();
     if (/^[a-z0-9]{0,8}$/i.test(compact)) field.value = compact.toUpperCase();
     const preview = $('#acceptInvitationPreview');
-    if (preview) { preview.textContent = ''; preview.classList.remove('field-error'); }
+    field.classList.remove('invitation-invalid');
+    field.removeAttribute('aria-invalid');
+    if (preview) { preview.textContent = ''; preview.classList.remove('field-error', 'invitation-error'); }
     clearTimeout(invitationPreviewTimer);
     if (!compact || !socket) return;
     if (!/^[a-z0-9]+$/i.test(compact)) {
-      if (preview) { preview.textContent = 'Usa únicamente letras y números.'; preview.classList.add('field-error'); }
+      field.classList.add('invitation-invalid');
+      field.setAttribute('aria-invalid', 'true');
+      if (preview) { preview.textContent = 'Usa únicamente letras y números.'; preview.classList.add('field-error', 'invitation-error'); }
       return;
     }
     if (compact.length < 8) {
@@ -994,6 +998,10 @@ window.MuroBoard = (function () {
           ? `Muro: ${res.invitation.wallName} · Invita: ${res.invitation.invitedBy} · Rol: ${res.invitation.role}`
           : (res?.error || 'El código no existe, caducó o ya no está disponible.');
         preview.classList.toggle('field-error', !res?.ok);
+        preview.classList.toggle('invitation-error', !res?.ok);
+        field.classList.toggle('invitation-invalid', !res?.ok);
+        if (res?.ok) field.removeAttribute('aria-invalid');
+        else field.setAttribute('aria-invalid', 'true');
       });
     }, 350);
   });
@@ -1004,17 +1012,28 @@ window.MuroBoard = (function () {
     const secret = $('#acceptInvitationCode')?.value.trim();
     const preview = $('#acceptInvitationPreview');
     if (!/^[A-Z0-9]{8}$/.test(secret || '')) {
-      if (preview) { preview.textContent = 'Escribe el código completo de 8 letras y números.'; preview.classList.add('field-error'); }
+      const field = $('#acceptInvitationCode');
+      field?.classList.add('invitation-invalid');
+      field?.setAttribute('aria-invalid', 'true');
+      if (preview) { preview.textContent = 'Escribe el código completo de 8 letras y números.'; preview.classList.add('field-error', 'invitation-error'); }
       return;
     }
     const answer = 'aceptar';
     socket.emit('invitation:answer', { secret, answer }, (res) => {
       if (!res?.ok) {
-        if (preview) { preview.textContent = 'Sala no encontrada. El código puede ser incorrecto o haber caducado.'; preview.classList.add('field-error'); }
+        const field = $('#acceptInvitationCode');
+        field?.classList.add('invitation-invalid');
+        field?.setAttribute('aria-invalid', 'true');
+        if (preview) { preview.textContent = 'Sala no encontrada. El código puede ser incorrecto o haber caducado.'; preview.classList.add('field-error', 'invitation-error'); }
         return toast('Sala no encontrada.', 'error');
       }
       $('#acceptInvitationForm')?.reset();
-      if ($('#acceptInvitationPreview')) $('#acceptInvitationPreview').textContent = '';
+      $('#acceptInvitationCode')?.classList.remove('invitation-invalid');
+      $('#acceptInvitationCode')?.removeAttribute('aria-invalid');
+      if ($('#acceptInvitationPreview')) {
+        $('#acceptInvitationPreview').textContent = '';
+        $('#acceptInvitationPreview').classList.remove('field-error', 'invitation-error');
+      }
       toast(`Te uniste a ${res.wallName}. Código creado por ${res.invitedBy}.`);
       fetchWalls();
     });

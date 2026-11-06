@@ -40,7 +40,13 @@
           <span id="loginEmailError" class="field-error"></span>
         </label>
         <label>Contraseña
-          <input id="loginPassword" type="password" minlength="10" placeholder="••••••••••" required autocomplete="current-password">
+          <span class="password-input-wrap">
+            <input id="loginPassword" type="password" minlength="10" placeholder="••••••••••" required autocomplete="current-password">
+            <button id="toggleLoginPassword" class="password-visibility-button" type="button" data-password-target="loginPassword" aria-label="Mostrar contraseña" aria-pressed="false">
+              <svg class="password-eye-show" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c5.2 0 9.1 4.6 10 6.2a1.6 1.6 0 0 1 0 1.6C21.1 14.4 17.2 19 12 19S2.9 14.4 2 12.8a1.6 1.6 0 0 1 0-1.6C2.9 9.6 6.8 5 12 5Zm0 2c-4 0-7.2 3.4-8.1 5 .9 1.6 4.1 5 8.1 5s7.2-3.4 8.1-5C19.2 10.4 16 7 12 7Zm0 2.1a2.9 2.9 0 1 1 0 5.8 2.9 2.9 0 0 1 0-5.8Z"/></svg>
+              <svg class="password-eye-hide" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.7 3.3 16 16-1.4 1.4-3-3A10.3 10.3 0 0 1 12 19C6.8 19 2.9 14.4 2 12.8a1.6 1.6 0 0 1 0-1.6 15.4 15.4 0 0 1 3-3.7L3.3 4.7l1.4-1.4ZM6.4 8.9A13.4 13.4 0 0 0 3.9 12c.9 1.6 4.1 5 8.1 5 1 0 1.9-.2 2.8-.6l-1.6-1.6A2.9 2.9 0 0 1 9.2 10L7.8 8.6c-.5.1-1 .2-1.4.3ZM12 5c5.2 0 9.1 4.6 10 6.2a1.6 1.6 0 0 1 0 1.6 15.8 15.8 0 0 1-2 2.7L18.5 14a13.2 13.2 0 0 0 1.6-2c-.9-1.6-4.1-5-8.1-5-.5 0-1 .1-1.5.2L8.9 5.6c1-.4 2-.6 3.1-.6Z"/></svg>
+            </button>
+          </span>
           <span id="loginPasswordError" class="field-error"></span>
         </label>
         <button class="link-button" type="button" data-view="recover">¿Olvidaste tu contraseña?</button>
@@ -63,11 +69,23 @@
           <span id="registerEmailError" class="field-error"></span>
         </label>
         <label>Contraseña
-          <input id="registerPassword" type="password" minlength="10" maxlength="128" placeholder="Mínimo 10 caracteres" required autocomplete="new-password">
+          <span class="password-input-wrap">
+            <input id="registerPassword" type="password" minlength="10" maxlength="128" placeholder="Mínimo 10 caracteres" required autocomplete="new-password">
+            <button class="password-visibility-button" type="button" data-password-target="registerPassword" aria-label="Mostrar contraseña" aria-pressed="false">
+              <svg class="password-eye-show" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c5.2 0 9.1 4.6 10 6.2a1.6 1.6 0 0 1 0 1.6C21.1 14.4 17.2 19 12 19S2.9 14.4 2 12.8a1.6 1.6 0 0 1 0-1.6C2.9 9.6 6.8 5 12 5Zm0 2c-4 0-7.2 3.4-8.1 5 .9 1.6 4.1 5 8.1 5s7.2-3.4 8.1-5C19.2 10.4 16 7 12 7Zm0 2.1a2.9 2.9 0 1 1 0 5.8 2.9 2.9 0 0 1 0-5.8Z"/></svg>
+              <svg class="password-eye-hide" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.7 3.3 16 16-1.4 1.4-3-3A10.3 10.3 0 0 1 12 19C6.8 19 2.9 14.4 2 12.8a1.6 1.6 0 0 1 0-1.6 15.4 15.4 0 0 1 3-3.7L3.3 4.7l1.4-1.4ZM6.4 8.9A13.4 13.4 0 0 0 3.9 12c.9 1.6 4.1 5 8.1 5 1 0 1.9-.2 2.8-.6l-1.6-1.6A2.9 2.9 0 0 1 9.2 10L7.8 8.6c-.5.1-1 .2-1.4.3ZM12 5c5.2 0 9.1 4.6 10 6.2a1.6 1.6 0 0 1 0 1.6 15.8 15.8 0 0 1-2 2.7L18.5 14a13.2 13.2 0 0 0 1.6-2c-.9-1.6-4.1-5-8.1-5-.5 0-1 .1-1.5.2L8.9 5.6c1-.4 2-.6 3.1-.6Z"/></svg>
+            </button>
+          </span>
           <span id="registerPasswordError" class="field-error"></span>
         </label>
         <label>Confirmar contraseña
-          <input id="registerConfirmPassword" type="password" minlength="10" maxlength="128" placeholder="Repite tu contraseña" required autocomplete="new-password">
+          <span class="password-input-wrap">
+            <input id="registerConfirmPassword" type="password" minlength="10" maxlength="128" placeholder="Repite tu contraseña" required autocomplete="new-password">
+            <button class="password-visibility-button" type="button" data-password-target="registerConfirmPassword" aria-label="Mostrar contraseña" aria-pressed="false">
+              <svg class="password-eye-show" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c5.2 0 9.1 4.6 10 6.2a1.6 1.6 0 0 1 0 1.6C21.1 14.4 17.2 19 12 19S2.9 14.4 2 12.8a1.6 1.6 0 0 1 0-1.6C2.9 9.6 6.8 5 12 5Zm0 2c-4 0-7.2 3.4-8.1 5 .9 1.6 4.1 5 8.1 5s7.2-3.4 8.1-5C19.2 10.4 16 7 12 7Zm0 2.1a2.9 2.9 0 1 1 0 5.8 2.9 2.9 0 0 1 0-5.8Z"/></svg>
+              <svg class="password-eye-hide" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.7 3.3 16 16-1.4 1.4-3-3A10.3 10.3 0 0 1 12 19C6.8 19 2.9 14.4 2 12.8a1.6 1.6 0 0 1 0-1.6 15.4 15.4 0 0 1 3-3.7L3.3 4.7l1.4-1.4ZM6.4 8.9A13.4 13.4 0 0 0 3.9 12c.9 1.6 4.1 5 8.1 5 1 0 1.9-.2 2.8-.6l-1.6-1.6A2.9 2.9 0 0 1 9.2 10L7.8 8.6c-.5.1-1 .2-1.4.3ZM12 5c5.2 0 9.1 4.6 10 6.2a1.6 1.6 0 0 1 0 1.6 15.8 15.8 0 0 1-2 2.7L18.5 14a13.2 13.2 0 0 0 1.6-2c-.9-1.6-4.1-5-8.1-5-.5 0-1 .1-1.5.2L8.9 5.6c1-.4 2-.6 3.1-.6Z"/></svg>
+            </button>
+          </span>
           <span id="registerConfirmError" class="field-error"></span>
         </label>
         <button class="primary-button" type="submit">Continuar</button>

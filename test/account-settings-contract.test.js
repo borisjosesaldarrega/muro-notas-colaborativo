@@ -273,3 +273,39 @@ test('el modal de nueva nota cierra sus acciones y no genera desplazamiento hori
   assert.match(css, /#noteDialog \{[^}]*overflow:\s*hidden/);
   assert.match(css, /#noteDialog textarea \{[^}]*max-width:\s*100%/);
 });
+
+test('el editor de muros no desborda y la portada conserva movimiento cartoon moderado', () => {
+  const css = readFileSync(join(root, 'Frontend/css/styles.css'), 'utf8');
+  assert.match(css, /#wallDialog \{[^}]*overflow-x:\s*hidden/);
+  assert.match(css, /#wallDialog form \{[^}]*max-width:\s*100%[^}]*overflow-x:\s*hidden/);
+  assert.match(css, /#wallDialog input[^}]*max-width:\s*100%/);
+  assert.match(css, /\.demo-notes::before/);
+  assert.match(css, /\.demo-notes::after/);
+  assert.match(css, /@keyframes idea-spark/);
+});
+
+test('el acceso permite corregir y revisar la contraseña después de un error', () => {
+  const html = readFileSync(join(root, 'Frontend/index.html'), 'utf8');
+  const app = readFileSync(join(root, 'Frontend/js/app.js'), 'utf8');
+  const css = readFileSync(join(root, 'Frontend/css/styles.css'), 'utf8');
+  assert.match(html, /id="toggleLoginPassword"[^>]*aria-label="Mostrar contraseña"/);
+  assert.match(app, /\$\$\('\[data-password-target\]'\)/);
+  assert.match(app, /input\.type = visible \? 'password' : 'text'/);
+  assert.match(app, /\['loginEmail', 'loginPassword'\][\s\S]*addEventListener\('input'/);
+  assert.match(app, /registerErrorByField[\s\S]*registerConfirmPassword:\s*'registerConfirm'/);
+  assert.match(html, /data-password-target="registerPassword"/);
+  assert.match(html, /data-password-target="registerConfirmPassword"/);
+  assert.match(css, /\.password-visibility-button/);
+  assert.match(css, /\.code-digit\.error[^}]*color:\s*#2f2941/);
+  assert.match(css, /html\[data-theme="dark"\] input\.is-invalid[^}]*color:\s*#fff/);
+});
+
+test('la invitación diferencia sala inexistente y recupera el campo al corregir', () => {
+  const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
+  const css = readFileSync(join(root, 'Frontend/css/styles.css'), 'utf8');
+  assert.match(board, /Sala no encontrada\.[\s\S]*classList\.add\('field-error', 'invitation-error'\)/);
+  assert.match(board, /field\.classList\.remove\('invitation-invalid'\)/);
+  assert.match(board, /field\.removeAttribute\('aria-invalid'\)/);
+  assert.match(css, /\.invitation-accept-bar \.invitation-error/);
+  assert.match(css, /html\[data-theme="dark"\] \.invitation-accept-bar \.invitation-error/);
+});
