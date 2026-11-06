@@ -241,6 +241,9 @@ test('permite abandonar una membresía sin afectar a la persona propietaria', ()
   assert.match(adapter, /case 'wall:member:leave'/);
   assert.match(board, /emitWithTimeout\('wall:member:leave'/);
   assert.match(html, /id="leaveWallBtn"/);
+  assert.match(html, /id="backToWallsButton"[^>]*>← Mis muros<\/button>/);
+  assert.match(html, /<div class="board-brand" aria-label="Muro Colaborativo">/);
+  assert.doesNotMatch(html, /<button[^>]*class="board-brand"/);
 });
 
 test('permite reportar miembros y notifica las medidas por correo sin revelar al reportante', () => {
