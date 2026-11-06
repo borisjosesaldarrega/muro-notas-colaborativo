@@ -671,9 +671,9 @@ window.MuroBoard = (function () {
     const wall = state.currentWall;
     if (!wall || !['editor', 'lector'].includes(wall.role)) return;
     const accepted = await window.MuroUI.confirmAction({
-      title: 'Salir del muro',
+      title: 'Dejar de participar',
       message: `Dejarás de tener acceso a “${wall.name}”. Para volver necesitarás usar otra invitación.`,
-      confirmText: 'Salir del muro',
+      confirmText: 'Dejar de participar',
       tone: 'danger'
     });
     if (!accepted) return;
@@ -681,7 +681,7 @@ window.MuroBoard = (function () {
     if (!response?.ok) return toast(response?.error || 'No se pudo salir del muro.', 'error');
     state.walls = state.walls.filter((item) => item.id !== wall.id);
     showWallsView(true);
-    toast('Saliste del muro.', 'success');
+    toast('Ya no participas en ese muro.', 'success');
   });
 
   // Modal Nueva Nota

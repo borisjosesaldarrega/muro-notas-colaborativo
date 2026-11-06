@@ -1274,7 +1274,6 @@ dialog form { background: linear-gradient(180deg, #fff, #fdfcff); }
   background: transparent;
   text-align: left;
 }
-.board-brand:hover .brand-mark { transform: translateY(-2px) rotate(-4deg); }
 .board-brand .brand-mark {
   width: 40px;
   height: 40px;
@@ -1323,6 +1322,12 @@ dialog form { background: linear-gradient(180deg, #fff, #fdfcff); }
 .new-note-action { color: #fff; background: #6658f5; box-shadow: 0 7px 0 rgba(102, 88, 245, .14); }
 .share-action:hover,
 .new-note-action:hover { background: #5748e7; box-shadow: 0 9px 0 rgba(102, 88, 245, .12); }
+.back-action {
+  color: #4d4661;
+  background: #f2f0f8;
+  box-shadow: none;
+}
+.back-action:hover { color: #4938b7; background: #e9e5f8; }
 .delete-action {
   min-width: 82px;
   color: #ba4761;
@@ -1512,9 +1517,14 @@ dialog form { background: linear-gradient(180deg, #fff, #fdfcff); }
   .board-brand .brand-mark { width: 38px; height: 38px; }
   #appView .board-actions { gap: 7px; }
   .board-action { min-width: 0; height: 40px; padding: 0 12px; border-radius: 12px; }
+  .back-action { width: 68px; padding: 0; font-size: 0; }
+  .back-action::before { content: '← Inicio'; font-size: .7rem; }
+  .leave-action { width: 82px; padding: 0; font-size: 0; }
+  .leave-action::before { content: 'Abandonar'; font-size: .68rem; }
   .share-action { font-size: 0; width: 42px; padding: 0; }
   .share-action::before { content: '↗'; font-size: 1.05rem; }
-  .new-note-action { font-size: .75rem; }
+  .new-note-action { width: 42px; padding: 0; font-size: 0; }
+  .new-note-action::before { content: '+'; font-size: 1.1rem; }
   #appView .avatar { width: 38px; height: 38px; flex-basis: 38px; }
   #appView .board-toolbar { min-height: 134px; padding: 16px 15px 14px; align-items: flex-start; flex-direction: column; gap: 12px; }
   .board-heading h1 { font-size: 1.35rem; }
