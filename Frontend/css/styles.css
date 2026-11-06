@@ -1329,6 +1329,13 @@ dialog form { background: linear-gradient(180deg, #fff, #fdfcff); }
   background: #fff1f4;
   box-shadow: none;
 }
+.leave-action {
+  min-width: 112px;
+  color: #8f4d1e;
+  background: #fff3df;
+  box-shadow: none;
+}
+.leave-action:hover { color: #7b3f16; background: #ffe9c7; }
 #appView .avatar {
   width: 40px;
   height: 40px;

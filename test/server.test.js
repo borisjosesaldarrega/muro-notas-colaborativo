@@ -216,6 +216,11 @@ test('crea un código de sala reutilizable y agrega cada membresía al unirse', 
   assert.equal((await ack(secondMember, 'wall:select', { id: wallId })).wall.role, 'lector');
   assert.equal((await ack(admin, 'wall:member:remove', { wallId, userId: secondMemberId })).ok, true);
   assert.equal((await ack(secondMember, 'wall:select', { id: wallId })).ok, false);
+  assert.equal((await ack(secondMember, 'invitation:answer', { secret: invited.code })).status, 'aceptada');
+  assert.equal((await ack(secondMember, 'wall:select', { id: wallId })).ok, true);
+  assert.equal((await ack(secondMember, 'wall:member:leave', { wallId })).ok, true);
+  assert.equal((await ack(secondMember, 'wall:select', { id: wallId })).ok, false);
+  assert.equal((await ack(admin, 'wall:member:leave', { wallId })).ok, false, 'la persona propietaria conserva el muro');
   assert.equal((await ack(member, 'invitation:preview', { secret: 'NOEXISTE' })).error, 'Sala no encontrada.');
   assert.equal((await ack(member, 'wall:select', { id: wallId })).wall.role, 'lector');
   assert.equal((await ack(member, 'note:create', { texto: 'No permitido', color: 'verde' })).ok, false);

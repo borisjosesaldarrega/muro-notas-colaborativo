@@ -229,6 +229,20 @@ test('autoriza un único muro comunitario sin transferir su propiedad', () => {
   assert.match(store, /es_comunitario/);
 });
 
+test('permite abandonar una membresía sin afectar a la persona propietaria', () => {
+  const migration = readFileSync(join(root, 'supabase/migrations/20261106034617_salir_muro_propio.sql'), 'utf8');
+  const server = readFileSync(join(root, 'server.js'), 'utf8');
+  const adapter = readFileSync(join(root, 'public/netlify-socket.js'), 'utf8');
+  const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
+  const html = readFileSync(join(root, 'Frontend/index.html'), 'utf8');
+  assert.match(migration, /usuario_id = solicitante/);
+  assert.match(migration, /propietario_no_puede_salir/);
+  assert.match(server, /socket\.on\('wall:member:leave'/);
+  assert.match(adapter, /case 'wall:member:leave'/);
+  assert.match(board, /emitWithTimeout\('wall:member:leave'/);
+  assert.match(html, /id="leaveWallBtn"/);
+});
+
 test('permite reportar miembros y notifica las medidas por correo sin revelar al reportante', () => {
   const board = readFileSync(join(root, 'Frontend/js/board.js'), 'utf8');
   const app = readFileSync(join(root, 'Frontend/js/app.js'), 'utf8');
