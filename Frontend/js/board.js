@@ -987,7 +987,8 @@ window.MuroBoard = (function () {
       return;
     }
     if (compact.length < 8) {
-      if (preview) preview.textContent = `Faltan ${8 - compact.length} caracteres.`;
+      const remaining = 8 - compact.length;
+      if (preview) preview.textContent = remaining === 1 ? 'Falta 1 carácter.' : `Faltan ${remaining} caracteres.`;
       return;
     }
     const requestedSecret = field.value.trim();
