@@ -360,17 +360,19 @@ window.MuroBoard = (function () {
       card.className = `wall-card wall-color-${colorClass(wall.color)}`;
       const roleText = wall.role === 'propietario' ? 'Propietario/a' : wall.role === 'comunitario' ? 'Comunitario' : wall.role ? 'Colaborador/a' : 'Sin acceso';
       const canManage = wall.role === 'propietario' && wall.id !== 'general';
+      const canLeave = ['editor', 'lector'].includes(wall.role) && wall.id !== 'general';
 
       card.innerHTML = `
         <div class="wall-card-head">
           <span class="wall-card-badge">${roleText}</span>
-          ${canManage ? `<div class="wall-card-menu">
+          ${canManage || canLeave ? `<div class="wall-card-menu">
             <button class="wall-card-menu-trigger" type="button" aria-label="Opciones de ${escapeHTML(wall.name || 'muro')}" aria-haspopup="menu" aria-expanded="false">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
             </button>
             <div class="wall-card-menu-popover hidden" role="menu">
-              <button type="button" data-wall-action="edit" role="menuitem">Editar</button>
-              <button type="button" data-wall-action="delete" class="danger" role="menuitem">Eliminar</button>
+              ${canManage ? '<button type="button" data-wall-action="edit" role="menuitem">Editar</button>' : ''}
+              ${canManage ? '<button type="button" data-wall-action="delete" class="danger" role="menuitem">Eliminar</button>' : ''}
+              ${canLeave ? '<button type="button" data-wall-action="leave" class="danger" role="menuitem">Dejar de participar</button>' : ''}
             </div>
           </div>` : ''}
         </div>
@@ -401,6 +403,7 @@ window.MuroBoard = (function () {
       });
       menu?.querySelector('[data-wall-action="edit"]')?.addEventListener('click', () => openWallDialog(wall));
       menu?.querySelector('[data-wall-action="delete"]')?.addEventListener('click', () => deleteWallFromDashboard(wall));
+      menu?.querySelector('[data-wall-action="leave"]')?.addEventListener('click', () => leaveWallMembership(wall));
 
       grid.appendChild(card);
     });
@@ -436,6 +439,27 @@ window.MuroBoard = (function () {
       renderWallsList(state.walls);
       toast('Muro eliminado para todas las personas.', 'success');
     });
+  }
+
+  async function leaveWallMembership(wall) {
+    if (!wall || !['editor', 'lector'].includes(wall.role)) return false;
+    const accepted = await window.MuroUI.confirmAction({
+      title: 'Dejar de participar',
+      message: `Dejarás de tener acceso a “${wall.name}”. Para volver necesitarás usar otra invitación.`,
+      confirmText: 'Dejar de participar',
+      tone: 'danger'
+    });
+    if (!accepted) return false;
+    const response = await emitWithTimeout('wall:member:leave', { wallId: wall.id });
+    if (!response?.ok) {
+      toast(response?.error || 'No se pudo abandonar la participación.', 'error');
+      return false;
+    }
+    state.walls = state.walls.filter((item) => item.id !== wall.id);
+    if (state.currentWall?.id === wall.id) showWallsView(true);
+    else renderWallsList(state.walls);
+    toast('Ya no participas en ese muro.', 'success');
+    return true;
   }
 
   function fetchWalls() {
@@ -669,19 +693,7 @@ window.MuroBoard = (function () {
 
   $('#leaveWallBtn')?.addEventListener('click', async () => {
     const wall = state.currentWall;
-    if (!wall || !['editor', 'lector'].includes(wall.role)) return;
-    const accepted = await window.MuroUI.confirmAction({
-      title: 'Dejar de participar',
-      message: `Dejarás de tener acceso a “${wall.name}”. Para volver necesitarás usar otra invitación.`,
-      confirmText: 'Dejar de participar',
-      tone: 'danger'
-    });
-    if (!accepted) return;
-    const response = await emitWithTimeout('wall:member:leave', { wallId: wall.id });
-    if (!response?.ok) return toast(response?.error || 'No se pudo salir del muro.', 'error');
-    state.walls = state.walls.filter((item) => item.id !== wall.id);
-    showWallsView(true);
-    toast('Ya no participas en ese muro.', 'success');
+    await leaveWallMembership(wall);
   });
 
   // Modal Nueva Nota
