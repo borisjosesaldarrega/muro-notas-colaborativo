@@ -211,6 +211,8 @@ test('aísla cambios de sesión, muestra el filtro lila y deja crecer las notas'
   assert.doesNotMatch(board, /Math\.min\(260/);
   assert.match(css, /#appView \.note textarea \{ max-height: none/);
   assert.match(css, /\.settings-toggles input\[type="checkbox"\]/);
+  assert.match(css, /#appView \{[\s\S]*height: 100dvh;[\s\S]*overflow: hidden;/);
+  assert.match(css, /#appView \.board::\-webkit-scrollbar \{ width: 0; height: 0; display: none; \}/);
 });
 
 test('autoriza un único muro comunitario sin transferir su propiedad', () => {
