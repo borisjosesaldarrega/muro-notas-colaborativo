@@ -69,6 +69,13 @@ test('registra, restaura y valida cuentas y roles en el servidor', async () => {
   assert.equal(restore.user.id, first.user.id);
   assert.equal((await ack(restored, 'auth:logout', { token: first.token })).ok, true);
   assert.equal((await ack(await connect(), 'auth:restore', { token: first.token })).ok, false);
+  // La misma credencial se revoco para todas las conexiones que la compartian.
+  assert.equal((await ack(admin, 'walls:list')).ok, false);
+  // La cuenta de otra persona debe conservar su sesion independiente.
+  assert.equal((await ack(member, 'walls:list')).ok, true);
+  // Para las pruebas siguientes, el administrador inicia una sesion nueva.
+  const adminLoginNuevo = await ack(admin, 'auth:login', { email: 'saldavargasboris@gmail.com', password: 'clave12345' });
+  assert.equal(adminLoginNuevo.ok, true);
 });
 
 test('actualiza el correo solo después de verificar la contraseña actual', async () => {
@@ -300,4 +307,35 @@ test('bloquea un IDOR aunque el atacante tenga rol global de superadmin', async 
   assert.equal(deleteAttempt.ok, false);
   assert.match(deleteAttempt.error, /propietaria/);
   assert.equal(server.walls.find((wall) => wall.id === guessedId).name, 'Privado de Brenda');
+});
+
+test('expone solo el muro comunitario y limita cada aporte a su autor', async () => {
+  const owner = clients[0];
+  const community = (await ack(owner, 'wall:create', { name: 'Comunidad de pruebas', description: 'Aportes de todas las cuentas' })).wall;
+  const storedWall = server.walls.find((wall) => wall.id === community.id);
+  storedWall.community = true;
+
+  const visitor = await connect();
+  const registration = await ack(visitor, 'auth:register', { name: 'Visitante Comunidad', email: 'visitante@example.com', password: 'clave-segura-10', passwordConfirmation: 'clave-segura-10' });
+  assert.equal(registration.ok, true);
+  const visibleWalls = await ack(visitor, 'walls:list');
+  assert.equal(visibleWalls.walls.find((wall) => wall.id === community.id)?.role, 'comunitario');
+
+  const selected = await ack(visitor, 'wall:select', { id: community.id });
+  assert.equal(selected.wall.role, 'comunitario');
+  assert.deepEqual(selected.members, [], 'el acceso comunitario no expone la lista privada de miembros');
+  const contribution = await ack(visitor, 'note:create', { texto: 'Mi aporte comunitario', color: 'lila', x: 100, y: 120 });
+  assert.equal(contribution.ok, true);
+  assert.equal((await ack(visitor, 'note:update', { id: contribution.note.id, texto: 'Mi aporte corregido', color: 'lila' })).ok, true);
+
+  await ack(owner, 'wall:select', { id: community.id });
+  assert.equal((await ack(owner, 'wall:update', { id: community.id, name: 'Comunidad de pruebas', description: 'Sigue bajo su propietario' })).ok, true);
+  assert.equal((await ack(visitor, 'wall:delete', { id: community.id })).ok, false);
+
+  const otherVisitor = await connect();
+  await ack(otherVisitor, 'auth:register', { name: 'Otra Visitante', email: 'otra-visitante@example.com', password: 'clave-segura-10', passwordConfirmation: 'clave-segura-10' });
+  await ack(otherVisitor, 'wall:select', { id: community.id });
+  const unauthorizedEdit = await ack(otherVisitor, 'note:update', { id: contribution.note.id, texto: 'No debo cambiarla', color: 'rosa' });
+  assert.equal(unauthorizedEdit.ok, false);
+  assert.match(unauthorizedEdit.error, /tus propias notas/);
 });

@@ -21,7 +21,8 @@ window.MuroBoard = (function () {
     filter: 'all',
     online: 1,
     user: null,
-    currentWall: { id: 'general', name: 'Muro de ideas', role: 'propietario' },
+    currentWall: null,
+    sessionVersion: 0,
     editingWallId: null,
     reportingUserId: null,
     boardScale: window.matchMedia('(max-width: 800px)').matches ? 0.55 : 1
@@ -103,9 +104,18 @@ window.MuroBoard = (function () {
     return '';
   }
 
+  function canCreateNote() {
+    return ['propietario', 'editor', 'comunitario'].includes(state.currentWall?.role);
+  }
+
+  function canModifyNote(note) {
+    const role = state.currentWall?.role;
+    return role === 'propietario' || role === 'editor' || (role === 'comunitario' && note?.authorId === state.user?.id);
+  }
+
   function applyWallPermissions() {
     const role = state.currentWall?.role || 'lector';
-    const canEdit = role === 'propietario' || role === 'editor';
+    const canEdit = canCreateNote();
     const canManage = role === 'propietario';
     const newNote = $('#newNoteButton');
     const invite = $('#inviteButton');
@@ -120,13 +130,30 @@ window.MuroBoard = (function () {
     const sizeClass = noteSizeClass(text);
     const minimum = sizeClass === 'size-sm' ? 46 : sizeClass === 'size-lg' ? 96 : 68;
     textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(260, Math.max(minimum, textarea.scrollHeight))}px`;
+    textarea.style.height = `${Math.max(minimum, textarea.scrollHeight)}px`;
     element.dataset.noteSize = sizeClass || 'medium';
   }
 
   function updateNoteCount() {
     const countSpan = $('#notesStat');
     if (countSpan) countSpan.textContent = state.notes.size;
+  }
+
+  function reset(user = null) {
+    state.sessionVersion += 1;
+    state.user = user;
+    state.walls = [];
+    state.notes.clear();
+    state.currentWall = null;
+    state.editingWallId = null;
+    state.reportingUserId = null;
+    state.filter = 'all';
+    noteSaveTimers.forEach((timer) => window.clearTimeout(timer));
+    noteSaveTimers.clear();
+    if (boardSurface) boardSurface.innerHTML = '';
+    if ($('#wallsGrid')) $('#wallsGrid').innerHTML = '<div class="muted walls-loading">Cargando tus muros…</div>';
+    $$('[data-filter]').forEach((item) => item.classList.toggle('active', item.dataset.filter === 'all'));
+    updateNoteCount();
   }
 
   function timeAgo(timestamp) {
@@ -223,7 +250,7 @@ window.MuroBoard = (function () {
     const sizeClass = noteSizeClass(note.texto);
     element.className = `note ${colorClass(note.color)}${sizeClass ? ` ${sizeClass}` : ''}${state.filter !== 'all' && state.filter !== note.color ? ' filtered' : ''}`;
     const textarea = element.querySelector('textarea');
-    const canEdit = state.currentWall?.role === 'propietario' || state.currentWall?.role === 'editor';
+    const canEdit = canModifyNote(note);
     textarea.readOnly = !canEdit;
     element.querySelector('.note-delete').classList.toggle('hidden', !canEdit);
     element.querySelector('.color-picker-mini').classList.toggle('hidden', !canEdit);
@@ -261,7 +288,7 @@ window.MuroBoard = (function () {
     let lastPreviewAt = 0;
 
     element.addEventListener('pointerdown', (event) => {
-      if (state.currentWall?.role === 'lector') return;
+      if (!canModifyNote(state.notes.get(element.dataset.noteId))) return;
       if (event.target.matches('textarea, button, .dot')) return;
 
       const rect = element.getBoundingClientRect();
@@ -316,7 +343,7 @@ window.MuroBoard = (function () {
      ========================================== */
 
   function renderWallsList(walls) {
-    state.walls = walls || [];
+    state.walls = (walls || []).filter((wall) => Boolean(wall.role) || wall.isPublic === true);
     const grid = $('#wallsGrid');
     if (!grid) return;
     grid.innerHTML = '';
@@ -329,7 +356,7 @@ window.MuroBoard = (function () {
     state.walls.forEach((wall) => {
       const card = document.createElement('article');
       card.className = `wall-card wall-color-${colorClass(wall.color)}`;
-      const roleText = wall.role ? (wall.role === 'propietario' ? 'Propietario/a' : 'Colaborador/a') : 'Público';
+      const roleText = wall.role === 'propietario' ? 'Propietario/a' : wall.role === 'comunitario' ? 'Comunitario' : wall.role ? 'Colaborador/a' : 'Sin acceso';
       const canManage = wall.role === 'propietario' && wall.id !== 'general';
 
       card.innerHTML = `
@@ -410,8 +437,12 @@ window.MuroBoard = (function () {
   }
 
   function fetchWalls() {
+    if (!state.user?.id) return;
+    const requestVersion = state.sessionVersion;
+    const requestUserId = state.user.id;
     if (socket) {
       socket.emit('walls:list', {}, (res) => {
+        if (requestVersion !== state.sessionVersion || state.user?.id !== requestUserId) return;
         if (res && res.ok && Array.isArray(res.walls)) {
           renderWallsList(res.walls);
           const requestedId = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('wall');
@@ -428,6 +459,9 @@ window.MuroBoard = (function () {
   }
 
   function selectWall(wallId, wallName, role = 'propietario') {
+    if (!state.user?.id) return;
+    const requestVersion = state.sessionVersion;
+    const requestUserId = state.user.id;
     state.currentWall = { id: wallId, name: wallName, role };
     window.location.hash = `wall=${wallId}`;
 
@@ -446,6 +480,7 @@ window.MuroBoard = (function () {
 
     if (socket) {
       socket.emit('wall:select', { id: wallId }, (res) => {
+        if (requestVersion !== state.sessionVersion || state.user?.id !== requestUserId || state.currentWall?.id !== wallId) return;
         if (res && res.ok) {
           state.currentWall = {
             id: res.wall.id,
@@ -454,6 +489,7 @@ window.MuroBoard = (function () {
             ownerId: res.wall.ownerId,
             role: res.wall.role,
             color: res.wall.color,
+            community: Boolean(res.wall.community),
             members: res.members || []
           };
           applyWallPermissions();
@@ -462,7 +498,8 @@ window.MuroBoard = (function () {
           }
           toast(`Entraste a la sala: ${res.wall.name}`);
         } else {
-          toast(res?.error || 'No se pudo cargar la sala.');
+          toast(res?.error || 'No se pudo cargar la sala.', 'error');
+          if (requestVersion === state.sessionVersion) showWallsView(false);
         }
       });
     } else {
@@ -907,16 +944,25 @@ window.MuroBoard = (function () {
     const compact = field.value.trim();
     if (/^[a-z0-9]{0,8}$/i.test(compact)) field.value = compact.toUpperCase();
     const preview = $('#acceptInvitationPreview');
-    if (preview) preview.textContent = '';
+    if (preview) { preview.textContent = ''; preview.classList.remove('field-error'); }
     clearTimeout(invitationPreviewTimer);
     if (!compact || !socket) return;
+    if (!/^[a-z0-9]+$/i.test(compact)) {
+      if (preview) { preview.textContent = 'Usa únicamente letras y números.'; preview.classList.add('field-error'); }
+      return;
+    }
+    if (compact.length < 8) {
+      if (preview) preview.textContent = `Faltan ${8 - compact.length} caracteres.`;
+      return;
+    }
     const requestedSecret = field.value.trim();
     invitationPreviewTimer = setTimeout(() => {
       socket.emit('invitation:preview', { secret: requestedSecret }, (res) => {
         if (!preview || field.value.trim() !== requestedSecret) return;
         preview.textContent = res?.ok
           ? `Muro: ${res.invitation.wallName} · Invita: ${res.invitation.invitedBy} · Rol: ${res.invitation.role}`
-          : (res?.error || 'El código no está disponible.');
+          : (res?.error || 'El código no existe, caducó o ya no está disponible.');
+        preview.classList.toggle('field-error', !res?.ok);
       });
     }, 350);
   });
@@ -925,9 +971,17 @@ window.MuroBoard = (function () {
     event.preventDefault();
     if (!socket) return toast('Conexión con el servidor no disponible.');
     const secret = $('#acceptInvitationCode')?.value.trim();
+    const preview = $('#acceptInvitationPreview');
+    if (!/^[A-Z0-9]{8}$/.test(secret || '')) {
+      if (preview) { preview.textContent = 'Escribe el código completo de 8 letras y números.'; preview.classList.add('field-error'); }
+      return;
+    }
     const answer = 'aceptar';
     socket.emit('invitation:answer', { secret, answer }, (res) => {
-      if (!res?.ok) return toast('Sala no encontrada.');
+      if (!res?.ok) {
+        if (preview) { preview.textContent = 'Sala no encontrada. El código puede ser incorrecto o haber caducado.'; preview.classList.add('field-error'); }
+        return toast('Sala no encontrada.', 'error');
+      }
       $('#acceptInvitationForm')?.reset();
       if ($('#acceptInvitationPreview')) $('#acceptInvitationPreview').textContent = '';
       toast(`Te uniste a ${res.wallName}. Código creado por ${res.invitedBy}.`);
@@ -955,12 +1009,28 @@ window.MuroBoard = (function () {
   });
 
   // Botón Volver a Mis Muros (Salir de la sala)
-  $('#backToWallsButton')?.addEventListener('click', () => {
+  function showWallsView(updateAddress = true) {
     socket?.emit('wall:leave', {}, () => {});
+    state.currentWall = null;
+    state.notes.clear();
+    if (boardSurface) boardSurface.innerHTML = '';
     $('#appView')?.classList.add('hidden');
     $('#wallsView')?.classList.remove('hidden');
-    window.location.hash = '';
+    if (updateAddress) history.replaceState(null, '', `${location.pathname}${location.search}`);
     fetchWalls();
+  }
+
+  $('#backToWallsButton')?.addEventListener('click', () => showWallsView(true));
+
+  window.addEventListener('hashchange', () => {
+    if (!state.user) return;
+    const wallId = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('wall');
+    if (!wallId && !$('#appView')?.classList.contains('hidden')) showWallsView(false);
+    else if (wallId && !state.walls.some((wall) => wall.id === wallId)) fetchWalls();
+    else if (wallId && $('#appView')?.classList.contains('hidden')) {
+      const wall = state.walls.find((item) => item.id === wallId);
+      if (wall) selectWall(wall.id, wall.name, wall.role);
+    }
   });
 
   // Filtros de color
@@ -973,8 +1043,13 @@ window.MuroBoard = (function () {
   });
 
   return {
+    resetSession() {
+      reset(null);
+    },
     init(user) {
-      state.user = user;
+      if (!user?.id) return;
+      if (state.user?.id !== user?.id) reset(user);
+      else state.user = user;
       const invitation = new URLSearchParams(window.location.search).get('invitacion');
       if (invitation && socket) socket.emit('invitation:answer', { secret: invitation, answer: 'aceptar' }, (res) => {
         if (res?.ok) { history.replaceState({}, '', window.location.pathname); toast(`Invitación aceptada: ${res.wallName}, de ${res.invitedBy}.`); }
@@ -982,6 +1057,7 @@ window.MuroBoard = (function () {
         fetchWalls();
       }); else fetchWalls();
     },
+    reset,
     selectWall,
     fetchWalls,
     getSocket: () => socket,

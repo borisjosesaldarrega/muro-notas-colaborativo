@@ -75,7 +75,7 @@
       </form>
 
       <!-- 3. VERIFICAR CÓDIGO (PASO 2) -->
-      <form id="verifyForm" class="auth-card hidden">
+      <form id="verifyForm" class="auth-card hidden" novalidate>
         <p id="verifyEyebrow" class="eyebrow">Paso 2 de 3 · Verificación</p>
         <h2 id="verifyTitle">Revisa tu correo</h2>
         <p id="verifyInstruction" class="muted">Ingresa el código de 8 dígitos que enviamos a <strong id="verifyEmailTarget" style="color:var(--ink);">tu correo</strong>.</p>
@@ -91,6 +91,7 @@
           <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="code-digit" required>
         </div>
 
+        <span id="verifyCodeError" class="field-error" aria-live="polite"></span>
         <div class="resend-block">
           <span id="countdownText" class="muted">Reenviar código en <b id="countdownTimer">00:45</b></span>
           <button id="resendCodeBtn" type="button" class="link-button" style="display:none; float:none;">Reenviar código</button>
@@ -153,7 +154,7 @@
         <p class="muted">Selecciona un muro para continuar o crea uno nuevo para tu equipo.</p>
       </div>
       <form id="acceptInvitationForm" class="invitation-accept-bar">
-        <div><strong>¿Recibiste una invitación?</strong><small>Introduce el código de invitación o abre el enlace que recibiste.</small><small id="acceptInvitationPreview" class="muted"></small></div>
+        <div><strong>¿Recibiste una invitación?</strong><small>Introduce el código de invitación o abre el enlace que recibiste.</small><small id="acceptInvitationPreview" class="muted" aria-live="polite"></small></div>
         <input id="acceptInvitationCode" maxlength="128" autocomplete="off" placeholder="Ej. A7K9M2QX" required>
         <button class="btn-join-code" type="submit"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 7a5 5 0 1 0-3.8 4.85L12 13.65V16h2v2h2v2h3v-3.35l-5.2-5.2A5 5 0 0 0 14 7Zm-7 2a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>Unirse</button>
       </form>
@@ -190,6 +191,7 @@
         <button class="swatch pink" data-filter="rosa"></button>
         <button class="swatch blue" data-filter="azul"></button>
         <button class="swatch green" data-filter="verde"></button>
+        <button class="swatch purple" data-filter="lila" title="Filtrar notas lilas"></button>
         </div>
         <div class="board-zoom" aria-label="Zoom del muro">
           <button type="button" data-board-zoom="out" title="Alejar">−</button>
@@ -633,7 +635,7 @@
           <label><input type="radio" name="theme" value="dark"><span><b class="theme-preview dark-preview"></b><strong>Oscuro</strong><small>Fondo oscuro</small></span></label>
         </div>
       </div>
-      <div class="settings-section settings-toggles"><label><input id="settingsConfirmDelete" type="checkbox">Confirmar antes de eliminar</label><label><input id="settingsCompactNotes" type="checkbox">Usar notas compactas</label></div>
+      <div class="settings-section settings-toggles"><label><input id="settingsConfirmDelete" type="checkbox"><span>Confirmar antes de eliminar</span></label><label><input id="settingsCompactNotes" type="checkbox"><span>Usar notas compactas</span></label></div>
       <div class="dialog-actions"><button id="cancelAccountSettings" type="button" class="secondary-button">Cerrar</button><button type="submit" class="primary-button">Guardar</button></div>
       </div>
     </form>
@@ -648,7 +650,7 @@
   </dialog>
 
   <dialog id="passwordDialog" class="account-action-dialog">
-    <form id="passwordForm"><div class="dialog-head"><div><p class="eyebrow">Seguridad</p><h3>Cambiar contraseña</h3></div><button class="close-button" type="button" data-close-dialog="passwordDialog">&times;</button></div><label>Contraseña actual<input id="passwordCurrent" type="password" autocomplete="current-password" required></label><label>Nueva contraseña<input id="passwordNew" type="password" minlength="10" autocomplete="new-password" required></label><label>Repetir nueva contraseña<input id="passwordConfirm" type="password" minlength="10" autocomplete="new-password" required></label><div class="dialog-actions"><button type="button" class="secondary-button" data-close-dialog="passwordDialog">Cancelar</button><button type="submit" class="primary-button">Cambiar contraseña</button></div></form>
+    <form id="passwordForm" novalidate><div class="dialog-head"><div><p class="eyebrow">Seguridad</p><h3>Cambiar contraseña</h3></div><button class="close-button" type="button" data-close-dialog="passwordDialog">&times;</button></div><label>Contraseña actual<input id="passwordCurrent" type="password" autocomplete="current-password" required><span id="passwordCurrentError" class="field-error"></span></label><label>Nueva contraseña<input id="passwordNew" type="password" minlength="10" autocomplete="new-password" required><span id="passwordNewError" class="field-error"></span></label><label>Repetir nueva contraseña<input id="passwordConfirm" type="password" minlength="10" autocomplete="new-password" required><span id="passwordConfirmError" class="field-error"></span></label><div class="dialog-actions"><button type="button" class="secondary-button" data-close-dialog="passwordDialog">Cancelar</button><button type="submit" class="primary-button">Cambiar contraseña</button></div></form>
   </dialog>
 
   <div id="toast" class="toast" role="status"></div>

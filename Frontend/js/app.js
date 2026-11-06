@@ -108,6 +108,10 @@
   let activeVerifiedExpiresAt = 0;
   let recoveryToken = '';
   let currentUser = null;
+  let authGeneration = 0;
+  let restoreInFlight = false;
+  let logoutPending = false;
+  const sameIdentity = (user) => Boolean(user?.id && currentUser?.id === user.id);
   let themeSaveSequence = 0;
   let cachedAdminUsers = [];
   let cachedAdminReports = [];
@@ -155,12 +159,17 @@
   }
 
   function storeSessionTokens(token = '', refreshToken = '', expiresAt = 0) {
+    if (logoutPending) return;
     if (token) localStorage.setItem(TOKEN_KEY, token);
     if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
     if (expiresAt) localStorage.setItem(EXPIRES_AT_KEY, String(expiresAt));
   }
 
   function enterApp(user, token = '', refreshToken = '', expiresAt = 0) {
+    if (!user?.id) return;
+    authGeneration += 1;
+    restoreInFlight = false;
+    if (!sameIdentity(user)) window.MuroBoard?.resetSession?.();
     currentUser = user;
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
     storeSessionTokens(token, refreshToken, expiresAt);
@@ -240,13 +249,17 @@
     const socket = window.MuroBoard?.getSocket();
     if (!socket) return toast('Conectando con el servidor...');
     setFormBusy(form, true, 'Ingresando…');
+    const requestGeneration = ++authGeneration;
     const res = await emitAsync(socket, 'auth:login', { email, password });
     setFormBusy(form, false);
+    if (requestGeneration !== authGeneration) return;
     if (res?.ok) {
       enterApp(res.user, res.token, res.refreshToken, res.expiresAt);
       toast(`¡Hola, ${res.user.name}!`);
     } else {
-      toast(res?.error || 'Correo o contraseña incorrectos.');
+      const message = res?.error || 'No pudimos iniciar sesión. Revisa tu correo y contraseña.';
+      setFieldError('loginPassword', message);
+      toast(message, 'error');
     }
   });
 
@@ -327,6 +340,7 @@
   const digitInputs = $$('.code-digit');
   digitInputs.forEach((input, index) => {
     input.addEventListener('input', (e) => {
+      if ($('#verifyCodeError')) $('#verifyCodeError').textContent = '';
       const val = e.target.value.replace(/[^0-9]/g, '');
       e.target.value = val ? val[val.length - 1] : '';
 
@@ -395,6 +409,7 @@
     button.textContent = 'Reenviar nuevo código';
     if (!res?.ok) return toast(res?.error || 'No se pudo reenviar el código.');
     digitInputs.forEach((input) => { input.value = ''; });
+    if ($('#verifyCodeError')) $('#verifyCodeError').textContent = '';
     startResendCountdown(60);
     toast('Enviamos un nuevo código de 8 dígitos a tu correo.');
   });
@@ -412,12 +427,15 @@
     }
 
     const enteredCode = Array.from(digitInputs).map((inp) => inp.value).join('');
+    if ($('#verifyCodeError')) $('#verifyCodeError').textContent = '';
     if (!/^\d{8}$/.test(enteredCode)) {
       digitInputs.forEach((input) => {
         input.classList.add('error');
         setTimeout(() => input.classList.remove('error'), 400);
       });
-      return toast('Ingresa los 8 dígitos del código.');
+      if ($('#verifyCodeError')) $('#verifyCodeError').textContent = 'Completa los 8 dígitos antes de continuar.';
+      Array.from(digitInputs).find((input) => !input.value)?.focus();
+      return toast('Ingresa los 8 dígitos del código.', 'error');
     }
     const socket = window.MuroBoard?.getSocket();
     if (!socket) return toast('No hay conexión con el servidor. Inténtalo nuevamente.');
@@ -430,7 +448,8 @@
         input.classList.add('error');
         setTimeout(() => input.classList.remove('error'), 400);
       });
-      return toast(res?.error || 'El código es incorrecto o caducó.');
+      if ($('#verifyCodeError')) $('#verifyCodeError').textContent = res?.error || 'El código es incorrecto, caducó o ya fue utilizado.';
+      return toast(res?.error || 'El código es incorrecto o caducó.', 'error');
     }
     if (verificationType === 'recovery') {
       recoveryToken = res.token || '';
@@ -453,6 +472,7 @@
   // Botón para entrar tras confirmación (PASO 3)
   $('#enterAfterConfirmBtn')?.addEventListener('click', () => {
     if (activeVerifiedUser) {
+      authGeneration += 1;
       enterApp(activeVerifiedUser, activeVerifiedToken, activeVerifiedRefreshToken, activeVerifiedExpiresAt);
       toast(`¡Hola, ${activeVerifiedUser.name}!`);
     } else {
@@ -901,7 +921,7 @@
   $$('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => $(`#${button.dataset.closeDialog}`)?.close()));
   $('#openUsernameChange')?.addEventListener('click', () => { $('#newUsername').value = currentUser?.name || ''; $('#usernameDialog')?.showModal(); });
   $('#openEmailChange')?.addEventListener('click', () => { $('#newEmail').value = currentUser?.email || ''; $('#emailCurrentPassword').value = ''; $('#emailDialog')?.showModal(); });
-  $('#openPasswordChange')?.addEventListener('click', () => { $('#passwordForm')?.reset(); $('#passwordDialog')?.showModal(); });
+  $('#openPasswordChange')?.addEventListener('click', () => { $('#passwordForm')?.reset(); clearFieldErrors('password'); $('#passwordDialog')?.showModal(); });
 
   $('#usernameForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -937,12 +957,22 @@
 
   $('#passwordForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    clearFieldErrors('password');
     const currentPassword = $('#passwordCurrent').value;
     const newPassword = $('#passwordNew').value;
-    if (newPassword.length < 10) return toast('La nueva contraseña debe tener al menos 10 caracteres.', 'error');
-    if (newPassword !== $('#passwordConfirm').value) return toast('Las contraseñas nuevas no coinciden.', 'error');
+    if (newPassword.length < 10) {
+      setFieldError('passwordNew', 'La nueva contraseña debe tener al menos 10 caracteres.');
+      return toast('Revisa la nueva contraseña.', 'error');
+    }
+    if (newPassword !== $('#passwordConfirm').value) {
+      setFieldError('passwordConfirm', 'Las contraseñas nuevas no coinciden.');
+      return toast('Las contraseñas nuevas no coinciden.', 'error');
+    }
     const result = await emitAsync(window.MuroBoard?.getSocket(), 'auth:password', { currentPassword, newPassword });
-    if (!result?.ok) return toast(result?.error || 'No se pudo cambiar la contraseña.', 'error');
+    if (!result?.ok) {
+      setFieldError('passwordCurrent', result?.error || 'La contraseña actual es incorrecta.');
+      return toast(result?.error || 'No se pudo cambiar la contraseña.', 'error');
+    }
     $('#passwordDialog').close();
     toast('Contraseña actualizada.', 'success');
   });
@@ -987,22 +1017,30 @@
 
   $('#closePanel')?.addEventListener('click', () => $('#sidePanel')?.classList.remove('open'));
   $('#logoutButton')?.addEventListener('click', async () => {
+    if (logoutPending) return;
+    logoutPending = true;
     const socket = window.MuroBoard?.getSocket();
     const button = $('#logoutButton');
     if (button) { button.disabled = true; button.classList.add('is-loading'); }
-    const result = socket ? await emitAsync(socket, 'auth:logout', { token: localStorage.getItem(TOKEN_KEY) || '' }) : { ok: true };
-    if (!result?.ok) {
-      if (button) { button.disabled = false; button.classList.remove('is-loading'); }
-      return toast(result?.error || 'No se pudo cerrar la sesión. Inténtalo nuevamente.', 'error');
-    }
+    // La invalidación local debe suceder ANTES de esperar la red.
+    authGeneration += 1;
+    restoreInFlight = false;
     clearStoredSession();
     currentUser = null;
+    window.MuroBoard?.resetSession?.();
     document.body.classList.remove('compact-notes');
     history.replaceState(null, '', `${location.pathname}${location.search}`);
     $('#sidePanel')?.classList.remove('open');
     showAuth('login');
+    const result = socket ? await emitAsync(socket, 'auth:logout', {}) : { ok: false };
+    // Ningún evento retrasado puede repoblar el almacenamiento.
+    clearStoredSession();
+    if (!result?.ok) {
+      socket?.disconnect?.();
+      toast('Sesión local cerrada. No se confirmó la salida del servidor; abre una pestaña nueva para entrar.', 'error');
+    } else toast('Sesión cerrada.');
     if (button) { button.disabled = false; button.classList.remove('is-loading'); }
-    toast('Sesión cerrada.');
+    logoutPending = false;
   });
 
   // Escuchar cambios en snapshot de administrador en tiempo real desde el Backend
@@ -1015,22 +1053,39 @@
       }
     });
     boardSocket.on('auth:token-refreshed', (session = {}) => {
+      if (logoutPending || !currentUser?.id || session.userId !== currentUser.id) return;
       storeSessionTokens(session.token, session.refreshToken, session.expiresAt);
     });
     boardSocket.on('auth:expired', () => {
+      if (logoutPending || !currentUser?.id) return;
+      authGeneration += 1;
       clearStoredSession();
       currentUser = null;
+      window.MuroBoard?.resetSession?.();
+      history.replaceState(null, '', `${location.pathname}${location.search}`);
       showAuth('login');
       toast('Tu sesión venció. Inicia sesión nuevamente.', 'error');
     });
     boardSocket.on('connect', () => {
-      if (!currentUser) return;
+      if (logoutPending || !currentUser || restoreInFlight) return;
+      restoreInFlight = true;
+      const requestGeneration = authGeneration;
+      const expectedUserId = currentUser.id;
       const token = localStorage.getItem(TOKEN_KEY) || '';
       const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY) || '';
       const wallId = window.MuroBoard?.getState()?.currentWall?.id;
       const wallWasOpen = !$('#appView')?.classList.contains('hidden');
       boardSocket.emit('auth:restore', { token, refreshToken }, (res) => {
-        if (!res?.ok) return;
+        restoreInFlight = false;
+        if (logoutPending || requestGeneration !== authGeneration) return;
+        if (!res?.ok || res.user?.id !== expectedUserId) {
+          clearStoredSession();
+          currentUser = null;
+          window.MuroBoard?.resetSession?.();
+          history.replaceState(null, '', `${location.pathname}${location.search}`);
+          showAuth('login');
+          return toast(res?.error || 'Tu sesión venció. Inicia sesión nuevamente.', 'error');
+        }
         currentUser = res.user;
         localStorage.setItem(SESSION_KEY, JSON.stringify(res.user));
         storeSessionTokens(res.token, res.refreshToken, res.expiresAt);
@@ -1048,10 +1103,13 @@
   const savedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY) || sessionStorage.getItem(REFRESH_TOKEN_KEY) || '';
   const sessionSocket = window.MuroBoard?.getSocket();
   if (sessionSocket) {
+    const requestGeneration = authGeneration;
     sessionSocket.emit('auth:restore', { token: savedToken, refreshToken: savedRefreshToken }, (res) => {
-      if (res?.ok) enterApp(res.user, res.token, res.refreshToken, res.expiresAt);
+      if (logoutPending || requestGeneration !== authGeneration) return;
+      if (res?.ok && res.user?.id) enterApp(res.user, res.token, res.refreshToken, res.expiresAt);
       else {
         clearStoredSession();
+        window.MuroBoard?.resetSession?.();
         showAuth('login');
         if (savedToken) toast(res?.error || 'La sesión expiró.');
       }

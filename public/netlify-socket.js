@@ -4,7 +4,7 @@
   const dateValue = (value) => value ? Date.parse(value) : Date.now();
   const sessionValue = (session) => ({ token: session?.access_token || '', refreshToken: session?.refresh_token || '', expiresAt: Number(session?.expires_at || 0) * 1000 });
   const noteValue = (row) => ({ id: row.id, titulo: row.titulo, texto: row.contenido, color: row.color, x: Number(row.posicion_x), y: Number(row.posicion_y), autor: row.nombre_autor, authorId: row.autor_id, editor: row.nombre_editor || '', editorId: row.editado_por_id || null, updatedAt: dateValue(row.actualizado_en) });
-  const wallValue = (row) => ({ id: row.id, name: row.nombre, description: row.descripcion || '', color: row.color || 'amarillo', ownerId: row.propietario_id, updatedAt: dateValue(row.actualizado_en) });
+  const wallValue = (row) => ({ id: row.id, name: row.nombre, description: row.descripcion || '', color: row.color || 'amarillo', ownerId: row.propietario_id, community: Boolean(row.es_comunitario), updatedAt: dateValue(row.actualizado_en) });
   const settingsValue = (row = {}) => ({ theme: row.tema || 'light', confirmDelete: row.confirmar_eliminacion ?? true, compactNotes: row.notas_compactas ?? false, notifications: row.notificaciones ?? true });
   const profileValue = (row, settings) => ({ id: row.id, name: row.nombre, email: row.correo, role: row.rol, avatar: row.avatar || '', createdAt: dateValue(row.creado_en), settings: settingsValue(settings) });
   const sha256 = async (value) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value))))).map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -142,9 +142,11 @@
         this.client.from('muro_salas').select('*').eq('id', id).single(), this.client.rpc('muro_rol_en_sala', { sala_objetivo: id }),
         this.client.from('muro_notas').select('*').eq('sala_id', id).order('creado_en'), this.wallMembers(id)
       ]);
-      if (wallError) throw wallError; if (roleError) throw roleError; if (notesError) throw notesError; if (!role) throw new Error('No eres miembro de este muro.');
+      if (wallError) throw wallError; if (roleError) throw roleError; if (notesError) throw notesError;
+      const effectiveRole = role || (wall.es_comunitario ? 'comunitario' : null);
+      if (!effectiveRole) throw new Error('No eres miembro de este muro.');
       this.currentWallId = id; await this.installRealtime(id);
-      return { wall: { ...wallValue(wall), role }, members, notes: (notes || []).map(noteValue) };
+      return { wall: { ...wallValue(wall), role: effectiveRole }, members: role ? members : [], notes: (notes || []).map(noteValue) };
     }
     async dispatch(event, payload) {
       switch (event) {
@@ -178,7 +180,7 @@
             this.client.from('muro_salas').select('*').order('actualizado_en', { ascending: false }), this.client.from('muro_sala_miembros').select('sala_id,usuario_id,rol'), this.client.from('muro_notas').select('id,sala_id')
           ]);
           if (wallsError) throw wallsError; if (membersError) throw membersError; if (notesError) throw notesError;
-          return { ok: true, walls: (walls || []).map((wall) => ({ ...wallValue(wall), role: memberships.find((item) => item.sala_id === wall.id && item.usuario_id === user.id)?.rol, notesCount: notes.filter((note) => note.sala_id === wall.id).length, membersCount: memberships.filter((member) => member.sala_id === wall.id).length })) };
+          return { ok: true, walls: (walls || []).map((wall) => ({ ...wallValue(wall), role: memberships.find((item) => item.sala_id === wall.id && item.usuario_id === user.id)?.rol || (wall.es_comunitario ? 'comunitario' : undefined), notesCount: notes.filter((note) => note.sala_id === wall.id).length, membersCount: memberships.filter((member) => member.sala_id === wall.id).length })) };
         }
         case 'wall:select': { const result = await this.selectWall(payload.id); return { ok: true, ...result }; }
         case 'wall:create': { await this.identity(); const { data: id, error } = await this.client.rpc('muro_crear_sala', { nombre_nuevo: payload.name.trim(), descripcion_nueva: payload.description?.trim() || '', color_nuevo: payload.color || 'amarillo' }); if (error) throw error; return { ok: true, id }; }

@@ -174,8 +174,11 @@ function createMuroServer(options = {}) {
   const findWall = (id) => walls.find((wall) => wall.id === cleanText(id, 100));
   // El rol global administra la plataforma, pero no concede acceso implícito al
   // contenido privado de los muros. La membresía siempre se comprueba por muro.
-  const wallRole = (wall, user) => wall?.members[user?.id];
+  const membershipRole = (wall, user) => wall?.members[user?.id];
+  const wallRole = (wall, user) => membershipRole(wall, user) || (wall?.community && user ? 'comunitario' : undefined);
   const canEdit = (wall, user) => ['propietario', 'editor'].includes(wallRole(wall, user));
+  const canCreateNote = (wall, user) => canEdit(wall, user) || wallRole(wall, user) === 'comunitario';
+  const canModifyNote = (wall, user, note) => canEdit(wall, user) || (wallRole(wall, user) === 'comunitario' && note?.authorId === user?.id);
   const canOwn = (wall, user) => wallRole(wall, user) === 'propietario';
   const requireUser = (socket, acknowledge) => {
     const user = findUser(socket);
@@ -195,6 +198,7 @@ function createMuroServer(options = {}) {
     name: wall.name,
     description: wall.description,
     color: wall.color || 'amarillo',
+    community: Boolean(wall.community),
     ownerId: wall.ownerId,
     role: wallRole(wall, user),
     notesCount: wall.notes.length,
@@ -211,7 +215,7 @@ function createMuroServer(options = {}) {
   };
   const emitWallDeletionToMembers = (wall) => {
     for (const client of io.sockets.sockets.values()) {
-      if (client.data.userId && wall.members[client.data.userId]) client.emit('wall:deleted', wall.id);
+      if (client.data.userId && (wall.community || wall.members[client.data.userId])) client.emit('wall:deleted', wall.id);
     }
   };
   const invitationView = (invitation, user) => ({
@@ -238,9 +242,10 @@ function createMuroServer(options = {}) {
   function establishSession(socket, user, suppliedSession = null) {
     const session = typeof suppliedSession === 'string' ? { token: suppliedSession } : (suppliedSession || {});
     const token = session.token || crypto.randomUUID();
+    if (socket.data.userId && socket.data.userId !== user.id) leaveCurrentWall(socket);
     sessions.set(token, user.id);
     socket.data.userId = user.id;
-    socket.data.accessToken = session.token || '';
+    socket.data.accessToken = token;
     socket.data.refreshToken = session.refreshToken || '';
     socket.data.expiresAt = Number(session.expiresAt || 0);
     return { token, refreshToken: session.refreshToken || '', expiresAt: socket.data.expiresAt, user: publicUser(user) };
@@ -250,13 +255,25 @@ function createMuroServer(options = {}) {
     if (!storage.schemaReady || !socket.data.userId || !socket.data.refreshToken) return;
     if (socket.data.expiresAt && socket.data.expiresAt > Date.now() + 60_000) return;
     const previousToken = socket.data.accessToken;
-    const refreshed = await store.refreshSession(socket.data.refreshToken);
+    const previousRefreshToken = socket.data.refreshToken;
+    const previousUserId = socket.data.userId;
+    const previousEpoch = socket.data.authEpoch || 0;
+    let refreshed;
+    try { refreshed = await store.refreshSession(previousRefreshToken); }
+    catch (error) {
+      // Una renovación de la cuenta anterior no puede invalidar la cuenta nueva.
+      if ((socket.data.authEpoch || 0) !== previousEpoch || socket.data.userId !== previousUserId || socket.data.refreshToken !== previousRefreshToken) return;
+      throw error;
+    }
+    if ((socket.data.authEpoch || 0) !== previousEpoch || socket.data.userId !== previousUserId || socket.data.refreshToken !== previousRefreshToken) return;
+    if (refreshed.user?.id !== previousUserId) throw new Error('auth_identity_mismatch');
     if (previousToken) sessions.delete(previousToken);
     sessions.set(refreshed.token, refreshed.user.id);
     socket.data.accessToken = refreshed.token;
     socket.data.refreshToken = refreshed.refreshToken;
     socket.data.expiresAt = refreshed.expiresAt;
     socket.emit('auth:token-refreshed', {
+      userId: previousUserId,
       token: refreshed.token,
       refreshToken: refreshed.refreshToken,
       expiresAt: refreshed.expiresAt
@@ -299,12 +316,15 @@ function createMuroServer(options = {}) {
   }
 
   io.on('connection', (socket) => {
-    socket.use(async (_packet, next) => {
+    socket.data.authEpoch = 0;
+    socket.use(async (packet, next) => {
       try {
         await ready;
-        await refreshSocketSession(socket);
+        if (!['auth:logout', 'auth:login', 'auth:restore'].includes(packet[0])) await refreshSocketSession(socket);
         next();
       } catch {
+        socket.data.authEpoch += 1;
+        leaveCurrentWall(socket);
         socket.data.userId = null;
         socket.data.accessToken = '';
         socket.data.refreshToken = '';
@@ -328,7 +348,7 @@ function createMuroServer(options = {}) {
       if (users.some((user) => user.email === email)) return fail(acknowledge, 'Ese correo ya está registrado.');
       if (storage.schemaReady) {
         try {
-          const result = await store.register({ name, email, password, redirectTo: process.env.APP_URL || 'http://localhost:3000' });
+          const result = await store.register({ name, email, password, redirectTo: process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000') });
           return acknowledge({ ok: true, ...result });
         } catch (error) {
           if (/confirmation_disabled/i.test(String(error?.message))) return fail(acknowledge, 'La confirmación por correo no está disponible. Inténtalo más tarde.');
@@ -383,9 +403,9 @@ function createMuroServer(options = {}) {
       if (!storage.schemaReady) return fail(acknowledge, 'El reenvío no está disponible en este entorno.');
       try {
         if (payload.type === 'recovery') {
-          await store.recover(email, process.env.APP_URL || 'http://localhost:3000');
+          await store.recover(email, process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000'));
         } else {
-          await store.resendSignup(email, process.env.APP_URL || 'http://localhost:3000');
+          await store.resendSignup(email, process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000'));
         }
         return acknowledge({ ok: true });
       } catch (error) {
@@ -395,10 +415,12 @@ function createMuroServer(options = {}) {
     });
 
     socket.on('auth:login', async (payload = {}, acknowledge = () => {}) => {
+      const authEpoch = ++socket.data.authEpoch;
       const email = validEmail(payload.email);
       if (storage.schemaReady) {
         try {
           const session = await store.login({ email, password: String(payload.password ?? '') });
+          if (socket.data.authEpoch !== authEpoch) return fail(acknowledge, 'La solicitud fue cancelada.');
           const index = users.findIndex((item) => item.id === session.user.id);
           if (index >= 0) users[index] = session.user; else users.push(session.user);
           return acknowledge({ ok: true, ...establishSession(socket, session.user, session) });
@@ -408,15 +430,27 @@ function createMuroServer(options = {}) {
         }
       }
       const user = users.find((item) => item.email === email && item.password === String(payload.password ?? ''));
+      if (socket.data.authEpoch !== authEpoch) return fail(acknowledge, 'La solicitud fue cancelada.');
       if (!user) return fail(acknowledge, 'Correo o contraseña incorrectos.');
       return acknowledge({ ok: true, ...establishSession(socket, user) });
     });
 
     socket.on('auth:restore', async (payload = {}, acknowledge = () => {}) => {
+      const authEpoch = ++socket.data.authEpoch;
       const token = cleanText(payload.token, 4096);
+      const refreshToken = cleanText(payload.refreshToken, 4096);
+      if (!token && !refreshToken) {
+        leaveCurrentWall(socket);
+        socket.data.userId = null;
+        socket.data.accessToken = '';
+        socket.data.refreshToken = '';
+        socket.data.expiresAt = 0;
+        return fail(acknowledge, 'Inicia sesión para continuar.');
+      }
       if (storage.schemaReady) {
         try {
-          const session = await store.restore(token, cleanText(payload.refreshToken, 4096));
+          const session = await store.restore(token, refreshToken);
+          if (socket.data.authEpoch !== authEpoch) return fail(acknowledge, 'La solicitud fue cancelada.');
           const index = users.findIndex((item) => item.id === session.user.id);
           if (index >= 0) users[index] = session.user; else users.push(session.user);
           return acknowledge({ ok: true, ...establishSession(socket, session.user, session) });
@@ -426,25 +460,47 @@ function createMuroServer(options = {}) {
         }
       }
       const user = users.find((item) => item.id === sessions.get(token));
+      if (socket.data.authEpoch !== authEpoch) return fail(acknowledge, 'La solicitud fue cancelada.');
       if (!user) return fail(acknowledge, 'La sesión expiró al reiniciarse el servidor.');
       socket.data.userId = user.id;
+      socket.data.accessToken = token;
       return acknowledge({ ok: true, token, user: publicUser(user) });
     });
 
-    socket.on('auth:logout', (payload = {}, acknowledge = () => {}) => {
-      sessions.delete(cleanText(payload.token, 4096));
+    socket.on('auth:logout', async (_payload = {}, acknowledge = () => {}) => {
+      // Nunca aceptar un token provisto por el navegador para revocar a otro usuario.
+      const token = socket.data.accessToken || '';
+      const userId = socket.data.userId;
+      ++socket.data.authEpoch;
+      if (token) sessions.delete(token);
+      // Revocar también sockets de otras pestañas que comparten ESTE JWT.
+      // No tocar sockets de otras cuentas ni de otras sesiones.
+      for (const client of io.sockets.sockets.values()) {
+        if (client === socket || !token || client.data.accessToken !== token) continue;
+        client.data.authEpoch = (client.data.authEpoch || 0) + 1;
+        leaveCurrentWall(client);
+        client.data.userId = null;
+        client.data.accessToken = '';
+        client.data.refreshToken = '';
+        client.data.expiresAt = 0;
+        client.emit('auth:expired');
+      }
       leaveCurrentWall(socket);
       socket.data.userId = null;
       socket.data.accessToken = '';
       socket.data.refreshToken = '';
       socket.data.expiresAt = 0;
+      if (storage.schemaReady && userId && token) {
+        try { await store.logout(token); }
+        catch { return fail(acknowledge, 'Se cerró la sesión local, pero no se confirmó su revocación.'); }
+      }
       acknowledge({ ok: true });
     });
 
     socket.on('auth:recover', async (payload = {}, acknowledge = () => {}) => {
       const email = validEmail(payload.email);
       if (storage.schemaReady && email) {
-        try { await store.recover(email, process.env.APP_URL || 'http://localhost:3000'); } catch { /* respuesta uniforme para no filtrar cuentas */ }
+        try { await store.recover(email, process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000')); } catch { /* respuesta uniforme para no filtrar cuentas */ }
       }
       acknowledge({ ok: true, message: 'Si la cuenta existe, se envió un código de 8 dígitos.' });
     });
@@ -603,7 +659,7 @@ function createMuroServer(options = {}) {
       if (!user || !wall) return user && fail(acknowledge, 'El muro no existe.');
       if (!wallRole(wall, user)) return fail(acknowledge, 'No tienes acceso a este muro.');
       joinWall(socket, wall);
-      acknowledge({ ok: true, wall: wallSummary(wall, user), notes: wall.notes, members: wallMembers(wall) });
+      acknowledge({ ok: true, wall: wallSummary(wall, user), notes: wall.notes, members: membershipRole(wall, user) ? wallMembers(wall) : [] });
     });
 
     socket.on('wall:leave', (_payload = {}, acknowledge = () => {}) => {
@@ -662,7 +718,7 @@ function createMuroServer(options = {}) {
         } catch { return fail(acknowledge, 'No se pudo crear la invitación.'); }
       }
       invitations.push(invitation);
-      const link = `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}`;
+      const link = `${process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000')}/?invitacion=${encodeURIComponent(secrets.token)}`;
       acknowledge({ ok: true, invitation: invitationView(invitation, user), code: secrets.code, link, members: wallMembers(wall) });
     });
 
@@ -729,12 +785,12 @@ function createMuroServer(options = {}) {
       if (storage.schemaReady) {
         try {
           const saved = await store.resendInvitation({ id: payload.id, ...secrets }, socket.data.accessToken);
-          return acknowledge({ ok: true, invitation: saved, code: secrets.code, link: `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}` });
+          return acknowledge({ ok: true, invitation: saved, code: secrets.code, link: `${process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000')}/?invitacion=${encodeURIComponent(secrets.token)}` });
         } catch { return fail(acknowledge, 'La invitación no se puede reenviar.'); }
       }
       const invitation = invitations.find((item) => item.id === payload.id && item.invitedBy === user.id && !['aceptada', 'cancelada'].includes(item.status));
       if (!invitation) return fail(acknowledge, 'La invitación no se puede reenviar.'); Object.assign(invitation, secrets, { status: 'pendiente' });
-      acknowledge({ ok: true, invitation: invitationView(invitation, user), code: secrets.code, link: `${process.env.APP_URL || 'http://localhost:3000'}/?invitacion=${encodeURIComponent(secrets.token)}` });
+      acknowledge({ ok: true, invitation: invitationView(invitation, user), code: secrets.code, link: `${process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://muro-colaborativo.onrender.com' : 'http://localhost:3000')}/?invitacion=${encodeURIComponent(secrets.token)}` });
     });
 
     socket.on('wall:member:update', async (payload = {}, acknowledge = () => {}) => {
@@ -772,7 +828,7 @@ function createMuroServer(options = {}) {
       const user = requireUser(socket, acknowledge);
       const wall = findWall(socket.data.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'Selecciona un muro.');
-      if (!canEdit(wall, user)) return fail(acknowledge, 'Tu permiso es de solo lectura.');
+      if (!canCreateNote(wall, user)) return fail(acknowledge, 'Tu permiso es de solo lectura.');
       const texto = cleanText(payload.texto);
       if (!texto) return fail(acknowledge, 'La nota no puede estar vacía.');
       if (!COLORS.has(payload.color)) return fail(acknowledge, 'Selecciona un color válido.');
@@ -799,9 +855,9 @@ function createMuroServer(options = {}) {
       const user = requireUser(socket, acknowledge);
       const wall = findWall(socket.data.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'Selecciona un muro.');
-      if (!canEdit(wall, user)) return fail(acknowledge, 'Tu permiso es de solo lectura.');
       const note = wall.notes.find((item) => item.id === cleanText(payload.id, 100));
       if (!note) return fail(acknowledge, 'La nota ya no existe.');
+      if (!canModifyNote(wall, user, note)) return fail(acknowledge, 'Solo puedes editar tus propias notas en el muro comunitario.');
       const texto = cleanText(payload.texto);
       if (!texto) return fail(acknowledge, 'La nota no puede estar vacía.');
       if (payload.color !== undefined && !COLORS.has(payload.color)) return fail(acknowledge, 'El color no es válido.');
@@ -825,9 +881,9 @@ function createMuroServer(options = {}) {
       const user = requireUser(socket, acknowledge);
       const wall = findWall(socket.data.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'Selecciona un muro.');
-      if (!canEdit(wall, user)) return fail(acknowledge, 'Tu permiso es de solo lectura.');
       const note = wall.notes.find((item) => item.id === cleanText(payload.id, 100));
       if (!note) return fail(acknowledge, 'La nota ya no existe.');
+      if (!canModifyNote(wall, user, note)) return fail(acknowledge, 'Solo puedes mover tus propias notas en el muro comunitario.');
       const nextNote = { ...note, x: safeCoordinate(payload.x, note.x), y: safeCoordinate(payload.y, note.y), updatedAt: Date.now() };
       if (storage.schemaReady) {
         try { await store.updateNote(wall.id, nextNote, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo mover la nota. Inténtalo nuevamente.'); }
@@ -840,9 +896,9 @@ function createMuroServer(options = {}) {
     socket.on('note:preview-move', (payload = {}) => {
       const user = findUser(socket);
       const wall = findWall(socket.data.wallId);
-      if (!user || !wall || !canEdit(wall, user)) return;
+      if (!user || !wall) return;
       const note = wall.notes.find((item) => item.id === cleanText(payload.id, 100));
-      if (!note) return;
+      if (!note || !canModifyNote(wall, user, note)) return;
       socket.to(`wall:${wall.id}`).volatile.emit('note:preview-moved', {
         wallId: wall.id,
         id: note.id,
@@ -855,10 +911,10 @@ function createMuroServer(options = {}) {
       const user = requireUser(socket, acknowledge);
       const wall = findWall(socket.data.wallId);
       if (!user || !wall) return user && fail(acknowledge, 'Selecciona un muro.');
-      if (!canEdit(wall, user)) return fail(acknowledge, 'Tu permiso es de solo lectura.');
       const id = cleanText(payload.id, 100);
       const index = wall.notes.findIndex((item) => item.id === id);
       if (index === -1) return fail(acknowledge, 'La nota ya no existe.');
+      if (!canModifyNote(wall, user, wall.notes[index])) return fail(acknowledge, 'Solo puedes eliminar tus propias notas en el muro comunitario.');
       if (storage.schemaReady) {
         try { await store.deleteNote(id, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo eliminar la nota. Inténtalo nuevamente.'); }
       }
