@@ -1517,10 +1517,14 @@ dialog form { background: linear-gradient(180deg, #fff, #fdfcff); }
   .board-brand .brand-mark { width: 38px; height: 38px; }
   #appView .board-actions { gap: 7px; }
   .board-action { min-width: 0; height: 40px; padding: 0 12px; border-radius: 12px; }
-  .back-action, .leave-action { padding-inline: 10px; font-size: .72rem; }
+  .back-action { width: 68px; padding: 0; font-size: 0; }
+  .back-action::before { content: '← Inicio'; font-size: .7rem; }
+  .leave-action { width: 82px; padding: 0; font-size: 0; }
+  .leave-action::before { content: 'Abandonar'; font-size: .68rem; }
   .share-action { font-size: 0; width: 42px; padding: 0; }
   .share-action::before { content: '↗'; font-size: 1.05rem; }
-  .new-note-action { font-size: .75rem; }
+  .new-note-action { width: 42px; padding: 0; font-size: 0; }
+  .new-note-action::before { content: '+'; font-size: 1.1rem; }
   #appView .avatar { width: 38px; height: 38px; flex-basis: 38px; }
   #appView .board-toolbar { min-height: 134px; padding: 16px 15px 14px; align-items: flex-start; flex-direction: column; gap: 12px; }
   .board-heading h1 { font-size: 1.35rem; }
