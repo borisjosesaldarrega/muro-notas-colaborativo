@@ -219,6 +219,36 @@
     });
   });
 
+  $$('[data-password-target]').forEach((toggle) => {
+    toggle.addEventListener('click', () => {
+      const input = $(`#${toggle.dataset.passwordTarget}`);
+      if (!input) return;
+      const visible = input.type === 'text';
+      input.type = visible ? 'password' : 'text';
+      toggle.setAttribute('aria-pressed', String(!visible));
+      toggle.setAttribute('aria-label', visible ? 'Mostrar contraseña' : 'Ocultar contraseña');
+      toggle.classList.toggle('is-visible', !visible);
+      input.focus();
+    });
+  });
+
+  ['loginEmail', 'loginPassword'].forEach((fieldId) => {
+    $(`#${fieldId}`)?.addEventListener('input', () => {
+      setFieldError('loginEmail', '');
+      setFieldError('loginPassword', '');
+    });
+  });
+
+  const registerErrorByField = {
+    registerName: 'registerName',
+    registerEmail: 'registerEmail',
+    registerPassword: 'registerPassword',
+    registerConfirmPassword: 'registerConfirm'
+  };
+  Object.entries(registerErrorByField).forEach(([fieldId, errorId]) => {
+    $(`#${fieldId}`)?.addEventListener('input', () => setFieldError(errorId, ''));
+  });
+
   /* ==========================================
      INICIO DE SESIÓN (SUPERADMIN O USUARIO REGULAR)
      ========================================== */

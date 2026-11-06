@@ -556,6 +556,8 @@ legend { font-weight: 700; margin-bottom: 10px; }
 }
 .code-digit.error {
   border-color: #ef4444;
+  background: #fff7f8;
+  color: #2f2941;
   animation: shake 0.3s;
 }
 
@@ -993,8 +995,40 @@ legend { font-weight: 700; margin-bottom: 10px; }
 }
 input.is-invalid {
   border-color: #ef4444 !important;
-  background-color: #fef2f2 !important;
+  background-color: #fff7f8 !important;
+  color: #2f2941 !important;
+  caret-color: #2f2941;
 }
+.password-input-wrap { position: relative; display: block; min-width: 0; }
+.password-input-wrap input { padding-right: 52px; }
+.password-visibility-button {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  color: #716985;
+  background: transparent;
+  transform: translateY(-50%);
+}
+.password-visibility-button:hover,
+.password-visibility-button:focus-visible { color: #5c42d2; background: #eeeaff; outline: none; }
+.password-visibility-button svg { width: 21px; height: 21px; fill: currentColor; }
+.password-eye-hide { display: none; }
+.password-visibility-button.is-visible .password-eye-show { display: none; }
+.password-visibility-button.is-visible .password-eye-hide { display: block; }
+html[data-theme="dark"] input.is-invalid { background-color: #3d293c !important; color: #fff !important; caret-color: #fff; }
+html[data-theme="dark"] .code-digit.error { background: #3d293c; color: #fff; }
+html[data-theme="dark"] .invitation-accept-bar input.invitation-invalid { color: #fff; background: #3d293c; border-color: #ff718c; }
+html[data-theme="dark"] .invitation-accept-bar .invitation-error { color: #ffd7df; background: #48283a; border-color: #7d4057; }
+html[data-theme="dark"] .password-visibility-button { color: #c9c1da; }
+html[data-theme="dark"] .password-visibility-button:hover,
+html[data-theme="dark"] .password-visibility-button:focus-visible { color: #fff; background: #493d61; }
 
 /* Miembros de la sala en modal de invitación */
 .invite-members-list {
@@ -1606,6 +1640,41 @@ button .ui-icon { margin-right: 7px; }
 }
 .invitation-accept-bar::before { content: ''; position: absolute; top: -8px; left: 42px; width: 52px; height: 13px; border-radius: 3px; background: rgba(218,208,255,.78); transform: rotate(-2deg); }
 .invitation-accept-bar input { height: 46px; border-radius: 13px; border: 1px solid #ded9ed; padding: 0 14px; background: #fbfaff; }
+.invitation-accept-bar input.invitation-invalid {
+  border-color: #dc3f5c;
+  background: #fff7f8;
+  box-shadow: 0 0 0 3px rgba(220,63,92,.1);
+}
+.invitation-accept-bar .invitation-error {
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 5px;
+  padding: 6px 9px 6px 28px;
+  position: relative;
+  border: 1px solid #ffc2ce;
+  border-radius: 10px;
+  color: #a91f3b;
+  background: #fff0f3;
+  font-size: .72rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+.invitation-accept-bar .invitation-error::before {
+  content: '!';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #c92f4b;
+  font-size: .61rem;
+  font-weight: 900;
+  transform: translateY(-50%);
+}
 .btn-join-code { height: 46px; display: inline-flex; align-items: center; justify-content: center; border-radius: 14px; color: #fff; background: #6658f5; }
 .walls-grid { grid-template-columns: repeat(auto-fill, minmax(285px, 330px)); align-items: start; }
 .wall-card {
@@ -1917,14 +1986,54 @@ html[data-theme="dark"] .admin-guide-grid p { color: #c1bacf; }
 .auth-brand {
   isolation: isolate;
   background:
+    radial-gradient(circle at 75% 18%, rgba(255,255,255,.12) 0 3px, transparent 4px),
+    radial-gradient(circle at 80% 23%, rgba(255,255,255,.08) 0 2px, transparent 3px),
     radial-gradient(circle at 18% 14%, rgba(171,144,255,.62), transparent 29%),
     radial-gradient(circle at 84% 78%, rgba(130,92,241,.72), transparent 31%),
     linear-gradient(145deg, #392170, #6038cf 58%, #7b4ce7);
+}
+.auth-brand::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  width: 210px;
+  height: 118px;
+  top: 12%;
+  right: 8%;
+  border: 2px dashed rgba(255,255,255,.16);
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  transform: rotate(-12deg);
+  pointer-events: none;
 }
 .auth-brand > * { position: relative; z-index: 2; }
 .auth-brand .eyebrow { color: #d8ccff; }
 .auth-brand h1 { text-shadow: 0 5px 0 rgba(42,22,104,.12); }
 .auth-brand .brand-mark { width: 48px; height: 48px; border-radius: 15px 15px 18px 13px; box-shadow: 7px 8px 0 rgba(42,22,104,.18); }
+.demo-notes::before {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 18%;
+  top: 52%;
+  height: 2px;
+  border-top: 2px dashed rgba(255,255,255,.2);
+  transform: rotate(-3deg);
+}
+.demo-notes::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  right: 12%;
+  top: 14%;
+  border-radius: 5px 2px 5px 2px;
+  background: rgba(255,255,255,.82);
+  box-shadow: 24px 31px 0 -4px rgba(255,229,143,.9), -9px 55px 0 -5px rgba(174,235,216,.9);
+  transform: rotate(45deg);
+  animation: idea-spark 3.2s ease-in-out infinite;
+}
 .demo-notes span { display: grid; place-items: center; border: 2px solid rgba(255,255,255,.45); }
 .demo-notes span:nth-child(1) { transform: rotate(-5deg) translateY(5px); }
 .demo-notes span:nth-child(2) { transform: rotate(4deg) translateY(13px); }
@@ -2022,10 +2131,29 @@ html[data-theme="dark"] .username-unique-hint { color: #c4b8ff !important; }
 .demo-notes span:nth-child(2) { animation-delay: -.7s; }
 .demo-notes span:nth-child(3) { animation-delay: -1.4s; }
 @keyframes note-bob { 0%,100% { margin-top: 0; } 50% { margin-top: -5px; } }
+@keyframes idea-spark { 0%,100% { opacity: .7; transform: rotate(45deg) scale(.88); } 50% { opacity: 1; transform: rotate(45deg) scale(1.08); } }
+
+/* El editor de muros debe caber dentro del modal, nunca crear una barra lateral. */
+#wallDialog {
+  max-width: calc(100vw - 28px);
+  overflow-x: hidden;
+}
+#wallDialog form {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+#wallDialog label,
+#wallDialog input,
+#wallDialog fieldset,
+#wallDialog .dialog-actions { min-width: 0; max-width: 100%; }
+#wallDialog input { display: block; }
 
 .invitation-accept-bar::after { content: ''; position: absolute; top: -8px; right: 42px; width: 52px; height: 13px; border-radius: 3px; background: rgba(255,218,232,.78); transform: rotate(2deg); }
 
 @media (max-width: 600px) {
+  #wallDialog form { padding: 24px 20px; }
+  #wallDialog .dialog-actions { flex-wrap: wrap; }
   .wall-card { min-height: 250px; }
   .wall-card-menu-popover { right: -2px; }
   .invitation-accept-bar::after { right: 28px; }
