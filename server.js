@@ -824,6 +824,23 @@ function createMuroServer(options = {}) {
       io.to(`wall:${wall.id}`).emit('members:changed', { wallId: wall.id, userId: payload.userId, removed: true, members });
     });
 
+    socket.on('wall:member:leave', async (payload = {}, acknowledge = () => {}) => {
+      const user = requireUser(socket, acknowledge);
+      const wall = findWall(payload.wallId);
+      if (!user || !wall) return user && fail(acknowledge, 'El muro no existe.');
+      const role = membershipRole(wall, user);
+      if (role === 'propietario') return fail(acknowledge, 'La persona propietaria no puede salir de su propio muro. Puede eliminarlo desde sus opciones.');
+      if (!['editor', 'lector'].includes(role)) return fail(acknowledge, 'No tienes una membresía que abandonar en este muro.');
+      if (storage.schemaReady) {
+        try { await store.leaveWall(wall.id, socket.data.accessToken); } catch { return fail(acknowledge, 'No se pudo salir del muro. Inténtalo nuevamente.'); }
+      }
+      delete wall.members[user.id];
+      leaveCurrentWall(socket);
+      const members = wallMembers(wall);
+      acknowledge({ ok: true });
+      io.to(`wall:${wall.id}`).emit('members:changed', { wallId: wall.id, userId: user.id, removed: true, members });
+    });
+
     socket.on('note:create', async (payload = {}, acknowledge = () => {}) => {
       const user = requireUser(socket, acknowledge);
       const wall = findWall(socket.data.wallId);

@@ -119,9 +119,11 @@ window.MuroBoard = (function () {
     const canManage = role === 'propietario';
     const newNote = $('#newNoteButton');
     const invite = $('#inviteButton');
+    const leaveWall = $('#leaveWallBtn');
     const deleteWall = $('#deleteWallBtn');
     if (newNote) { newNote.disabled = !canEdit; newNote.title = canEdit ? 'Crear una nota' : 'Tu permiso es de solo lectura'; }
     if (invite) invite.classList.toggle('hidden', !canManage);
+    if (leaveWall) leaveWall.classList.toggle('hidden', !['editor', 'lector'].includes(role));
     if (deleteWall) deleteWall.classList.toggle('hidden', !canManage);
     state.notes.forEach(renderNote);
   }
@@ -663,6 +665,23 @@ window.MuroBoard = (function () {
       $('#wallsView')?.classList.remove('hidden');
       fetchWalls();
     }
+  });
+
+  $('#leaveWallBtn')?.addEventListener('click', async () => {
+    const wall = state.currentWall;
+    if (!wall || !['editor', 'lector'].includes(wall.role)) return;
+    const accepted = await window.MuroUI.confirmAction({
+      title: 'Salir del muro',
+      message: `Dejarás de tener acceso a “${wall.name}”. Para volver necesitarás usar otra invitación.`,
+      confirmText: 'Salir del muro',
+      tone: 'danger'
+    });
+    if (!accepted) return;
+    const response = await emitWithTimeout('wall:member:leave', { wallId: wall.id });
+    if (!response?.ok) return toast(response?.error || 'No se pudo salir del muro.', 'error');
+    state.walls = state.walls.filter((item) => item.id !== wall.id);
+    showWallsView(true);
+    toast('Saliste del muro.', 'success');
   });
 
   // Modal Nueva Nota
