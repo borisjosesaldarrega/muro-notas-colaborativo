@@ -238,9 +238,10 @@ function createMuroServer(options = {}) {
   function establishSession(socket, user, suppliedSession = null) {
     const session = typeof suppliedSession === 'string' ? { token: suppliedSession } : (suppliedSession || {});
     const token = session.token || crypto.randomUUID();
+    if (socket.data.userId && socket.data.userId !== user.id) leaveCurrentWall(socket);
     sessions.set(token, user.id);
     socket.data.userId = user.id;
-    socket.data.accessToken = session.token || '';
+    socket.data.accessToken = token;
     socket.data.refreshToken = session.refreshToken || '';
     socket.data.expiresAt = Number(session.expiresAt || 0);
     return { token, refreshToken: session.refreshToken || '', expiresAt: socket.data.expiresAt, user: publicUser(user) };
@@ -250,13 +251,25 @@ function createMuroServer(options = {}) {
     if (!storage.schemaReady || !socket.data.userId || !socket.data.refreshToken) return;
     if (socket.data.expiresAt && socket.data.expiresAt > Date.now() + 60_000) return;
     const previousToken = socket.data.accessToken;
-    const refreshed = await store.refreshSession(socket.data.refreshToken);
+    const previousRefreshToken = socket.data.refreshToken;
+    const previousUserId = socket.data.userId;
+    const previousEpoch = socket.data.authEpoch || 0;
+    let refreshed;
+    try { refreshed = await store.refreshSession(previousRefreshToken); }
+    catch (error) {
+      // Una renovación de la cuenta anterior no puede invalidar la cuenta nueva.
+      if ((socket.data.authEpoch || 0) !== previousEpoch || socket.data.userId !== previousUserId || socket.data.refreshToken !== previousRefreshToken) return;
+      throw error;
+    }
+    if ((socket.data.authEpoch || 0) !== previousEpoch || socket.data.userId !== previousUserId || socket.data.refreshToken !== previousRefreshToken) return;
+    if (refreshed.user?.id !== previousUserId) throw new Error('auth_identity_mismatch');
     if (previousToken) sessions.delete(previousToken);
     sessions.set(refreshed.token, refreshed.user.id);
     socket.data.accessToken = refreshed.token;
     socket.data.refreshToken = refreshed.refreshToken;
     socket.data.expiresAt = refreshed.expiresAt;
     socket.emit('auth:token-refreshed', {
+      userId: previousUserId,
       token: refreshed.token,
       refreshToken: refreshed.refreshToken,
       expiresAt: refreshed.expiresAt
@@ -299,12 +312,15 @@ function createMuroServer(options = {}) {
   }
 
   io.on('connection', (socket) => {
-    socket.use(async (_packet, next) => {
+    socket.data.authEpoch = 0;
+    socket.use(async (packet, next) => {
       try {
         await ready;
-        await refreshSocketSession(socket);
+        if (!['auth:logout', 'auth:login', 'auth:restore'].includes(packet[0])) await refreshSocketSession(socket);
         next();
       } catch {
+        socket.data.authEpoch += 1;
+        leaveCurrentWall(socket);
         socket.data.userId = null;
         socket.data.accessToken = '';
         socket.data.refreshToken = '';
@@ -395,10 +411,12 @@ function createMuroServer(options = {}) {
     });
 
     socket.on('auth:login', async (payload = {}, acknowledge = () => {}) => {
+      const authEpoch = ++socket.data.authEpoch;
       const email = validEmail(payload.email);
       if (storage.schemaReady) {
         try {
           const session = await store.login({ email, password: String(payload.password ?? '') });
+          if (socket.data.authEpoch !== authEpoch) return fail(acknowledge, 'La solicitud fue cancelada.');
           const index = users.findIndex((item) => item.id === session.user.id);
           if (index >= 0) users[index] = session.user; else users.push(session.user);
           return acknowledge({ ok: true, ...establishSession(socket, session.user, session) });
@@ -408,11 +426,13 @@ function createMuroServer(options = {}) {
         }
       }
       const user = users.find((item) => item.email === email && item.password === String(payload.password ?? ''));
+      if (socket.data.authEpoch !== authEpoch) return fail(acknowledge, 'La solicitud fue cancelada.');
       if (!user) return fail(acknowledge, 'Correo o contraseña incorrectos.');
       return acknowledge({ ok: true, ...establishSession(socket, user) });
     });
 
     socket.on('auth:restore', async (payload = {}, acknowledge = () => {}) => {
+      const authEpoch = ++socket.data.authEpoch;
       const token = cleanText(payload.token, 4096);
       const refreshToken = cleanText(payload.refreshToken, 4096);
       if (!token && !refreshToken) {
@@ -426,6 +446,7 @@ function createMuroServer(options = {}) {
       if (storage.schemaReady) {
         try {
           const session = await store.restore(token, refreshToken);
+          if (socket.data.authEpoch !== authEpoch) return fail(acknowledge, 'La solicitud fue cancelada.');
           const index = users.findIndex((item) => item.id === session.user.id);
           if (index >= 0) users[index] = session.user; else users.push(session.user);
           return acknowledge({ ok: true, ...establishSession(socket, session.user, session) });
@@ -435,18 +456,40 @@ function createMuroServer(options = {}) {
         }
       }
       const user = users.find((item) => item.id === sessions.get(token));
+      if (socket.data.authEpoch !== authEpoch) return fail(acknowledge, 'La solicitud fue cancelada.');
       if (!user) return fail(acknowledge, 'La sesión expiró al reiniciarse el servidor.');
       socket.data.userId = user.id;
+      socket.data.accessToken = token;
       return acknowledge({ ok: true, token, user: publicUser(user) });
     });
 
-    socket.on('auth:logout', (payload = {}, acknowledge = () => {}) => {
-      sessions.delete(cleanText(payload.token, 4096));
+    socket.on('auth:logout', async (_payload = {}, acknowledge = () => {}) => {
+      // Nunca aceptar un token provisto por el navegador para revocar a otro usuario.
+      const token = socket.data.accessToken || '';
+      const userId = socket.data.userId;
+      ++socket.data.authEpoch;
+      if (token) sessions.delete(token);
+      // Revocar también sockets de otras pestañas que comparten ESTE JWT.
+      // No tocar sockets de otras cuentas ni de otras sesiones.
+      for (const client of io.sockets.sockets.values()) {
+        if (client === socket || !token || client.data.accessToken !== token) continue;
+        client.data.authEpoch = (client.data.authEpoch || 0) + 1;
+        leaveCurrentWall(client);
+        client.data.userId = null;
+        client.data.accessToken = '';
+        client.data.refreshToken = '';
+        client.data.expiresAt = 0;
+        client.emit('auth:expired');
+      }
       leaveCurrentWall(socket);
       socket.data.userId = null;
       socket.data.accessToken = '';
       socket.data.refreshToken = '';
       socket.data.expiresAt = 0;
+      if (storage.schemaReady && userId && token) {
+        try { await store.logout(token); }
+        catch { return fail(acknowledge, 'Se cerró la sesión local, pero no se confirmó su revocación.'); }
+      }
       acknowledge({ ok: true });
     });
 

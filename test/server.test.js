@@ -69,6 +69,13 @@ test('registra, restaura y valida cuentas y roles en el servidor', async () => {
   assert.equal(restore.user.id, first.user.id);
   assert.equal((await ack(restored, 'auth:logout', { token: first.token })).ok, true);
   assert.equal((await ack(await connect(), 'auth:restore', { token: first.token })).ok, false);
+  // La misma credencial se revoco para todas las conexiones que la compartian.
+  assert.equal((await ack(admin, 'walls:list')).ok, false);
+  // La cuenta de otra persona debe conservar su sesion independiente.
+  assert.equal((await ack(member, 'walls:list')).ok, true);
+  // Para las pruebas siguientes, el administrador inicia una sesion nueva.
+  const adminLoginNuevo = await ack(admin, 'auth:login', { email: 'saldavargasboris@gmail.com', password: 'clave12345' });
+  assert.equal(adminLoginNuevo.ok, true);
 });
 
 test('actualiza el correo solo después de verificar la contraseña actual', async () => {

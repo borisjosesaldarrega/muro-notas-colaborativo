@@ -110,6 +110,7 @@
   let currentUser = null;
   let authGeneration = 0;
   let restoreInFlight = false;
+  let logoutPending = false;
   const sameIdentity = (user) => Boolean(user?.id && currentUser?.id === user.id);
   let themeSaveSequence = 0;
   let cachedAdminUsers = [];
@@ -158,6 +159,7 @@
   }
 
   function storeSessionTokens(token = '', refreshToken = '', expiresAt = 0) {
+    if (logoutPending) return;
     if (token) localStorage.setItem(TOKEN_KEY, token);
     if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
     if (expiresAt) localStorage.setItem(EXPIRES_AT_KEY, String(expiresAt));
@@ -998,15 +1000,14 @@
 
   $('#closePanel')?.addEventListener('click', () => $('#sidePanel')?.classList.remove('open'));
   $('#logoutButton')?.addEventListener('click', async () => {
+    if (logoutPending) return;
+    logoutPending = true;
     const socket = window.MuroBoard?.getSocket();
     const button = $('#logoutButton');
     if (button) { button.disabled = true; button.classList.add('is-loading'); }
-    const result = socket ? await emitAsync(socket, 'auth:logout', { token: localStorage.getItem(TOKEN_KEY) || '' }) : { ok: true };
-    if (!result?.ok) {
-      if (button) { button.disabled = false; button.classList.remove('is-loading'); }
-      return toast(result?.error || 'No se pudo cerrar la sesión. Inténtalo nuevamente.', 'error');
-    }
+    // La invalidación local debe suceder ANTES de esperar la red.
     authGeneration += 1;
+    restoreInFlight = false;
     clearStoredSession();
     currentUser = null;
     window.MuroBoard?.resetSession?.();
@@ -1014,8 +1015,15 @@
     history.replaceState(null, '', `${location.pathname}${location.search}`);
     $('#sidePanel')?.classList.remove('open');
     showAuth('login');
+    const result = socket ? await emitAsync(socket, 'auth:logout', {}) : { ok: false };
+    // Ningún evento retrasado puede repoblar el almacenamiento.
+    clearStoredSession();
+    if (!result?.ok) {
+      socket?.disconnect?.();
+      toast('Sesión local cerrada. No se confirmó la salida del servidor; abre una pestaña nueva para entrar.', 'error');
+    } else toast('Sesión cerrada.');
     if (button) { button.disabled = false; button.classList.remove('is-loading'); }
-    toast('Sesión cerrada.');
+    logoutPending = false;
   });
 
   // Escuchar cambios en snapshot de administrador en tiempo real desde el Backend
@@ -1028,9 +1036,11 @@
       }
     });
     boardSocket.on('auth:token-refreshed', (session = {}) => {
+      if (logoutPending || !currentUser?.id || session.userId !== currentUser.id) return;
       storeSessionTokens(session.token, session.refreshToken, session.expiresAt);
     });
     boardSocket.on('auth:expired', () => {
+      if (logoutPending || !currentUser?.id) return;
       authGeneration += 1;
       clearStoredSession();
       currentUser = null;
@@ -1039,7 +1049,7 @@
       toast('Tu sesión venció. Inicia sesión nuevamente.', 'error');
     });
     boardSocket.on('connect', () => {
-      if (!currentUser || restoreInFlight) return;
+      if (logoutPending || !currentUser || restoreInFlight) return;
       restoreInFlight = true;
       const requestGeneration = authGeneration;
       const expectedUserId = currentUser.id;
@@ -1049,7 +1059,7 @@
       const wallWasOpen = !$('#appView')?.classList.contains('hidden');
       boardSocket.emit('auth:restore', { token, refreshToken }, (res) => {
         restoreInFlight = false;
-        if (requestGeneration !== authGeneration || !res?.ok || res.user?.id !== expectedUserId) return;
+        if (logoutPending || requestGeneration !== authGeneration || !res?.ok || res.user?.id !== expectedUserId) return;
         currentUser = res.user;
         localStorage.setItem(SESSION_KEY, JSON.stringify(res.user));
         storeSessionTokens(res.token, res.refreshToken, res.expiresAt);
@@ -1069,7 +1079,7 @@
   if (sessionSocket) {
     const requestGeneration = authGeneration;
     sessionSocket.emit('auth:restore', { token: savedToken, refreshToken: savedRefreshToken }, (res) => {
-      if (requestGeneration !== authGeneration) return;
+      if (logoutPending || requestGeneration !== authGeneration) return;
       if (res?.ok && res.user?.id) enterApp(res.user, res.token, res.refreshToken, res.expiresAt);
       else {
         clearStoredSession();

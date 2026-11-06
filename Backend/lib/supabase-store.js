@@ -204,6 +204,14 @@ class SupabaseStore {
     return this.sessionResult(data.session, data.user.id);
   }
 
+  // Revoca únicamente la sesión del JWT de la conexión actual.
+  // El servicio administrativo verifica la identidad en Supabase Auth.
+  async logout(accessToken) {
+    if (!accessToken || !this.admin?.auth?.admin) throw new Error('auth_logout_unavailable');
+    const { error } = await this.admin.auth.admin.signOut(accessToken, 'local');
+    throwIf(error, 'auth_logout');
+  }
+
   async recover(email, redirectTo) {
     const { error } = await this.isolatedAuth().resetPasswordForEmail(email, { redirectTo });
     throwIf(error, 'auth_recover');
@@ -216,18 +224,11 @@ class SupabaseStore {
     return this.sessionResult(data.session, data.user?.id);
   }
 
-  async restore(token, refreshToken = '') {
-    // Sin credenciales explícitas, jamás aceptar la identidad de otro usuario.
-    if (!token && !refreshToken) throw new Error('auth_session_missing');
-    if (!token) return this.refreshSession(refreshToken);
-    const { data, error } = await this.isolatedAuth().getUser(token);
-    if (error || !data.user?.id) return this.refreshSession(refreshToken);
-    return {
-      token,
-      refreshToken,
-      expiresAt: refreshToken ? Date.now() + 5 * 60 * 1000 : 0,
-      user: await this.getUser(data.user.id)
-    };
+  async restore(_token, refreshToken = '') {
+    // getUser(JWT) no prueba que esa sesión siga activa después de signOut.
+    // La rotación del refresh token verifica contra Supabase la sesión vigente.
+    if (!refreshToken) throw new Error('auth_refresh_missing');
+    return this.refreshSession(refreshToken);
   }
 
   async changePassword(user, currentPassword, newPassword) {
